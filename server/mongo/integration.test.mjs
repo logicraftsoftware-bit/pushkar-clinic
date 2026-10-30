@@ -32,11 +32,21 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
   });
   const modules=await request('/admin/modules','GET',null,token);
   assert.equal(modules.status,200);assert.equal(modules.data.length,8);
-  const plan=await request('/admin/plans','POST',{name:'Synthetic Plan',code:'synthetic',description:'Test only',monthlyPrice:100,yearlyPrice:1000,trialDays:14,maxBranches:2,maxUsers:10,maxDoctors:5,storageLimitGb:1,aiUsageLimit:0,moduleIds:[modules.data[0].id],status:'active'},token);
+  const plan=await request('/admin/plans','POST',{name:'Synthetic Plan',code:'synthetic',description:'Test only',monthlyPrice:100,yearlyPrice:1000,trialDays:14,maxBranches:2,maxUsers:10,maxDoctors:5,storageLimitGb:1,aiUsageLimit:0,moduleIds:modules.data.map(row=>row.id),status:'active'},token);
   assert.equal(plan.status,201,JSON.stringify(plan.data));
   const input={name:'Synthetic Clinic',code:'SYNTHETIC',hospitalType:'Clinic',registrationNumber:'TEST-ONLY',email:'clinic@example.invalid',phone:'9999999999',emergencyPhone:'9999999999',address:'Synthetic Road',city:'Test City',state:'Test State',pinCode:'100001',country:'India',branchName:'Main',planId:plan.data.id,subscriptionStartDate:'2026-10-31',billingCycle:'monthly',trialDays:14,status:'active',adminName:'Synthetic Admin',adminEmail:'admin@example.invalid',adminPhone:'9999999998',password};
   const hospital=await request('/admin/hospitals','POST',input,token);
   assert.equal(hospital.status,201,JSON.stringify(hospital.data));
+  await t.test('Super Admin lists and dashboards match the existing frontend response shapes',async()=>{
+    const list=await request('/admin/hospitals?search=SYNTHETIC&page=1&limit=1','GET',null,token);
+    assert.equal(list.status,200,JSON.stringify(list.data));assert.equal(list.data.total,1);assert.equal(list.data.data.length,1);assert.equal(list.data.data[0].branches,1);
+    const detail=await request(`/admin/hospitals/${hospital.data.id}`,'GET',null,token);
+    assert.equal(detail.status,200);assert.equal(detail.data.admin_email,input.adminEmail);assert.equal(detail.data.password_hash,undefined);
+    const dashboard=await request('/admin/dashboard','GET',null,token);assert.equal(dashboard.status,200,JSON.stringify(dashboard.data));assert.equal(dashboard.data.hospitals.active,1);
+    assert.equal((await request('/admin/subscriptions','GET',null,token)).data.length,1);
+    assert.equal((await request('/admin/reports','GET',null,token)).status,200);
+    assert.equal((await request('/admin/monitoring','GET',null,token)).status,200);
+  });
   await t.test('provisioning creates one tenant, branch, user and subscription without leaking credentials',async()=>{
     assert.equal(hospital.data.password,undefined);assert.equal(hospital.data.password_hash,undefined);
     for(const collection of ['branches','users','subscriptions'])assert.equal(await db.collection(collection).countDocuments({tenant_id:hospital.data.id}),1);
@@ -210,6 +220,13 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const receipts=await request('/operations/finance/payments','GET',null,staffLogin.data.token);
     assert.equal(receipts.status,200);assert.equal(receipts.data.reduce((sum,row)=>sum+row.amount,0),210);
     assert.equal((await request('/hospital-admin/settings/constructor','PUT',{value:'bad'},staffLogin.data.token)).status,400);
+  });
+  await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
+    assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
+    assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
+    assert.equal((await request('/admin/dashboard','GET',null,token)).status,200);
+    assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:false},token)).status,200);
+    assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,200);
   });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);

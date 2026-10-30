@@ -6,16 +6,22 @@ This is an in-progress native MongoDB conversion, not a completed production rel
 
 `server/mongo/` contains a separate MongoDB backend with connection pooling, index initialization, a transaction helper, tenant-scoped repositories, scrypt password hashing, private first-administrator bootstrap, persistent login limits, revocable sessions, and native login/password-change/logout endpoints. Session validation checks current user activity, expiration, hospital status and session version. No SQL compatibility shim is used.
 
-The native backend now includes authentication, plan and clinic provisioning, patient registration/detail editing/search/deletion, branch-scoped access, clinic branches/departments/wards/rooms/beds, staff login provisioning, doctor schedules, appointment slot lookup/booking, and transactional check-in/receipt posting. Duplicate patient overrides are audited; UHIDs are allocated from transactional counters. Unconverted endpoints still return HTTP 501. The full ERP is not ready to deploy.
+The native backend now includes authentication, plan/clinic provisioning, patient registration/editing/search/deletion, branch-scoped permissions, clinic branches/departments/wards/rooms/beds, staff accounts, doctor schedules, appointment queues/booking/check-in, IPD admission/bed transfer with bed-rate history, operational settings and receipt views. Laboratory catalog editing, branch-priced order billing, retry-safe payment collection, barcode generation and sample collection are written. Super Admin dashboard, clinic list/detail/edit/archive, subscriptions, module controls, settings and reports are also written. Unconverted routes explicitly fail rather than returning fake success. The full ERP is not ready to deploy.
+
+## Cloud verification status
+
+Both jobs passed for commit `611a7bb`: [successful cloud validation](https://github.com/logicraftsoftware-bit/pushkar-clinic/actions/runs/41114440759). That run verified the existing frontend/backend build and legacy tests, plus the native MongoDB authentication, patients, staff/scheduling, concurrent appointments/check-in, IPD deposits, duplicate-admission rollback and bed transfer.
+
+The newer laboratory/settings and Super Admin extensions have syntax checks and dependency-free tests, but still need a successful cloud integration run. GitHub requested device sign-in again before their push could complete. No production Atlas connection or data was used.
 
 ## Still required before production
 
-- Remaining Super Admin dashboard/reports, settings/module management, clinic editing, master deletion, custom roles and full staff frontend parity.
+- Cloud validation and frontend review of the newly written Super Admin/settings features; complete master deletion, custom roles and staff screen parity.
 - RBAC permissions, branch restrictions, access event streams and audit coverage for business operations.
 - Complete the remaining patient/frontend compatibility checks and accounting integrations.
-- Appointment editing/search parity, IPD admission/transfer/discharge, nursing, doctor consultation, OT and dietary workflows.
-- Invoices, payments, refunds, accounting, referral wallets and inventory transactions.
-- Laboratory catalogs, order/sample/result/verification workflows and report sharing.
+- Appointment editing, IPD admission edits and discharge clearance, nursing, doctor consultation, OT and dietary workflows.
+- General invoices/payments, cancellation approvals/refunds, accounting dashboards, referral wallets and inventory transactions. OPD check-in, IPD admission collections and lab receipt posting are implemented, pending the verification boundaries above.
+- Laboratory order edits, result entry, technician/doctor verification, QC, accreditation and report release/sharing. Catalog/order billing/payment/sample collection code must complete cloud validation before use.
 - Pharmacy, purchasing, HR, insurance and reporting.
 - Full route compatibility and tenant-isolation tests against a disposable MongoDB database.
 - Hostinger startup switch only after those checks pass.
@@ -42,4 +48,4 @@ The development command `npm --prefix server run start:mongo` starts only the in
 
 ## Verification boundaries
 
-Security helper tests run with Node's built-in test runner and require no database or dependency installation: `node --test server/mongo/tests/*.test.mjs`. GitHub CI also runs them. Syntax checks do not establish end-to-end compatibility. GitHub CI is configured to run integration tests against a disposable replica set for authentication, atomic provisioning and rollback, patient duplicate/tenant isolation, staff credential storage, concurrent appointment booking/check-in, password revocation and suspended-clinic access. This integration suite has not yet run. Live connection testing still requires private hosting configuration; no live credentials or database writes were used during this implementation.
+Security helper tests run with Node's built-in test runner and require no database or dependency installation: `node --test server/mongo/tests/*.test.mjs`. GitHub CI also runs them. Syntax checks do not establish end-to-end compatibility. GitHub CI runs integration tests against a disposable MongoDB process on an Ubuntu runner, initialized as a replica set for authentication, atomic provisioning and rollback, patient duplicate/tenant isolation, staff credential storage, concurrent appointment booking/check-in, password revocation and suspended-clinic access. The baseline integration suite passed for the commit linked above; later extensions still require validation. Live connection testing requires private hosting configuration; no live credentials or database writes were used during this implementation.

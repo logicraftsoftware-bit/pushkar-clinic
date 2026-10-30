@@ -6,6 +6,7 @@ import { hashPassword, publicRecord } from './security.mjs';
 import { planInput, hospitalInput } from './provisioning-schema.mjs';
 import { subscriptionEnd } from './subscription-date.mjs';
 import { initializeRoles } from './access.mjs';
+import {escapeSearch} from './search.mjs';
 
 const router = Router();
 const planFields = {
@@ -19,7 +20,9 @@ async function planDocument(input, session) {
   return Object.fromEntries(Object.entries(planFields).map(([from,to]) => [to, from === 'code' ? input[from].toLowerCase() : input[from]]));
 }
 router.get('/modules', async (_request,response) => {
-  response.json(await db.collection('platform_modules').find({}, { projection: { _id:0 } }).sort({ name:1 }).toArray());
+  const rows=await db.collection('platform_modules').find({}, { projection: { _id:0 } }).sort({ name:1 }).toArray();
+  for(const row of rows)row.enabled_hospitals=await db.collection('hospitals').countDocuments({deleted_at:null,modules:row.code});
+  response.json(rows);
 });
 router.get('/plans', async (_request,response) => {
   const plans = await db.collection('subscription_plans').find({}, { projection:{_id:0} }).sort({created_at:-1}).toArray();
@@ -52,19 +55,26 @@ router.put('/plans/:id', async (request,response) => {
 router.get('/hospitals', async (request,response) => {
   const search=z.string().max(150).default('').parse(request.query.search);
   const filter={deleted_at:null};
-  if(search)filter.name={$regex:search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'};
-  const rows=await db.collection('hospitals').find(filter,{projection:{_id:0}}).sort({created_at:-1}).limit(500).toArray();
+  if(search){const pattern=escapeSearch(search);filter.$or=[{name:{$regex:pattern,$options:'i'}},{code:{$regex:pattern,$options:'i'}}];}
+  if(request.query.status)filter.status=z.enum(['active','trial','suspended','inactive']).parse(request.query.status);
+  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),limit=z.coerce.number().int().min(1).max(100).default(10).parse(request.query.limit);
+  const rows=await db.collection('hospitals').find(filter,{projection:{_id:0}}).sort({created_at:-1}).skip((page-1)*limit).limit(limit).toArray();
   for(const row of rows){
     row.branch_count=await db.collection('branches').countDocuments({tenant_id:row.id});
     row.user_count=await db.collection('users').countDocuments({tenant_id:row.id});
+    row.branches=row.branch_count;row.users=row.user_count;
+    const subscription=await db.collection('subscriptions').findOne({tenant_id:row.id},{sort:{created_at:-1}});
+    row.plan_code=subscription?.plan_code??null;row.subscription_status=subscription?.status??null;row.expires_at=subscription?.expires_at??null;
   }
-  response.json(rows);
+  response.json({data:rows,page,limit,total:await db.collection('hospitals').countDocuments(filter)});
 });
 router.get('/hospitals/:id', async (request,response) => {
   const id=z.string().uuid().parse(request.params.id);
   const row=await db.collection('hospitals').findOne({id,deleted_at:null},{projection:{_id:0}});
   if(!row)return response.status(404).json({error:'Hospital not found'});
-  response.json({...row,branches:await db.collection('branches').find({tenant_id:id},{projection:{_id:0}}).toArray()});
+  const branches=await db.collection('branches').find({tenant_id:id},{projection:{_id:0}}).sort({created_at:1}).toArray();
+  const subscription=await db.collection('subscriptions').findOne({tenant_id:id},{sort:{created_at:-1}}),administrator=await db.collection('users').findOne({tenant_id:id,role_codes:'HOSPITAL_ADMIN'});
+  response.json({...row,branches,branch_id:branches[0]?.id??null,branch_name:branches[0]?.name??'',subscription_id:subscription?.id??null,plan_id:subscription?.plan_id??null,subscription_start_date:subscription?.starts_at??null,billing_cycle:subscription?.billing_cycle??'monthly',trial_days:subscription?.trial_days??0,subscription_status:subscription?.status??null,admin_id:administrator?.id??null,admin_name:administrator?`${administrator.first_name} ${administrator.last_name}`:'',admin_email:administrator?.email??'',admin_phone:administrator?.phone??''});
 });
 router.post('/hospitals', async (request,response) => {
   const body=hospitalInput.extend({password:z.string().min(12).max(200)}).parse(request.body);

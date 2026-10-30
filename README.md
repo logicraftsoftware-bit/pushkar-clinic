@@ -1,4 +1,4 @@
-# Careframe Hospital ERP
+# Pushkar Clinic ERP
 
 > Pushkar Clinic copy: read [HOSTINGER.md](HOSTINGER.md) before deploying. The requested MongoDB conversion is outstanding; this inherited backend still requires PostgreSQL. Previous-client records and VPS workflows have been removed.
 

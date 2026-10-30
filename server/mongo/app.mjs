@@ -16,6 +16,7 @@ import settings from './settings.mjs';
 import finance from './finance.mjs';
 import diagnosticMasters from './diagnostic-masters.mjs';
 import laboratory from './laboratory.mjs';
+import platform from './platform.mjs';
 import { permissionsFor } from './access.mjs';
 
 const app = express();
@@ -27,6 +28,12 @@ app.use((_request, response, next) => { response.set('Cache-Control', 'no-store'
 app.use(async (_request, response, next) => {
   try { await initializeMongo(); next(); }
   catch { response.status(503).json({ code: 'DATABASE_UNAVAILABLE', error: 'Database unavailable. Check the server configuration.' }); }
+});
+app.use(async(request,response,next)=>{
+  if(request.path.startsWith('/api/v1/admin')||['/api/v1/health','/api/v1/branding'].includes(request.path))return next();
+  const setting=await db.collection('platform_settings').findOne({key:'maintenance_mode'});
+  if(setting?.value===true)return response.status(503).json({code:'MAINTENANCE',error:'The clinic service is temporarily under maintenance.'});
+  next();
 });
 
 const loginSchema = z.object({ identifier: z.string().trim().min(3).max(200), password: z.string().min(8).max(200), portal: z.string().min(1).max(40) });
@@ -40,10 +47,13 @@ async function rateLimit(request, response, next) {
   next();
 }
 async function issueSession(account, audience, claims) {
-  const jti = randomUUID(), expires_at = new Date(Date.now() + 8 * 3600000);
+  const setting=await db.collection('platform_settings').findOne({key:'session_timeout_minutes'});
+  const minutes=Number(setting?.value??480);
+  const duration=Number.isInteger(minutes)&&minutes>=5&&minutes<=1440?minutes:480;
+  const jti = randomUUID(), expires_at = new Date(Date.now() + duration * 60000);
   await db.collection('sessions').insertOne({ _id: jti, user_id: account.id, audience, tenant_id: account.tenant_id ?? null, expires_at });
   return jwt.sign({ ...claims, jti, version: account.session_version ?? 0 }, config.JWT_SECRET, {
-    subject: account.id, expiresIn: '8h', issuer: 'careframe-api', audience, algorithm: 'HS256',
+    subject: account.id, expiresIn: duration*60, issuer: 'careframe-api', audience, algorithm: 'HS256',
   });
 }
 function authenticate(audience) {
@@ -107,10 +117,11 @@ app.post('/api/v1/auth/login', rateLimit, async (request, response) => {
   const token = await issueSession(account, 'careframe-portal', { tenantId: account.tenant_id, branchId: account.branch_id, role: account.role, portal });
   const activityId = randomUUID();
   await db.collection('login_activity').insertOne({ id: activityId, tenant_id: account.tenant_id, user_id: account.id, role: account.role, branch_id: account.branch_id, login_status: 'Success', login_time: new Date() });
+  const modules=await db.collection('platform_modules').find({code:{$in:hospital.modules??[]},is_active:true},{projection:{code:1}}).toArray();
   response.json({ token, forcePasswordChange: Boolean(account.force_password_change), loginActivityId: activityId,
     user: { id: account.id, name: `${account.first_name} ${account.last_name}`.trim(), email: account.email, phone: account.phone, role: account.role, portal },
     hospital: { id: hospital.id, name: hospital.name, code: hospital.code, logoUrl: hospital.logo_url ?? '', status: hospital.status, branchId: branch.id, branchName: branch.name, settings: hospital.settings ?? {} },
-    modules: hospital.modules ?? [],
+    modules: modules.map(row=>row.code),
   });
 });
 app.post('/api/v1/auth/change-password', authenticate('careframe-portal'), async (request, response) => {
@@ -136,7 +147,7 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   await db.collection('sessions').deleteOne({ _id: response.locals.claims.jti, user_id: response.locals.account.id });
   response.status(204).end();
 });
-app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning);
+app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
 app.get('/api/v1/access-control/me',authenticate('careframe-portal'),async(_request,response)=>{
   const account=response.locals.account;
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
