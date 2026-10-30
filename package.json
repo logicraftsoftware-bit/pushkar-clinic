@@ -1,0 +1,51 @@
+{
+  "name": "careframe-hospital-erp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "migrate": "tsx server/src/migrate.ts",
+    "migrate:charges": "tsx server/src/seed-hospital-charges.ts",
+    "build": "tsc -b && vite build",
+    "build:hostinger": "npm run build && npm --prefix server ci --include=dev --no-audit --no-fund && npm --prefix server run build",
+    "start": "node hosting.mjs",
+    "test": "tsx --test server/tests/*.test.ts",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.3",
+    "qrcode.react": "^4.2.0",
+    "react": "^18.3.1",
+    "react-barcode": "^1.6.1",
+    "react-datepicker": "^9.1.0",
+    "react-dom": "^18.3.1",
+    "recharts": "^3.1.0",
+    "sweetalert2": "^11.26.25",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.30",
+    "@types/pg": "^8.15.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "eslint": "^9.17.0",
+    "tsx": "^4.20.3",
+    "typescript-eslint": "^8.18.2"
+  }
+}

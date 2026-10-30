@@ -1,0 +1,32 @@
+.fi-payment-breakdown {
+  overflow: hidden;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.fi-payment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid #e5eaf1;
+  color: #7d899b;
+}
+
+.fi-payment-toolbar svg { width: 16px; }
+.fi-payment-toolbar span { margin-left: auto; font-size: 12px; }
+.fi-payment-table { overflow-x: auto; }
+.fi-payment-table table { width: 100%; min-width: 850px; border-collapse: collapse; }
+.fi-payment-table th,
+.fi-payment-table td { padding: 12px 14px; border-bottom: 1px solid #e8ecf2; text-align: left; font-size: 12px; }
+.fi-payment-table th { color: #68768a; font-size: 10px; text-transform: uppercase; }
+.fi-payment-table th:nth-child(5),
+.fi-payment-table td:nth-child(5) { text-align: right; }
+.fi-payment-table td:last-child { width: 120px; text-align: right; }
+.fi-payment-table button { display: inline-flex; align-items: center; gap: 5px; height: 31px; padding: 0 9px; border: 1px solid #d6dfeb; border-radius: 6px; background: #fff; color: #315ebc; }
+.fi-payment-table button svg { width: 14px; }
+.fi-payment-table tfoot td { border: 0; background: #f0f2f5; font-weight: 700; }
+.fi-payment-table tfoot td:first-child { text-align: right; }
+.fi-no-payments { padding: 30px !important; text-align: center !important; color: #8491a3; }

@@ -1,0 +1,216 @@
+.patient-photo-upload > span {
+  display: block;
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.patient-photo-upload > div {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.patient-photo-upload img,
+.patient-photo-upload > div > svg {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+  padding: 5px;
+  background: #edf3ff;
+  color: #4d79dc;
+}
+.patient-photo-upload label {
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid #dce3ec;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4669b3;
+  cursor: pointer;
+  font-size: 10px;
+}
+.patient-photo-upload label svg {
+  width: 14px;
+}
+.patient-photo-upload label input {
+  display: none;
+}
+.patient-photo-upload button {
+  border: 0;
+  background: transparent;
+  color: #cf5661;
+  font-size: 10px;
+}
+.patient-charges {
+  grid-column: 1/-1;
+  border: 1px solid #dce3ec;
+  border-radius: 9px;
+  padding: 13px;
+}
+.patient-charges-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 11px;
+}
+.patient-charges-head strong,
+.patient-charges-head span {
+  display: block;
+}
+.patient-charges-head strong {
+  font: 700 14px Manrope;
+}
+.patient-charges-head span,
+.patient-charges > small {
+  color: #8793a4;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.patient-charges-head button {
+  height: 35px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 11px;
+  background: #4d79dc;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.patient-charges-head button svg {
+  width: 14px;
+}
+.patient-charge-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 34px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 0;
+  border-top: 1px solid #edf0f4;
+}
+.patient-charge-row strong {
+  text-align: right;
+  color: #315ebc;
+  font-size: 12px;
+}
+.patient-charge-row button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ead9dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #cf5661;
+}
+.patient-charge-row button svg {
+  width: 13px;
+}
+.patient-total {
+  margin-top: 10px;
+  padding: 12px 4px 2px;
+  border-top: 1px solid #dce3ec;
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+}
+.patient-total strong {
+  color: #315ebc;
+}
+.pt-clinical-multi {
+  grid-column: 1/-1;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.pt-clinical-multi legend {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #526177;
+}
+.pt-clinical-multi label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.pt-clinical-multi input[type="checkbox"] {
+  width: auto;
+}
+.pt-clinical-multi .pt-other {
+  flex: 1 1 240px;
+}
+.pt-clinical-multi .pt-other input {
+  flex: 1;
+}
+.pt-field-error {
+  display: block;
+  margin-top: 5px;
+  color: #c0394b;
+  font-size: 10px;
+}
+.pt-medications {
+  grid-column: 1 / -1;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  padding: 10px;
+}
+.pt-medications legend {
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #526177;
+}
+.pt-medication-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, 1fr) 34px;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pt-medication-row button {
+  border: 1px solid #ead9dc;
+  border-radius: 7px;
+  background: #fff;
+  color: #cf5661;
+}
+.pt-medication-row button:disabled { opacity: 0.35; }
+.pt-medication-row svg, .pt-add-medication svg { width: 14px; }
+.pt-add-medication {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #b9c9e8;
+  border-radius: 7px;
+  background: #f5f8ff;
+  color: #315ebc;
+  padding: 7px 10px;
+}
+.pt-registration-form input:invalid:not(:placeholder-shown),
+.pt-registration-form select:invalid {
+  border-color: #d84f61;
+  box-shadow: 0 0 0 2px #d84f6114;
+}
+@media (max-width: 700px) {
+  .patient-charge-row {
+    grid-template-columns: minmax(0, 1fr) 80px 34px;
+  }
+  .pt-medication-row { grid-template-columns: 1fr; }
+}
+.pt-uhid-verified{display:block;color:#25835a;font-size:10px;font-weight:700;margin:-5px 0 12px}
+.pt-form-error{margin:12px 20px 0}
+
+.pt-clinical-collapse{grid-column:1/-1;border:1px solid #dce3ec;border-radius:8px;background:#fff;min-width:0}
+.pt-clinical-collapse>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;list-style:none;cursor:pointer;font-size:12px;font-weight:600;color:#526177}
+.pt-clinical-collapse>summary::-webkit-details-marker{display:none}
+.pt-clinical-collapse>summary:focus-visible{outline:2px solid #315ebc;outline-offset:2px}
+.pt-clinical-collapse[open]>summary{border-bottom:1px solid #e5eaf1}
+.pt-clinical-collapse[open]>summary svg{transform:rotate(180deg)}
+.pt-clinical-collapse>fieldset{border:0;margin:0;padding:12px 14px;min-width:0}
+.pt-clinical-collapse>fieldset>legend{display:none}

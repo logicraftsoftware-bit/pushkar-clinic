@@ -1,0 +1,1 @@
+.pi-row-actions{display:flex;gap:6px}.pi-row-actions button{width:31px;height:30px;border:1px solid #dbe3ed;background:#fff;border-radius:6px;color:#49647f}.pi-row-actions .delete{color:#c43f4e;background:#fff5f6}.pi-supplier-modal{width:min(850px,100%)}.pi-supplier-modal .wide{grid-column:span 2}@media(max-width:650px){.pi-supplier-modal .wide{grid-column:auto}}

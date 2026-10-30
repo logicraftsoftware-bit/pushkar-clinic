@@ -1,0 +1,17 @@
+.co-work-head .co-move-ipd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  border-color: #167b55;
+  background: #167b55;
+  color: #fff;
+}
+
+.co-work-head .co-move-ipd svg {
+  width: 15px;
+}
+
+.co-ipd-legacy-breakdown {
+  display: none;
+}

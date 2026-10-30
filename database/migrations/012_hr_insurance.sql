@@ -1,0 +1,1 @@
+-- Insurance claims and HR records initialize idempotently through the API.

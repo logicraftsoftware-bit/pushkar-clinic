@@ -1,0 +1,1 @@
+-- Finance and inventory tables are initialized idempotently by the API for hosted tenants.

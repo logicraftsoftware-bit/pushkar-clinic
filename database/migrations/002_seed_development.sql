@@ -1,0 +1,1 @@
+-- Reserved migration number: inherited client data/setup intentionally removed.

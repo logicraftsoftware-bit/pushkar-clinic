@@ -1,0 +1,1 @@
+-- Documents, login activity, audit logs, and settings initialize through the API.

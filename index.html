@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1425" />
+    <meta name="description" content="Careframe modern hospital operations platform" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <title>Careframe — Hospital Operations</title>
+    <script>
+      (() => {
+        let recovering = false;
+        function recover() {
+          if (recovering) return;
+          recovering = true;
+          const url = new URL(window.location.href);
+          if (!url.searchParams.has("_asset_retry")) {
+            url.searchParams.set("_asset_retry", String(Date.now()));
+            window.location.replace(url.href);
+            return;
+          }
+          function showRecovery() {
+            const root = document.getElementById("root");
+            if (!root) return;
+            const message = document.createElement("p");
+            message.textContent = "The application could not finish loading. Your session is safe. Reload to try again.";
+            const button = document.createElement("button");
+            button.textContent = "Reload application";
+            button.onclick = () => {
+              url.searchParams.set("_asset_retry", String(Date.now()));
+              window.location.replace(url.href);
+            };
+            root.replaceChildren(message, button);
+          }
+          if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showRecovery, { once: true });
+          else showRecovery();
+        }
+        window.addEventListener("error", event => {
+          const target = event.target;
+          if (target && target.tagName === "SCRIPT" && target.type === "module") recover();
+        }, true);
+        window.addEventListener("vite:preloadError", event => {
+          event.preventDefault();
+          recover();
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

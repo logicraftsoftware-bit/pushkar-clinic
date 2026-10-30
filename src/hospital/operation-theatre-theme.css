@@ -1,0 +1,54 @@
+.ot-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ot-head-actions button {
+  min-height: 39px;
+  border: 1px solid #d7e0ed;
+  border-radius: 8px;
+  padding: 0 15px;
+  background: #ffffff;
+  color: #315ebc;
+  font: 600 12px "DM Sans", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(23, 35, 59, 0.04);
+}
+
+.ot-head-actions button:last-child {
+  border-color: #4d73df;
+  background: linear-gradient(135deg, #4b79df, #7354e9);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(77, 115, 223, 0.2);
+}
+
+.ot-head-actions button:hover {
+  border-color: #9eb4dd;
+  background: #f5f8ff;
+}
+
+.ot-head-actions button:last-child:hover {
+  border-color: #426bd0;
+  background: linear-gradient(135deg, #426fd5, #6848dd);
+}
+
+.ot-head-actions button svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 560px) {
+  .ot-head-actions {
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .ot-head-actions button {
+    flex: 1;
+  }
+}

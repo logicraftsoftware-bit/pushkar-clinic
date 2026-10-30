@@ -1,0 +1,21 @@
+.lab-print-panel-back{z-index:200}
+.workspace-view.lab-print-panel{width:min(1400px,96vw);max-height:92vh;overflow:auto}
+.lab-print-panel-body{padding:18px}
+.lab-print-patient,.lab-print-payments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0 0 20px;padding:14px;background:#f7fafc;border:1px solid #dce5ef;border-radius:8px}
+.lab-print-patient dt,.lab-print-payments dt{font-size:11px;color:#64748b;margin-bottom:5px}.lab-print-patient dd,.lab-print-payments dd{margin:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.lab-print-status-table{overflow:auto;border:1px solid #dce5ef;border-radius:8px}
+.lab-print-status-table table{border-collapse:collapse;width:100%;min-width:1000px;font-size:12px}
+.lab-print-status-table th{background:#edf4fa;text-align:left;color:#425777;padding:12px 10px;white-space:nowrap}
+.lab-print-status-table td{padding:12px 10px;border-top:1px solid #e5edf4;vertical-align:middle}
+.lab-print-status-table tbody tr:nth-child(even){background:#f8fbfd}
+.lab-print-status-table small{display:block;color:#64748b;margin-top:4px}
+.lab-print-panel input[type=checkbox]{width:17px;height:17px;accent-color:#4178c8}
+.lab-print-stage{display:inline-flex;align-items:center;gap:6px}.lab-print-stage.yes{color:#16834a}.lab-print-stage.no{color:#d33e4d}.lab-print-stage>span{display:flex}
+.lab-print-panel button,.lab-print-panel-controls>label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.lab-print-status-table button,.lab-print-panel-controls>button,.lab-print-panel-controls>label{padding:9px 12px;border:1px solid #bbd5ed;border-radius:6px;background:#edf7fd;color:#225d97;font:inherit;font-size:12px}
+.lab-print-panel-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:14px 0 20px}.lab-print-panel-controls>span{color:#64748b;font-size:12px;margin-left:auto}
+.lab-print-panel button:disabled{opacity:.5;cursor:default}.lab-print-panel-body>h3{font-size:14px;margin:18px 0 10px}
+.lab-print-confirmation{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff8e7;border:1px solid #ead49c;border-radius:8px;padding:14px;margin:12px 0}.lab-print-confirmation>div{flex:1;min-width:220px}.lab-print-confirmation p{margin:5px 0;color:#6d603f;font-size:12px}.lab-print-confirmation button{border:1px solid #c6d9ce;border-radius:6px;padding:10px;background:#fff;color:#225a3b}
+@media(max-width:800px){.lab-print-patient,.lab-print-payments{grid-template-columns:repeat(2,minmax(0,1fr))}.lab-print-panel-body{padding:12px}}
+
+.lab-report-direct>.lab-report-toolbar{display:none}

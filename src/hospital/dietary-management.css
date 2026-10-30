@@ -1,0 +1,312 @@
+.diet-page > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.diet-page h1 {
+  font: 700 24px Manrope;
+  margin: 5px 0;
+  display: flex;
+  gap: 9px;
+}
+.diet-page header small {
+  color: #4f7fe5;
+  font-weight: 700;
+}
+.diet-page header p {
+  margin: 0;
+  color: #7b8799;
+  font-size: 11px;
+}
+.diet-page header button,
+.diet-tools button,
+.diet-modal footer button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #4f7fe5;
+  color: #fff;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.diet-page > nav {
+  display: flex;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 6px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  overflow: auto;
+}
+.diet-page > nav button {
+  border: 0;
+  background: transparent;
+  padding: 9px 13px;
+  border-radius: 7px;
+  color: #718096;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.diet-page > nav button.active {
+  background: #e9f0ff;
+  color: #396dcc;
+  font-weight: 700;
+}
+.diet-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 11px;
+  margin-bottom: 14px;
+}
+.diet-kpis article,
+.diet-reports article {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+}
+.diet-kpis svg {
+  position: absolute;
+  right: 13px;
+  color: #4f7fe5;
+}
+.diet-kpis span,
+.diet-kpis strong {
+  display: block;
+}
+.diet-kpis span {
+  font-size: 10px;
+  color: #7d899b;
+}
+.diet-kpis strong {
+  font: 700 22px Manrope;
+  margin-top: 8px;
+}
+.diet-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 10px;
+  overflow: auto;
+}
+.diet-breakdowns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.diet-breakdowns article {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.diet-breakdowns h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.diet-breakdowns span {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 10px;
+}
+.diet-schedule-actions {
+  flex-wrap: wrap;
+}
+.diet-schedule-actions strong {
+  margin-right: auto;
+}
+.diet-schedule-actions span {
+  color: #7d899b;
+  font-size: 10px;
+}
+.diet-board > section {
+  background: #eef2f7;
+  border-radius: 10px;
+  padding: 9px;
+  min-height: 330px;
+}
+.diet-board h3 {
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+}
+.diet-board h3 b {
+  background: #dce7fb;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+.diet-board article {
+  background: #fff;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 7px 0;
+}
+.diet-board article span,
+.diet-board article small {
+  display: block;
+  font-size: 9px;
+  color: #78869a;
+  margin-top: 4px;
+}
+.diet-board article button {
+  border: 0;
+  background: #e9f0ff;
+  color: #3569c9;
+  border-radius: 6px;
+  padding: 5px;
+  margin-top: 8px;
+  font-size: 9px;
+}
+.diet-tools {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 11px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.diet-tools input {
+  border: 0;
+  outline: 0;
+  flex: 1;
+}
+.diet-table {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+}
+.diet-table td small,
+.diet-table td b {
+  display: block;
+}
+.diet-table select {
+  border: 1px solid #dce3ec;
+  border-radius: 6px;
+  padding: 6px;
+}
+.diet-empty {
+  text-align: center;
+  padding: 50px;
+  color: #8793a4;
+}
+.diet-reports {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.diet-reports article strong,
+.diet-reports article span {
+  display: block;
+}
+.diet-reports article strong {
+  font: 700 20px Manrope;
+  margin-top: 8px;
+}
+.diet-reports > button {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 14px;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+}
+.diet-reports > button span {
+  color: #4f7fe5;
+}
+.diet-modal {
+  position: fixed;
+  inset: 0;
+  background: #10182799;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.diet-modal form {
+  background: #fff;
+  border-radius: 13px;
+  padding: 18px;
+  width: min(620px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-height: 90vh;
+  overflow: auto;
+}
+.diet-modal header,
+.diet-modal footer {
+  grid-column: 1/-1;
+  display: flex;
+  justify-content: space-between;
+}
+.diet-modal header h2 {
+  margin: 0;
+}
+.diet-modal header button {
+  background: transparent;
+  color: #333;
+  font-size: 24px;
+  padding: 0;
+}
+.diet-modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 10px;
+  text-transform: capitalize;
+}
+.diet-modal input,
+.diet-modal select,
+.diet-modal textarea {
+  border: 1px solid #dce3ec;
+  border-radius: 7px;
+  padding: 9px;
+}
+.diet-modal footer {
+  justify-content: flex-end;
+}
+.diet-modal footer button:first-child {
+  background: #eef2f7;
+  color: #586579;
+}
+.diet-loading {
+  padding: 80px;
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .diet-kpis,
+  .diet-reports,
+  .diet-breakdowns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .diet-board {
+    grid-template-columns: repeat(6, 210px);
+  }
+}
+@media (max-width: 520px) {
+  .diet-kpis,
+  .diet-reports,
+  .diet-breakdowns {
+    grid-template-columns: 1fr;
+  }
+  .diet-modal form {
+    grid-template-columns: 1fr;
+  }
+  .diet-page > header {
+    align-items: flex-start;
+  }
+  .diet-page > header > button {
+    display: none;
+  }
+}

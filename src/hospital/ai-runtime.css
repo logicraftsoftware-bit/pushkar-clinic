@@ -1,0 +1,14 @@
+.ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ai-thinking svg,
+.ai-spin {
+  animation: ai-spin 1s linear infinite;
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}

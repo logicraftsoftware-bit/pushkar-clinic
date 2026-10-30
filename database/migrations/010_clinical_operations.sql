@@ -1,0 +1,2 @@
+-- Operational appointment queue and IPD admission records are created idempotently
+-- by server/src/clinical-operations.ts so existing hosted tenants upgrade safely.

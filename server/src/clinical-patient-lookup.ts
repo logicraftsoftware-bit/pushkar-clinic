@@ -1,0 +1,3 @@
+// Patient identity is shared across branches; the appointment branch is scoped separately.
+export const clinicalPatientLookupSql=`SELECT id,branch_id,created_at,medical_record_number,concat_ws(' ',first_name,last_name) name,phone,email,address,date_of_birth,registration_fee,maintenance_fee,registration_addons,payment_mode,payment_reference,discount,registration_payment_status,total_amount FROM patients WHERE tenant_id=$1 AND deleted_at IS NULL ORDER BY first_name,last_name,id`;
+export const clinicalPatientEligibilitySql=`SELECT id FROM patients WHERE id=$1 AND tenant_id=$2 AND deleted_at IS NULL`;

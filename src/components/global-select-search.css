@@ -1,0 +1,121 @@
+.global-select-popover {
+  position: fixed;
+  z-index: 10000;
+  max-height: min(360px, calc(100vh - 16px));
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #cbd7e7;
+  border-radius: 9px;
+  box-shadow: 0 14px 40px #14213a33;
+  overflow: hidden;
+  color: #14213a;
+}
+.global-select-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #e5eaf1;
+}
+.global-select-search > svg {
+  width: 17px;
+  color: #718096;
+}
+.global-select-search input {
+  min-width: 0;
+  flex: 1;
+  height: 35px;
+  border: 1px solid #cbd7e7;
+  border-radius: 6px;
+  padding: 0 10px;
+  outline: 0;
+}
+.global-select-search input:focus {
+  border-color: #4d72dd;
+  box-shadow: 0 0 0 2px #4d72dd1f;
+}
+.global-select-search button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #68768b;
+}
+.global-select-search button svg {
+  width: 16px;
+}
+.global-select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #e5eaf1;
+  background: #f7f9fc;
+  text-align: left;
+  font-weight: 700;
+}
+.global-select-all svg {
+  width: 16px;
+  color: #4d72dd;
+}
+.global-select-options {
+  overflow: auto;
+  padding: 5px;
+}
+.global-select-options > button {
+  width: 100%;
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: 20px 1fr 20px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: #fff;
+  text-align: left;
+  color: #293750;
+}
+.global-select-options > button:hover,
+.global-select-options > button.selected {
+  background: #eef4ff;
+  color: #315fc5;
+}
+.global-select-options > button:disabled {
+  opacity: 0.45;
+}
+.global-select-options > button svg {
+  width: 15px;
+}
+.global-select-options > button b {
+  font-weight: 500;
+}
+.global-select-options .selected-check {
+  color: #315fc5;
+}
+.global-select-options p {
+  padding: 14px;
+  text-align: center;
+  color: #7c899c;
+  margin: 0;
+}
+.global-select-popover > footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 11px;
+  border-top: 1px solid #e5eaf1;
+  background: #f7f9fc;
+  font-size: 11px;
+}
+.global-select-popover > footer button {
+  border: 0;
+  border-radius: 6px;
+  background: #4d72dd;
+  color: #fff;
+  padding: 7px 13px;
+}

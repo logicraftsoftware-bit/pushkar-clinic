@@ -1,0 +1,23 @@
+/* Mandatory fields share one visual treatment across ERP forms. */
+#root :where(input,select,textarea):is([required],[aria-required="true"]):where(:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not(:disabled):not([readonly])),
+#root :where([role="combobox"])[aria-required="true"]{
+  border:2px solid #0ba66a!important;
+  background-color:#f0fdf5!important;
+  color:#065f46;
+  box-shadow:0 0 0 2px #10b98112;
+}
+#root label:has(> :is(input,select,textarea):is([required],[aria-required="true"]))>span{
+  color:#067647;font-weight:600;
+}
+#root :is(input,select,textarea):is([required],[aria-required="true"]):focus-visible{
+  outline:2px solid #0ba66a;outline-offset:2px;
+}
+/* Invalid entries retain a distinct error state after interaction or validation. */
+#root :is(input,select,textarea):is([aria-invalid="true"],:user-invalid){
+  border:2px solid #e54864!important;
+  background-color:#fff5f6!important;
+  box-shadow:0 0 0 2px #e5486412;
+}
+@media print{
+  #root :is(input,select,textarea):is([required],[aria-required="true"]){box-shadow:none}
+}

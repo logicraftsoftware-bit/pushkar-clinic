@@ -1,0 +1,5 @@
+.hosai-launcher{position:fixed;right:24px;bottom:24px;z-index:24;display:flex;align-items:center;border-radius:16px;background:linear-gradient(135deg,#4778df,#8350e8);box-shadow:0 10px 28px #4d50bd5c;color:#fff}
+.hosai-open{height:52px;display:flex;gap:9px;align-items:center;padding:0 12px 0 17px;background:none;border:0;color:inherit;border-radius:16px 0 0 16px}.hosai-open span{font-size:12px;font-weight:700}.hosai-close{display:grid;place-items:center;width:24px;height:28px;margin-right:7px;border:0;border-radius:8px;background:#ffffff20;color:inherit}.hosai-close:hover{background:#ffffff40}
+.hosai-expand{position:fixed;right:6px;bottom:32px;z-index:24;width:25px;height:38px;display:grid;place-items:center;padding:0;border:1px solid #d9d4ff;border-radius:12px 0 0 12px;background:#695be5;color:#fff;box-shadow:0 3px 10px #4d50bd30}
+.hosai-launcher button:focus-visible,.hosai-expand:focus-visible{outline:3px solid #bacbff;outline-offset:3px}
+@media(max-width:760px){.hosai-launcher{right:16px;bottom:82px}.hosai-open{height:46px;padding-left:12px;gap:6px}.hosai-open span{font-size:11px}.hosai-expand{bottom:90px}}

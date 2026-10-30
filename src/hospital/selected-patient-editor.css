@@ -1,0 +1,4 @@
+.selected-patient-draft[hidden]{display:none!important}
+.selected-patient-input-row{display:flex;align-items:stretch;gap:8px}.selected-patient-input-row>input{flex:1;min-width:0}.selected-patient-input-row>.selected-patient-edit-button{flex-shrink:0}
+.selected-patient-edit-button{display:inline-flex!important;align-items:center;gap:6px;padding:5px 9px!important;border:1px solid #cbd5fb!important;border-radius:6px;background:#f2f5ff!important;color:#414ab5!important;font-size:12px!important;font-weight:600;cursor:pointer;white-space:nowrap}
+.selected-patient-edit-button:disabled{opacity:.5;cursor:default}.lab-selected-patient-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}

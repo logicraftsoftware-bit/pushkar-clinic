@@ -1,0 +1,209 @@
+.opd-calendar-page {
+  --opd-blue: #4f7fe5;
+  --opd-ink: #1d2b43;
+  --opd-muted: #738096;
+  --opd-border: #e5eaf3;
+  color: var(--opd-ink);
+  padding: 0 0 24px;
+  min-width: 0;
+}
+.opd-calendar-page * { box-sizing: border-box; }
+.opd-calendar-page button, .opd-calendar-page input, .opd-calendar-page select { font: inherit; }
+.opd-calendar-page button { cursor: pointer; transition: background .16s, border-color .16s, box-shadow .16s; }
+.opd-calendar-page button:disabled { cursor: not-allowed; opacity: .45; }
+.opd-calendar-page button:focus-visible, .opd-calendar-page input:focus-visible, .opd-calendar-page select:focus-visible { outline: 3px solid #91aff3; outline-offset: 3px; }
+.opd-steps { display: flex; align-items: center; gap: 12px; color: #b2bdcd; margin: 0 0 22px; }
+.opd-steps > button, .opd-steps > span { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: #7a879c; background: none; border: 0; padding: 0; }
+.opd-steps > button > span, .opd-steps > span > span { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 7px; background: #eaf0f7; font-size: 10px; font-weight: 700; }
+.opd-steps > [aria-current="step"] { color: #496bc3; font-weight: 600; }
+.opd-steps > [aria-current="step"] > span { background: #e3eaff; color: #4f71d0; }
+.opd-steps button:disabled { opacity: 1; color: #929eb0; }
+.opd-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin: 0 0 22px; }
+.opd-heading small { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: #7c73bf; }
+.opd-heading h1 { font-family: Manrope, 'DM Sans', sans-serif; font-size: 26px; font-weight: 750; letter-spacing: -.8px; line-height: 1.35; margin: 7px 0 6px; }
+.opd-heading p { font-size: 12px; color: var(--opd-muted); margin: 0; line-height: 1.6; }
+.opd-heading-actions { display: flex; gap: 9px; flex-shrink: 0; }
+.opd-heading-actions button, .opd-month-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--opd-border); background: #fff; color: #4e5f7a; border-radius: 9px; padding: 11px 15px; font-size: 12px; font-weight: 600; }
+.opd-heading-actions button:hover, .opd-month-controls button:hover { background: #f4f7ff; border-color: #bbcdf4; }
+.opd-heading-actions .opd-primary { background: linear-gradient(115deg, #477ee7, #7d54d9); border-color: transparent; color: #fff; box-shadow: 0 4px 10px #5c76d626; }
+.opd-heading-actions .opd-primary:hover { box-shadow: 0 5px 16px #5c76d640; }
+.opd-back { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 0; margin-bottom: 18px; color: #617393; font-size: 12px!important; font-weight: 600!important; }
+.opd-back:hover { color: #4f7fe5; }
+.opd-overview { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.opd-overview article { display: flex; align-items: center; gap: 14px; min-width: 0; border: 1px solid var(--opd-border); background: #fff; border-radius: 12px; padding: 15px 18px; box-shadow: 0 3px 10px #1c2b4204; }
+.opd-overview-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 11px; background: #edf3ff; color: #4f7fe5; }
+.opd-overview-icon.violet { background: #f2edfc; color: #8a62cc; }
+.opd-overview-icon.teal { background: #e9f7f5; color: #36a095; }
+.opd-overview article small { display: block; font-size: 10px; color: var(--opd-muted); }
+.opd-overview article strong { display: block; font: 750 24px Manrope, sans-serif; margin-top: 4px; line-height: 1.2; }
+.opd-overview article strong small { display: inline; font: 400 11px 'DM Sans', sans-serif; color: #96a1b1; }
+.opd-overview-note { margin-left: auto; background: #f2f5fb; color: #8a96a9; border-radius: 6px; padding: 5px 8px; font-size: 9px; white-space: nowrap; }
+.opd-month-card { width: 100%; border: 1px solid var(--opd-border); border-radius: 16px; background: #fff; padding: 0 20px 20px; box-shadow: 0 5px 22px #24345405; }
+.opd-month-nav { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid #edf0f6; padding: 20px 2px; }
+.opd-month-title { display: flex; align-items: center; gap: 12px; }
+.opd-month-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 11px; background: linear-gradient(135deg, #eef3ff, #f4effc); color: #6274c7; }
+.opd-month-title h2 { font: 700 18px Manrope, sans-serif; margin: 0; letter-spacing: -.4px; }
+.opd-month-title p { margin: 5px 0 0; color: #8a96a9; font-size: 10px; }
+.opd-month-controls, .opd-month-controls > div { display: flex; align-items: center; gap: 8px; }
+.opd-month-controls > div { gap: 4px; }
+.opd-month-controls button { padding: 8px; min-height: 35px; }
+.opd-month-controls .opd-today-button { padding: 8px 14px; margin-right: 4px; }
+.opd-month-controls svg { width: 17px; height: 17px; }
+.opd-month-legend { display: flex; justify-content: flex-end; gap: 18px; padding: 14px 2px; font-size: 10px; color: #8a96a9; }
+.opd-month-legend span, .opd-color-guide span { display: inline-flex; align-items: center; gap: 6px; }
+.opd-calendar-page i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.opd-calendar-page i.green { background: #28af8c; }
+.opd-calendar-page i.gray { background: #a0aec0; }
+.opd-calendar-page i.blue { background: #668ce9; }
+.opd-calendar-page i.red { background: #e96c78; }
+.opd-calendar-page i.amber { background: #e6ab43; }
+.opd-calendar-page i.purple { background: #a27adc; }
+.opd-calendar-page i.opd-today-dot { background: #fff; border: 2px solid #8062d6; width: 9px; height: 9px; }
+.opd-weekdays, .opd-month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.opd-weekdays { margin-bottom: 9px; text-align: center; font-size: 10px; font-weight: 600; color: #8a96a9; padding: 8px 0; }
+.opd-month-grid button { min-width: 0; height: clamp(80px, 8.6vh, 104px); border: 1px solid #e9edf4; border-radius: 10px; background: #fcfdff; color: #42516a; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; text-align: left; }
+.opd-month-grid button.booked { background: linear-gradient(135deg, #f0f5ff, #f6f7ff); border-color: #dce5fa; }
+.opd-month-grid button.outside { background: #fafbfd; border-color: #f0f2f6; color: #a9b3c4; }
+.opd-month-grid button.outside .opd-day-bookings { opacity: .5; }
+.opd-month-grid button.today { border-color: #8e7be0; box-shadow: 0 0 0 1px #8e7be033; background: linear-gradient(135deg, #f1f4ff, #f8f4ff); }
+.opd-month-grid button:hover { border-color: #92aceb; box-shadow: 0 3px 12px #6381bc14; background: #edf3ff; }
+.opd-date-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.opd-day-number { font-size: 12px; font-weight: 600; min-width: 24px; height: 24px; display: grid; place-items: center; }
+.opd-month-grid button.today .opd-day-number { color: white; background: linear-gradient(135deg, #5783e7, #8a62d8); border-radius: 7px; box-shadow: 0 2px 6px #756ada26; }
+.opd-today-label { font-size: 8px; font-weight: 600; color: #8a71cc; }
+.opd-day-bookings { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 6px; background: #e5edfe; color: #5a78b7; min-width: 0; }
+.opd-day-bookings strong { font-size: 11px; font-weight: 700; color: #4269b9; }
+.opd-day-bookings > span { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opd-day-bookings svg { flex-shrink: 0; }
+.opd-day-bookings svg:last-child { margin-left: auto; color: #8aa3d6; }
+.opd-no-bookings { color: #d5dce8; font-size: 12px; padding: 3px 6px; }
+.opd-doctors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.opd-doctor { display: flex; align-items: center; gap: 15px; min-height: 108px; padding: 20px; background: #fff; border: 1px solid var(--opd-border); border-radius: 13px; text-align: left; color: var(--opd-ink); box-shadow: 0 3px 10px #1c2b4204; }
+.opd-doctor:hover { border-color: #b5c6ee; background: #fcfdff; box-shadow: 0 6px 20px #4a65a00c; }
+.opd-doctor-icon { width: 48px; height: 48px; flex: 0 0 48px; border: 1px solid #e8eafb; border-radius: 13px; background: linear-gradient(135deg, #edf3ff, #f4effc); color: #6a7dcc; display: grid; place-items: center; }
+.opd-doctor-details { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.opd-doctor-details strong { font-size: 13px; font-weight: 650; line-height: 1.5; }
+.opd-doctor-details small { font-size: 10px; line-height: 1.4; color: #8a96a9; overflow-wrap: anywhere; }
+.opd-doctor-details small:first-of-type { color: #6f7faa; }
+.opd-doctor-count { display: flex; flex-direction: column; text-align: center; gap: 3px; padding: 9px 14px; background: #f5f7fc; border-radius: 10px; }
+.opd-doctor-count strong { font: 700 21px Manrope, sans-serif; color: #597dcc; }
+.opd-doctor-count small { font-size: 9px; color: #8a96a9; }
+.opd-doctor > svg { color: #adb9cf; flex-shrink: 0; }
+.opd-color-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; padding: 12px 16px; border: 1px solid var(--opd-border); border-radius: 10px; background: #fff; font-size: 10px; color: #8a96a9; margin-bottom: 15px; }
+.opd-color-guide b { color: #64738c; font-weight: 500; }
+.opd-patient-card { background: #fff; border: 1px solid var(--opd-border); border-radius: 14px; padding: 18px; box-shadow: 0 4px 16px #24345404; }
+.opd-patient-filters { display: flex; align-items: center; gap: 10px; padding: 0 0 18px; }
+.opd-search { display: flex; align-items: center; gap: 10px; border: 1px solid var(--opd-border); background: #fafbfe; border-radius: 9px; padding: 11px 13px; flex: 1; min-width: 180px; color: #94a2b8; }
+.opd-search:focus-within { border-color: #93aee9; }
+.opd-search input { border: 0; background: transparent; min-width: 0; width: 100%; color: #435571; font-size: 12px; }
+.opd-search input::placeholder { color: #99a5b7; }
+.opd-patient-filters select { border: 1px solid var(--opd-border); border-radius: 9px; background: #fff; padding: 11px 12px; color: #60708a; max-width: 220px; font-size: 11px; }
+.opd-patient-total { background: #f7f9fc; border-block: 1px solid #edf1f6; padding: 11px 14px; color: #8b98ad; font-size: 10px; }
+.opd-patient-row { display: flex; align-items: center; gap: 12px; min-height: 82px; padding: 15px 14px; border-bottom: 1px solid #edf1f6; border-left: 3px solid #7298ee; }
+.opd-patient-row:hover { background: #fcfdff; }
+.opd-patient-row:last-child { border-bottom: 0; }
+.opd-patient-row.border-green { border-left-color: #57bfa7; }
+.opd-patient-row.border-red { border-left-color: #ea8790; }
+.opd-patient-row.border-gray { border-left-color: #adb9cd; }
+.opd-time { color: #5d7bbc; background: #f1f5fe; padding: 7px 9px; border-radius: 7px; font-size: 11px; min-width: 78px; text-align: center; font-weight: 650; white-space: nowrap; }
+.opd-patient-name { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; background: none; border: 0; padding: 0; text-align: left; color: var(--opd-ink); }
+.opd-patient-name strong { font-size: 12px; font-weight: 600; }
+.opd-patient-name small { font-size: 10px; color: #929eb0; }
+.opd-patient-name:hover strong { color: #4f7fe5; }
+.opd-badge { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-width: 90px; border-radius: 6px; border: 0; padding: 7px 9px; font-size: 9px!important; font-weight: 600!important; text-transform: capitalize; white-space: nowrap; }
+.opd-badge.blue { color: #567bc9; background: #edf3ff; }
+.opd-badge.green { color: #329a7f; background: #eaf8f2; }
+.opd-badge.red { color: #cc6670; background: #fff0f1; }
+.opd-badge.amber { color: #b58a36; background: #fff7e4; }
+.opd-badge.purple { color: #9471c5; background: #f5efff; }
+.opd-badge.gray { color: #7e8b9e; background: #f0f3f8; }
+.opd-payment { min-width: 105px; justify-content: space-between; }
+.opd-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.opd-row-actions button { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #e0e7f6; color: #6281c2; background: #fff; border-radius: 7px; padding: 9px 8px; font-size: 10px; white-space: nowrap; }
+.opd-row-actions button:hover { background: #f4f7fe; border-color: #b9caf0; }
+.opd-row-actions button.opd-check { border-color: #d0eade; color: #329b7e; }
+.opd-row-actions button.opd-absent { border-color: #f4dbe0; color: #cf7381; }
+.opd-empty { padding: 55px 20px; text-align: center; color: #8a96a9; font-size: 12px; display: flex; gap: 10px; justify-content: center; grid-column: 1/-1; }
+.opd-error, .opd-notice { padding: 12px 16px; margin-bottom: 15px; border-radius: 9px; font-size: 12px; }
+.opd-error { background: #fff1f2; color: #b42338; }
+.opd-error button { margin-left: 15px; }
+.opd-notice { background: #ecfdf5; color: #047857; }
+@media (max-width: 1250px) {
+  .opd-overview-note { display: none; }
+  .opd-patient-row { flex-wrap: wrap; }
+  .opd-row-actions { margin-left: auto; }
+  .opd-patient-name { min-width: 200px; }
+  .opd-day-bookings svg:first-child { display: none; }
+}
+@media (max-width: 900px) {
+  .opd-overview { gap: 9px; }
+  .opd-overview article { gap: 9px; padding: 12px; }
+  .opd-overview-icon { width: 32px; height: 32px; flex-basis: 32px; }
+  .opd-overview article small { font-size: 9px; }
+  .opd-overview article strong { font-size: 20px; }
+  .opd-heading h1 { font-size: 23px; }
+  .opd-doctors { grid-template-columns: 1fr; }
+  .opd-month-card { padding: 0 12px 12px; }
+  .opd-month-grid, .opd-weekdays { gap: 5px; }
+  .opd-month-grid button { padding: 7px; }
+  .opd-day-bookings { gap: 3px; padding: 4px; }
+  .opd-day-bookings svg:last-child { display: none; }
+  .opd-patient-filters { flex-wrap: wrap; }
+  .opd-search { flex-basis: 100%; }
+  .opd-patient-filters select { flex: 1; min-width: 0; max-width: none; }
+}
+@media (max-width: 540px) {
+  .opd-heading { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .opd-heading h1 { font-size: 22px; }
+  .opd-heading-actions button { font-size: 11px; padding: 10px 12px; }
+  .opd-steps { gap: 8px; margin-bottom: 18px; }
+  .opd-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .opd-overview article { align-items: flex-start; flex-direction: column; gap: 9px; padding: 10px; }
+  .opd-overview-icon { width: 28px; height: 28px; flex-basis: 28px; border-radius: 8px; }
+  .opd-overview-icon svg { width: 16px; height: 16px; }
+  .opd-overview article small { min-height: 24px; line-height: 1.4; }
+  .opd-overview article strong small { font-size: 9px; }
+  .opd-month-card { padding: 0 8px 8px; border-radius: 12px; }
+  .opd-month-nav { padding: 14px 2px; gap: 8px; }
+  .opd-month-icon, .opd-month-title p { display: none; }
+  .opd-month-title h2 { font-size: 15px; }
+  .opd-month-controls { gap: 4px; }
+  .opd-month-controls button { padding: 6px; min-height: 30px; }
+  .opd-month-controls .opd-today-button { padding: 6px 8px; font-size: 10px; margin: 0; }
+  .opd-month-legend { justify-content: flex-start; gap: 12px; font-size: 9px; }
+  .opd-month-grid, .opd-weekdays { gap: 4px; }
+  .opd-month-grid button { height: 71px; padding: 5px; border-radius: 7px; }
+  .opd-day-number { font-size: 11px; min-width: 21px; height: 21px; }
+  .opd-today-label, .opd-day-bookings > span { display: none; }
+  .opd-day-bookings { justify-content: center; }
+  .opd-day-bookings strong { font-size: 10px; }
+  .opd-day-bookings svg:first-child { display: block; width: 11px; }
+  .opd-patient-card { padding: 10px; }
+  .opd-patient-row { padding: 12px 8px; gap: 10px; }
+  .opd-patient-name { min-width: 150px; }
+  .opd-row-actions { margin-left: 0; }
+  .opd-doctor { padding: 14px; gap: 10px; }
+  .opd-doctor-icon { width: 38px; height: 38px; flex-basis: 38px; }
+  .opd-doctor-count { padding: 8px 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .opd-calendar-page button { transition: none; } }
+.opd-checkin-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 0; border: 1px solid #e5eaf3; border-radius: 17px; color: #1d2b43; box-shadow: 0 24px 80px #182c4b35; }
+.opd-checkin-dialog::backdrop { background: #14213980; backdrop-filter: blur(3px); }
+.opd-checkin-dialog header { display: flex; align-items: center; gap: 12px; padding: 22px; border-bottom: 1px solid #edf0f6; }
+.opd-checkin-dialog header > div { flex: 1; min-width: 0; }
+.opd-checkin-dialog h2 { margin: 0 0 6px; font: 700 18px Manrope, sans-serif; }
+.opd-checkin-dialog header p { font-size: 11px; color: #738096; margin: 0; overflow-wrap: anywhere; }
+.opd-checkin-dialog .opd-dialog-close { border: 0; background: #f5f7fb; color: #738096; padding: 7px; border-radius: 8px; display: grid; place-items: center; }
+.opd-checkin-body { padding: 20px 22px; display: grid; gap: 16px; }
+.opd-checkin-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-radius: 11px; background: #f5f7fd; padding: 14px; }
+.opd-checkin-summary small { display: block; font-size: 10px; color: #8190a8; margin-bottom: 6px; }
+.opd-checkin-summary strong { font-size: 15px; color: #496bc3; overflow-wrap: anywhere; }
+.opd-checkin-body label { display: grid; gap: 8px; font-size: 12px; font-weight: 600; color: #52637f; }
+.opd-checkin-body label span { display: inline; font-size: 10px; color: #8e9bb0; font-weight: 400; }
+.opd-checkin-body input, .opd-checkin-body select { width: 100%; border: 1px solid #dfe6f2; border-radius: 9px; padding: 12px; background: #fff; color: #243752; font-size: 13px; }
+.opd-checkin-body input::placeholder { color: #99a5b7; font-size: 11px; }
+.opd-checkin-hint { background: #f2f5ff; border-radius: 8px; padding: 11px 12px; margin: 0; color: #657aaa; font-size: 11px; line-height: 1.6; }
+.opd-checkin-body .opd-error { margin: 0; }
+.opd-checkin-dialog footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid #edf0f6; }
+.opd-checkin-dialog footer button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 16px; border-radius: 9px; border: 1px solid #dfe6f2; background: white; color: #62728c; font-size: 12px; font-weight: 600; }
+.opd-checkin-dialog footer .opd-primary { color: #fff; border-color: transparent; background: linear-gradient(115deg, #477ee7, #7d54d9); }

@@ -1,0 +1,8 @@
+BEGIN;
+ALTER TABLE patients
+  ADD COLUMN IF NOT EXISTS photo_url text,
+  ADD COLUMN IF NOT EXISTS allergies text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS existing_conditions text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS current_medication text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'Active';
+COMMIT;

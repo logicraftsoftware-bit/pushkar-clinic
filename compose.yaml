@@ -1,0 +1,26 @@
+name: hospital-erp
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hospital-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hospital_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-hospital_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hospital_dev_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - hospital_postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hospital_app} -d ${POSTGRES_DB:-hospital_erp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  hospital_postgres_data:
+    name: hospital-erp-postgres-data

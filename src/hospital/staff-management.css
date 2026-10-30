@@ -1,0 +1,333 @@
+.staff-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.staff-head small {
+  font-size: 10px;
+  color: #8c97a8;
+}
+.staff-head h1 {
+  font: 700 26px Manrope;
+  margin: 7px 0 4px;
+}
+.staff-head p {
+  font-size: 12px;
+  color: #7d899a;
+  margin: 0;
+}
+.staff-head > button {
+  height: 39px;
+  border: 0;
+  border-radius: 8px;
+  background: #4d79dc;
+  color: #fff;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.staff-head svg {
+  width: 16px;
+}
+.staff-error {
+  background: #fff0f1;
+  color: #c94f5b;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+.staff-toolbar,
+.staff-card {
+  background: #fff;
+  border: 1px solid #e1e7ef;
+  border-radius: 11px;
+}
+.staff-toolbar {
+  height: 48px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  color: #8895a7;
+}
+.staff-toolbar svg {
+  width: 16px;
+}
+.staff-toolbar input {
+  border: 0;
+  outline: 0;
+  flex: 1;
+  font-size: 12px;
+}
+.staff-toolbar span {
+  font-size: 10px;
+}
+.staff-card {
+  overflow: auto;
+}
+.staff-card table {
+  min-width: 1000px;
+}
+.staff-card td:last-child {
+  white-space: nowrap;
+}
+.staff-card td:last-child button {
+  width: 29px;
+  height: 29px;
+  border: 1px solid #dfe5ed;
+  background: #fff;
+  color: #5874a9;
+  border-radius: 6px;
+  margin-right: 5px;
+}
+.staff-card td:last-child svg {
+  width: 13px;
+}
+.staff-person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.staff-person > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #e9f0ff;
+  color: #5278d2;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.staff-person img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.staff-person svg {
+  width: 16px;
+}
+.staff-person strong,
+.staff-person small {
+  display: block;
+}
+.staff-person small {
+  font-weight: 400;
+  color: #929dad;
+  margin-top: 3px;
+}
+.staff-status {
+  font-size: 8px;
+  padding: 4px 7px;
+  border-radius: 9px;
+  background: #dff7ed;
+  color: #168d6c;
+}
+.staff-status.inactive {
+  background: #eceff3;
+  color: #68758a;
+}
+.staff-status.on-leave {
+  background: #fff0df;
+  color: #c77935;
+}
+.staff-loading {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #8491a2;
+}
+.staff-modal-back {
+  position: fixed;
+  inset: 0;
+  background: #0b142877;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.staff-modal {
+  width: min(1050px, 100%);
+  max-height: 94vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+}
+.staff-modal > header,
+.staff-modal > footer {
+  padding: 17px 21px;
+  border-bottom: 1px solid #e8ecf2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.staff-modal h2 {
+  font: 700 19px Manrope;
+  margin: 0;
+}
+.staff-modal header p {
+  font-size: 10px;
+  color: #8a96a7;
+  margin: 4px 0;
+}
+.staff-modal header button {
+  border: 0;
+  background: transparent;
+  color: #788598;
+}
+.staff-section {
+  border: 0;
+  margin: 0;
+  padding: 18px 21px;
+  border-bottom: 1px solid #edf0f4;
+}
+.staff-section legend {
+  font: 700 14px Manrope;
+  color: #2b394e;
+}
+.staff-section > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
+.staff-section label > span:not(.check) {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #59667a;
+  margin-bottom: 6px;
+}
+.staff-section em {
+  color: #df5965;
+}
+.staff-section input,
+.staff-section select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+.staff-section .wide {
+  grid-column: span 2;
+}
+.staff-section .check {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #536176;
+}
+.staff-section .check input {
+  width: 16px;
+  height: 16px;
+}
+.doctor-schedule > .schedule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+}
+.schedule-head p {
+  margin: 0;
+  color: #7f8b9d;
+  font-size: 11px;
+}
+.schedule-head button {
+  height: 35px;
+  border: 0;
+  border-radius: 7px;
+  background: #eaf1ff;
+  color: #4473d2;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.doctor-schedule > .schedule-list {
+  display: block;
+  padding: 0 20px 15px;
+}
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 38px;
+  gap: 12px;
+  align-items: end;
+  border-top: 1px solid #e8ecf2;
+  padding: 12px 0;
+}
+.schedule-row > button {
+  height: 38px;
+  border: 1px solid #f0cfd2;
+  border-radius: 7px;
+  background: #fff5f5;
+  color: #cc5360;
+}
+.schedule-row .react-datepicker-wrapper,
+.schedule-row .react-datepicker__input-container {
+  width: 100%;
+}
+.react-datepicker-popper {
+  z-index: 120;
+}
+.schedule-empty {
+  padding: 18px;
+  border: 1px dashed #d9e0e9;
+  border-radius: 8px;
+  color: #8a96a7;
+  text-align: center;
+  font-size: 11px;
+}
+.staff-modal > footer {
+  justify-content: flex-end;
+  gap: 8px;
+  border: 0;
+}
+.staff-modal > footer button {
+  height: 38px;
+  border: 1px solid #dfe5ed;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0 13px;
+}
+.staff-modal > footer .primary {
+  background: #4d79dc;
+  color: #fff;
+  border-color: #4d79dc;
+}
+.staff-modal header svg {
+  width: 18px;
+}
+@media (max-width: 800px) {
+  .staff-section > div {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .staff-section > div {
+    grid-template-columns: 1fr;
+  }
+  .staff-section .wide {
+    grid-column: auto;
+  }
+  .staff-head p {
+    display: none;
+  }
+}
+.staff-multi-select{position:relative;width:100%}.staff-multi-trigger{align-items:center;background:#fff;border:1px solid #d8e0ec;border-radius:8px;color:#1d2939;display:flex;font:inherit;height:40px;justify-content:space-between;padding:0 12px;width:100%}.staff-multi-trigger:hover{border-color:#98a8c0}.staff-multi-select.open .staff-multi-trigger{border-color:#4f7ce5;box-shadow:0 0 0 2px rgba(79,124,229,.12)}.staff-multi-menu{background:#fff;border:1px solid #d8e0ec;border-radius:8px;box-shadow:0 12px 32px rgba(15,23,42,.16);left:0;overflow:hidden;position:absolute;right:0;top:calc(100% + 5px);z-index:50}.staff-multi-search{align-items:center;border-bottom:1px solid #e7ebf2;display:flex;padding:8px}.staff-multi-search svg{color:#8b98aa;height:16px;margin-left:4px;position:absolute;width:16px}.staff-multi-search input{border:1px solid #d8e0ec!important;height:34px!important;padding-left:30px!important;width:100%}.staff-multi-options{max-height:190px;overflow:auto}.staff-multi-option{align-items:center;cursor:pointer;display:flex!important;gap:9px;min-height:38px;padding:8px 12px}.staff-multi-option:hover{background:#f5f8ff}.staff-multi-option.select-all{border-bottom:1px solid #e7ebf2}.staff-multi-option input{accent-color:#19a85b;height:16px!important;margin:0;width:16px!important}.staff-multi-option span,.staff-multi-option strong{font-size:13px}.staff-multi-options>small{display:block;padding:14px;color:#7b8798}.staff-multi-required{height:1px!important;left:10px;opacity:0;pointer-events:none;position:absolute;top:20px;width:1px!important}
+.staff-calendar-modal{width:min(900px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:12px;box-shadow:0 20px 60px #0f172a50}.staff-calendar-modal>header{padding:18px 22px;border-bottom:1px solid #e5eaf1;display:flex;justify-content:space-between;align-items:start}.staff-calendar-modal h2{margin:0;font-size:18px}.staff-calendar-modal header p{margin:4px 0 0;color:#7f8b9d;font-size:12px}.staff-calendar-modal>header>button{border:0;background:transparent}.staff-calendar-body{display:grid;grid-template-columns:1fr 280px;gap:20px;padding:22px}.staff-calendar-body .react-datepicker{width:100%;border:1px solid #dce3ec;font-family:inherit}.staff-calendar-body .react-datepicker__month-container{width:100%}.staff-calendar-body .react-datepicker__header{background:#f7f9fc;border-bottom:1px solid #dce3ec;padding:12px}.staff-calendar-body .react-datepicker__month{margin:12px}.staff-calendar-body .react-datepicker__week{display:grid;grid-template-columns:repeat(7,1fr)}.staff-calendar-body .react-datepicker__day-name,.staff-calendar-body .react-datepicker__day{width:auto;margin:2px;height:35px;line-height:35px}.staff-scheduled-day{background:#d9f5e4!important;color:#14733b!important;border-radius:7px;font-weight:700}.staff-calendar-body aside{border-left:1px solid #e5eaf1;padding-left:18px}.staff-calendar-body aside h3{margin:0 0 10px;font-size:14px}.staff-calendar-body aside p{font-size:12px;color:#7f8b9d}.staff-calendar-body aside button{width:100%;border:1px solid #dce3ec;background:#fff;border-radius:7px;text-align:left;padding:10px;margin-bottom:8px}.staff-calendar-body aside strong,.staff-calendar-body aside span{display:block}.staff-calendar-body aside span{margin-top:3px;font-size:11px;color:#52627a}.staff-slot-back{position:fixed;inset:0;background:#0b14255c;z-index:130;display:grid;place-items:center}.staff-slot-modal{width:min(420px,92vw);background:#fff;border-radius:10px;padding:20px;box-shadow:0 20px 60px #0f172a50}.staff-slot-modal h3{margin:0 0 16px;font-size:16px}.staff-slot-modal label{display:block;margin:10px 0}.staff-slot-modal label span{display:block;font-size:11px;margin-bottom:5px}.staff-slot-modal input{width:100%;height:38px;border:1px solid #dce3ec;border-radius:7px;padding:0 9px}.staff-slot-modal footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.staff-slot-modal footer button{height:38px;border:1px solid #dce3ec;border-radius:7px;background:#fff;padding:0 12px}.staff-slot-modal footer .primary{background:#4d79dc;border-color:#4d79dc;color:#fff}@media(max-width:700px){.staff-calendar-body{grid-template-columns:1fr}.staff-calendar-body aside{border-left:0;border-top:1px solid #e5eaf1;padding:16px 0 0}}
+.staff-schedule-entry{display:grid;grid-template-columns:1fr 38px;gap:6px}.staff-calendar-body aside .staff-remove-slot{padding:0;text-align:center;color:#c94752;border-color:#f0cfd2;background:#fff5f5}.staff-calendar-body aside .staff-remove-slot svg{width:16px}.staff-slot-modal footer .danger{color:#c94752;border-color:#f0cfd2;background:#fff5f5}
+
+.staff-branch-fees>p{margin:0 0 16px;font-size:12px;line-height:1.6;color:#61718b}.staff-branch-fees input{background:#f7faff;border-color:#bed0ef}
+
+.staff-branch-fees>div{grid-template-columns:minmax(0,1fr)}.staff-branch-fee-card{border:1px solid #dce5f2;border-radius:9px;padding:14px;background:#fafcff}.staff-branch-fee-card h4{margin:0 0 12px;color:#263e62;font-size:13px}.staff-branch-fee-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}@media(max-width:700px){.staff-branch-fee-fields{grid-template-columns:minmax(0,1fr)}}

@@ -1,0 +1,2 @@
+-- Operation Theatre is initialized idempotently by server/src/ot-module.ts.
+-- Keeping this migration marker ensures hosted migration order documents the module.

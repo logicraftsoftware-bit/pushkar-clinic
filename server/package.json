@@ -1,0 +1,35 @@
+{
+  "name": "careframe-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc && node scripts/copy-runtime-data.mjs",
+    "migrate": "tsx src/migrate.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "import:radiology": "tsx src/import-radiology-tests.ts",
+    "import:neurology": "tsx src/import-neurology-tests.ts",
+    "test:access-load": "tsx performance/access-load.mts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.30",
+    "@types/pg": "^8.15.4",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
