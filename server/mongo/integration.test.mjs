@@ -48,6 +48,45 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
   });
   const staffLogin=await request('/auth/login','POST',{identifier:input.adminEmail,password,portal:'hospital_admin'});
   assert.equal(staffLogin.status,200,JSON.stringify(staffLogin.data));
+  await t.test('temporary-password accounts cannot access patient data',async()=>{
+    assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,403);
+  });
+  // Fixture-only setup: patient workflows are independently exercised before
+  // the password revocation test below. Never use this setup against Atlas.
+  await db.collection('users').updateOne({email:input.adminEmail},{$set:{force_password_change:false}});
+  const branch=await db.collection('branches').findOne({tenant_id:hospital.data.id});
+  const patientInput={branch_id:branch.id,first_name:'Synthetic',last_name:'Patient',phone:'9999999997',address:{title:'Mr.',line:'Example Road',city:'Example City',state:'Example State',pin:'100001'},maintenance_fee:100,discount:20,registration_payment_status:'Unpaid'};
+  let patient;
+  await t.test('patient registration uses server totals and immutable sequential UHIDs',async()=>{
+    const result=await request('/patients','POST',{...patientInput,total_amount:99999,tenant_id:'untrusted'},staffLogin.data.token);
+    assert.equal(result.status,201,JSON.stringify(result.data));patient=result.data;
+    assert.equal(patient.tenant_id,hospital.data.id);assert.equal(patient.total_amount,80);
+    assert.equal(patient.medical_record_number,'UHID-000001');
+    const immutable=await request(`/patients/${patient.id}`,'PUT',{...patientInput,medical_record_number:'OTHER'},staffLogin.data.token);
+    assert.equal(immutable.status,400);assert.equal(immutable.data.code,'IMMUTABLE_UHID');
+  });
+  await t.test('duplicate registration rolls back its counter and needs an audited override',async()=>{
+    const duplicate=await request('/patients','POST',patientInput,staffLogin.data.token);
+    assert.equal(duplicate.status,409);assert.equal(duplicate.data.code,'POSSIBLE_DUPLICATE_PATIENT');
+    assert.equal(await db.collection('patients').countDocuments({tenant_id:hospital.data.id}),1);
+    assert.equal((await db.collection('counters').findOne({_id:`${hospital.data.id}:patient`})).value,1);
+    const override=await request('/patients','POST',{...patientInput,duplicate_override:true,duplicate_override_reason:'Synthetic administrator approval'},staffLogin.data.token);
+    assert.equal(override.status,201,JSON.stringify(override.data));assert.equal(override.data.medical_record_number,'UHID-000002');
+    assert.equal(await db.collection('audit_events').countDocuments({tenant_id:hospital.data.id,action:'patient_duplicate_override'}),1);
+  });
+  await t.test('patient search and detail updates preserve financial values',async()=>{
+    const page=await request('/patients?page=1&page_size=1&search=Synthetic','GET',null,staffLogin.data.token);
+    assert.equal(page.status,200);assert.equal(page.data.total,2);assert.equal(page.data.rows.length,1);
+    const update=await request(`/patients/${patient.id}/details`,'PUT',{...patientInput,first_name:'Updated',maintenance_fee:900,discount:0},staffLogin.data.token);
+    assert.equal(update.status,200,JSON.stringify(update.data));assert.equal(update.data.maintenance_fee,100);assert.equal(update.data.total_amount,80);
+  });
+  await t.test('another tenant and an inactive branch cannot receive a patient',async()=>{
+    const foreignId='00000000-0000-4000-8000-000000000099';
+    await db.collection('branches').insertOne({id:foreignId,tenant_id:'other-tenant',code:'OTHER',is_active:true});
+    assert.equal((await request('/patients','POST',{...patientInput,branch_id:foreignId},staffLogin.data.token)).status,403);
+    assert.equal((await request(`/patients/${foreignId}`,'GET',null,staffLogin.data.token)).status,404);
+    await db.collection('branches').deleteOne({id:foreignId});
+  });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
   });
@@ -62,6 +101,6 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request('/auth/login','POST',{identifier:input.adminEmail,password:'New-synthetic-password-123',portal:'hospital_admin'})).status,401);
   });
   await t.test('unconverted workflows never return synthetic success',async()=>{
-    const result=await request('/patients');assert.equal(result.status,501);assert.equal(result.data.code,'MONGODB_WORKFLOW_PENDING');
+    const result=await request('/pharmacy/not-converted');assert.equal(result.status,501);assert.equal(result.data.code,'MONGODB_WORKFLOW_PENDING');
   });
 });

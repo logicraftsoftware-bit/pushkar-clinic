@@ -1,0 +1,17 @@
+const labApprovalPermissions=["patient.view", "lab.order.view", "lab.result.create", "lab.result.verify", "reports.view", "reports.export", "menu.dashboard.view", "menu.lab-orders.view", "menu.samples.view", "menu.results.view", "menu.verification.view", "menu.reports.view"];
+export const permissionTemplates={
+  HOSPITAL_ADMIN: ["*"],
+  RECEPTIONIST: ["patient.view","patient.create","patient.update","appointment.view","appointment.create","appointment.update","appointment.cancel","ipd.view","ipd.create","ipd.update","billing.view","billing.create","billing.update","menu.dashboard.view","menu.patients.view","menu.appointments.view","menu.queue.view","menu.ipd.view","menu.billing.view","menu.notifications.view"],
+  DOCTOR: ["patient.view","appointment.view","appointment.update","ipd.view","opd.view","opd.create","opd.update","prescription.view","prescription.create","lab.order.view","radiology.view","menu.dashboard.view","menu.appointments.view","menu.ipd.view","menu.emr.view","menu.consultation.view","menu.diagnosis.view","menu.prescriptions.view","menu.clinical-orders.view","menu.voice-documentation.view"],
+  NURSE: ["patient.view","patient.update","ipd.view","ipd.update","opd.view","opd.update","prescription.view","lab.order.view","radiology.view","menu.dashboard.view","menu.patients.view","menu.vitals.view","menu.mar.view","menu.care-plans.view","menu.clinical-orders.view","menu.handover.view"],
+  LAB_MANAGER: ["patient.view","lab.order.view","lab.result.create","lab.result.verify","radiology.view","radiology.report.create","radiology.report.verify","reports.view","reports.export","menu.dashboard.view","menu.lab-orders.view","menu.samples.view","menu.results.view","menu.verification.view","menu.reports.view","menu.devices.view"],
+  LAB_TECHNICIAN: labApprovalPermissions,
+  PATHOLOGIST: labApprovalPermissions,
+  RADIOLOGIST: labApprovalPermissions,
+  PHARMACY_MANAGER: ["patient.view","prescription.view","pharmacy.view","pharmacy.sale","pharmacy.return","pharmacy.inventory.manage","inventory.view","inventory.manage","billing.view","billing.create","menu.dashboard.view","menu.prescriptions.view","menu.pos.view","menu.inventory.view","menu.batches.view","menu.forecasting.view"],
+  BRANCH_ADMIN: ["patient.view","patient.create","patient.update","appointment.view","appointment.create","appointment.update","ipd.view","ipd.create","ipd.update","inventory.view","inventory.manage","staff.view","staff.create","staff.update","reports.view","reports.export","settings.view","settings.manage","menu.dashboard.view","menu.patients.view","menu.appointments.view","menu.ipd.view","menu.inventory.view","menu.staff.view","menu.reports.view","menu.settings.view"],
+  INVENTORY_MANAGER: ["inventory.view","inventory.manage","reports.view","reports.export","menu.dashboard.view","menu.inventory.view","menu.reports.view"],
+  ACCOUNTANT: ["billing.view","billing.create","billing.update","billing.refund","insurance.view","insurance.manage","reports.view","reports.export","menu.dashboard.view","menu.billing.view","menu.insurance.view","menu.reports.view"],
+  HR_MANAGER: ["hr.view","hr.manage","staff.view","staff.create","staff.update","documents.view","documents.manage","reports.view","reports.export","menu.dashboard.view","menu.hr.view","menu.staff.view","menu.documents.view","menu.reports.view"],
+  PATIENT: ["menu.dashboard.view","menu.appointments.view","menu.emr.view","menu.prescriptions.view","menu.reports.view","menu.billing.view","menu.discharge.view","menu.notifications.view"],
+}

@@ -5,6 +5,7 @@ import { db, transaction } from './database.mjs';
 import { hashPassword, publicRecord } from './security.mjs';
 import { planInput, hospitalInput } from './provisioning-schema.mjs';
 import { subscriptionEnd } from './subscription-date.mjs';
+import { initializeRoles } from './access.mjs';
 
 const router = Router();
 const planFields = {
@@ -78,6 +79,7 @@ router.post('/hospitals', async (request,response) => {
       emergency_phone:body.emergencyPhone,address_line:body.address,city:body.city,state:body.state,pin_code:body.pinCode,
       country:body.country,gstin:body.gstin,modules:moduleRows.map(row=>row.code),created_at:now,updated_at:now,deleted_at:null};
     await db.collection('hospitals').insertOne({...record},{session});
+    await initializeRoles(id,session);
     await db.collection('branches').insertOne({id:branchId,tenant_id:id,name:body.branchName,code:'MAIN',phone:body.phone,
       address:{line:body.address,city:body.city,state:body.state,pinCode:body.pinCode,country:body.country},is_active:true,created_at:now,updated_at:now},{session});
     const names=body.adminName.trim().split(/\s+/);
