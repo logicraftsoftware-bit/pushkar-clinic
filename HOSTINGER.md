@@ -2,6 +2,8 @@
 
 This checkout is a React/Vite frontend and an Express/TypeScript API inherited from another clinic. **It is not ready for MongoDB production deployment.** No database, account, service, or dependency has been installed locally.
 
+The native MongoDB conversion has started in `server/mongo/`. See [MONGODB-MIGRATION.md](MONGODB-MIGRATION.md) for implemented routes, remaining workflows, private connection settings and verification limits. The Hostinger entry point has deliberately not been switched to this incomplete backend.
+
 ## Hostinger Cloud Hosting
 
 Use hPanel's **Node.js web app** deployment, not a static-only website upload. Hostinger supports managed Node.js apps on eligible Business and Cloud plans:

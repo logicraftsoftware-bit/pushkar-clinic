@@ -2,6 +2,8 @@
 
 > Pushkar Clinic copy: read [HOSTINGER.md](HOSTINGER.md) before deploying. The requested MongoDB conversion is outstanding; this inherited backend still requires PostgreSQL. Previous-client records and VPS workflows have been removed.
 
+The native MongoDB conversion is in progress: [implementation status and connection instructions](MONGODB-MIGRATION.md). The current production entry point still uses the legacy backend.
+
 A modern React and TypeScript foundation for a multi-role hospital operations platform.
 
 ## Development

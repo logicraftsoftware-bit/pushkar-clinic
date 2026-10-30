@@ -1,0 +1,16 @@
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+dotenv.config({ path: process.env.ENV_FILE ?? fileURLToPath(new URL('../../.env', import.meta.url)) });
+
+// Report field names only. Zod error input must never expose a connection URI.
+const parsed = z.object({
+  MONGODB_URI: z.string().regex(/^mongodb(?:\+srv)?:\/\//),
+  MONGODB_DB: z.string().regex(/^[A-Za-z0-9_-]+$/).default('pushkar_clinic'),
+  JWT_SECRET: z.string().min(32),
+  API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  FRONTEND_ORIGIN: z.string().url(),
+  NODE_ENV: z.enum(['development','test','production']).default('production'),
+}).safeParse({ ...process.env, API_PORT: process.env.PORT ?? process.env.API_PORT });
+if (!parsed.success) throw new Error(`Invalid backend environment: ${[...new Set(parsed.error.issues.map(issue => issue.path.join('.')))].join(', ')}`);
+export const config = parsed.data;

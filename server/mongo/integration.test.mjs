@@ -1,0 +1,67 @@
+// GitHub runner only: never permit this suite to reset a real clinic database.
+import { test, after } from 'node:test';
+import assert from 'node:assert/strict';
+if (process.env.MONGODB_INTEGRATION_TEST !== 'true' || !/^pushkar_test_[a-z0-9_]+$/.test(process.env.MONGODB_DB ?? '')) {
+  throw new Error('Use an explicitly enabled, disposable pushkar_test_* database.');
+}
+const { client, db, initializeMongo } = await import('./database.mjs');
+const { hashPassword } = await import('./security.mjs');
+const { default: app } = await import('./app.mjs');
+await initializeMongo();
+const server = app.listen(0, '127.0.0.1');
+await new Promise(resolve => server.once('listening', resolve));
+const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+const password = 'Synthetic-integration-password-123';
+const adminId = '00000000-0000-4000-8000-000000000001';
+await db.collection('super_admin_users').insertOne({ id: adminId, username: 'test-owner', display_name: 'Synthetic Owner', password_hash: await hashPassword(password), is_active: true, session_version: 0 });
+async function request(path, method = 'GET', body, token) {
+  const response = await fetch(`${base}${path}`, { method, headers: { 'Content-Type':'application/json', ...(token ? { Authorization:`Bearer ${token}` } : {}) }, ...(body ? {body:JSON.stringify(body)} : {}) });
+  return { status:response.status, data:response.status === 204 ? null : await response.json() };
+}
+after(async()=>{
+  await new Promise(resolve=>server.close(resolve));
+  await db.dropDatabase();
+  await client.close();
+});
+test('native MongoDB authentication and atomic clinic provisioning', async t => {
+  const login=await request('/admin/auth/login','POST',{username:'test-owner',password});
+  assert.equal(login.status,200);const token=login.data.token;
+  await t.test('session audiences cannot be interchanged',async()=>{
+    assert.equal((await request('/auth/change-password','POST',{currentPassword:password,newPassword:'Different-synthetic-password-123'},token)).status,401);
+    assert.equal((await request('/admin/me')).status,401);
+  });
+  const modules=await request('/admin/modules','GET',null,token);
+  assert.equal(modules.status,200);assert.equal(modules.data.length,8);
+  const plan=await request('/admin/plans','POST',{name:'Synthetic Plan',code:'synthetic',description:'Test only',monthlyPrice:100,yearlyPrice:1000,trialDays:14,maxBranches:2,maxUsers:10,maxDoctors:5,storageLimitGb:1,aiUsageLimit:0,moduleIds:[modules.data[0].id],status:'active'},token);
+  assert.equal(plan.status,201,JSON.stringify(plan.data));
+  const input={name:'Synthetic Clinic',code:'SYNTHETIC',hospitalType:'Clinic',registrationNumber:'TEST-ONLY',email:'clinic@example.invalid',phone:'9999999999',emergencyPhone:'9999999999',address:'Synthetic Road',city:'Test City',state:'Test State',pinCode:'100001',country:'India',branchName:'Main',planId:plan.data.id,subscriptionStartDate:'2026-10-31',billingCycle:'monthly',trialDays:14,status:'active',adminName:'Synthetic Admin',adminEmail:'admin@example.invalid',adminPhone:'9999999998',password};
+  const hospital=await request('/admin/hospitals','POST',input,token);
+  assert.equal(hospital.status,201,JSON.stringify(hospital.data));
+  await t.test('provisioning creates one tenant, branch, user and subscription without leaking credentials',async()=>{
+    assert.equal(hospital.data.password,undefined);assert.equal(hospital.data.password_hash,undefined);
+    for(const collection of ['branches','users','subscriptions'])assert.equal(await db.collection(collection).countDocuments({tenant_id:hospital.data.id}),1);
+  });
+  await t.test('duplicate provisioning rolls back all writes',async()=>{
+    assert.equal((await request('/admin/hospitals','POST',{...input,code:'ANOTHER'},token)).status,409);
+    assert.equal(await db.collection('hospitals').countDocuments({}),1);
+    assert.equal(await db.collection('branches').countDocuments({}),1);
+  });
+  const staffLogin=await request('/auth/login','POST',{identifier:input.adminEmail,password,portal:'hospital_admin'});
+  assert.equal(staffLogin.status,200,JSON.stringify(staffLogin.data));
+  await t.test('staff tokens cannot access platform administration',async()=>{
+    assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
+  });
+  await t.test('password changes revoke old sessions',async()=>{
+    const changed=await request('/auth/change-password','POST',{currentPassword:password,newPassword:'New-synthetic-password-123'},staffLogin.data.token);
+    assert.equal(changed.status,204,JSON.stringify(changed.data));
+    assert.equal((await request('/auth/logout','POST',{},staffLogin.data.token)).status,401);
+    assert.equal((await request('/auth/login','POST',{identifier:input.adminEmail,password,portal:'hospital_admin'})).status,401);
+  });
+  await t.test('suspended hospitals cannot sign in',async()=>{
+    assert.equal((await request(`/admin/hospitals/${hospital.data.id}/status`,'PATCH',{status:'suspended'},token)).status,200);
+    assert.equal((await request('/auth/login','POST',{identifier:input.adminEmail,password:'New-synthetic-password-123',portal:'hospital_admin'})).status,401);
+  });
+  await t.test('unconverted workflows never return synthetic success',async()=>{
+    const result=await request('/patients');assert.equal(result.status,501);assert.equal(result.data.code,'MONGODB_WORKFLOW_PENDING');
+  });
+});

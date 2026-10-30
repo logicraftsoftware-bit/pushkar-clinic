@@ -11,7 +11,11 @@
     "typecheck": "tsc --noEmit",
     "import:radiology": "tsx src/import-radiology-tests.ts",
     "import:neurology": "tsx src/import-neurology-tests.ts",
-    "test:access-load": "tsx performance/access-load.mts"
+    "test:access-load": "tsx performance/access-load.mts",
+    "start:mongo": "node mongo/index.mjs",
+    "mongodb:check": "node mongo/check-connection.mjs",
+    "mongodb:bootstrap": "node mongo/bootstrap.mjs",
+    "test:mongo": "node --test mongo/tests/*.test.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -19,6 +23,7 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb": "^7.8.0",
     "pg": "^8.16.3",
     "zod": "^3.25.76"
   },
