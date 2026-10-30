@@ -48,7 +48,7 @@ test('retires exactly the requested centres and Dental departments, retaining hi
     const retired=await db.query('SELECT * FROM branches ORDER BY id');await db.exec(medicityDentalRetirementSql);
     assert.deepEqual((await db.query('SELECT * FROM branches ORDER BY id')).rows,retired.rows);
     assert.deepEqual((await db.query('SELECT * FROM erp_catalog_retirements')).rows,audit.rows);
-    const migration=await readFile(new URL('../../database/migrations/027_retire_medicity_dental_catalog.sql',import.meta.url),'utf8');assert.ok(migration.includes(medicityDentalRetirementSql.trim()));
+    const migration=await readFile(new URL('../../database/migrations/027_retire_medicity_dental_catalog.sql',import.meta.url),'utf8');assert.ok(!migration.includes(medicityDentalRetirementSql.trim()),'a fresh clinic must not automatically run the previous-client retirement');
   }finally{await db.close();}
 });
 

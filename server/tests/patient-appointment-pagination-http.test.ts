@@ -18,6 +18,7 @@ const tenant=id(10000),foreign=id(10001),branch=id(10002),otherBranch=id(10003),
 await db.exec(`CREATE TABLE branches(id uuid,tenant_id uuid,name text,is_active boolean DEFAULT true);
   CREATE TABLE hospitals(id uuid,name text,logo_url text,status text,deleted_at timestamptz);
   CREATE TABLE users(id uuid,tenant_id uuid,branch_id uuid,first_name text,last_name text);
+  CREATE TABLE staff_members(id uuid,tenant_id uuid,user_id uuid,department_id uuid,professional jsonb,first_name text,middle_name text,last_name text,staff_type text);
   CREATE TABLE departments(id uuid,tenant_id uuid,branch_id uuid,name text,is_active boolean DEFAULT true);
   CREATE TABLE patients(id uuid PRIMARY KEY,tenant_id uuid,branch_id uuid,medical_record_number text,first_name text,last_name text,phone text,email text,created_at timestamptz,deleted_at timestamptz,
     address jsonb DEFAULT '{}',date_of_birth date,sex text,allergies text,existing_conditions text,registration_fee numeric DEFAULT 0,maintenance_fee numeric DEFAULT 0,registration_addons jsonb DEFAULT '[]',discount numeric DEFAULT 0,total_amount numeric DEFAULT 0,payment_mode text,payment_reference text,registration_payment_status text);

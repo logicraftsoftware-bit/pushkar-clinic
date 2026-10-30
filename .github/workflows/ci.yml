@@ -23,20 +23,27 @@ jobs:
             package-lock.json
             server/package-lock.json
       - run: npm ci --include=dev --no-audit --no-fund
-      - run: npm run build:hostinger 2>&1 | tee /tmp/clinic-build.log
-      - run: npm test 2>&1 | tee /tmp/clinic-tests.log
+      - id: build
+        run: npm run build:hostinger 2>&1 | tee /tmp/clinic-build.log
+      - id: legacy_tests
+        run: npm test 2>&1 | tee /tmp/clinic-tests.log
       - name: Expose validation failure details in check annotations
         if: failure()
         shell: bash
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          TEST_OUTCOME: ${{ steps.legacy_tests.outcome }}
         run: |
           python3 - <<'PY'
-          import pathlib
-          for name in ['build', 'mongo', 'tests']:
+          import pathlib, os
+          for name, outcome in [('build', os.environ['BUILD_OUTCOME']), ('tests', os.environ['TEST_OUTCOME'])]:
+              if outcome != 'failure':
+                  continue
               path = pathlib.Path(f'/tmp/clinic-{name}.log')
               if not path.exists():
                   continue
               lines = path.read_text(errors='replace').splitlines()
-              failures = [line for line in lines if any(term in line.lower() for term in ['error', 'failed', 'not ok', 'cannot find', 'assertion', 'actual:', 'expected:'])]
+              failures = [line for line in lines if not line.lstrip().startswith(('ok ', '# Subtest:')) and any(term in line.lower() for term in ['error', 'failed', 'not ok', 'cannot find', 'assertion', 'actual:', 'expected:'])]
               message = '\n'.join(failures[-25:])[-3500:] or '\n'.join(lines[-12:])[-2000:]
               message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
               print(f'::error title=Clinic {name} validation::{message}')
@@ -57,6 +64,7 @@ jobs:
       - run: npm --prefix server run test:mongo
       - name: Start disposable MongoDB replica set on GitHub runner
         run: |
+          exec > >(tee /tmp/clinic-mongo-setup.log) 2>&1
           docker run --detach --name mongo-test --publish 27017:27017 mongo:8.0 --replSet rs0 --bind_ip_all
           for attempt in $(seq 1 30); do
             if docker exec mongo-test mongosh --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
@@ -79,6 +87,13 @@ jobs:
       - name: Report MongoDB integration failure
         if: failure()
         run: |
-          if [ -f /tmp/clinic-mongo.log ]; then
-            python3 -c "import pathlib; s=pathlib.Path('/tmp/clinic-mongo.log').read_text(errors='replace')[-6000:]; print('::error title=MongoDB integration::'+s.replace('%','%25').replace(chr(10),'%0A').replace(chr(13),'%0D'))"
-          fi
+          python3 - <<'PY'
+          import pathlib
+          for name in ['setup', 'integration']:
+              path = pathlib.Path('/tmp/clinic-mongo-setup.log' if name == 'setup' else '/tmp/clinic-mongo.log')
+              if path.exists():
+                  content = path.read_text(errors='replace')[-6000:]
+                  escaped = content.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
+                  print(f'::error title=MongoDB {name}::{escaped}')
+          PY
+          docker logs --tail 30 mongo-test || true

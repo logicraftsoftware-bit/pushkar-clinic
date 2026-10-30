@@ -120,6 +120,15 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const deleted=await request(`/hospital-management/staff/${doctor.id}/appointment-schedule/${future}`,'DELETE',null,staffLogin.data.token);
     assert.equal(deleted.status,409);
   });
+  await t.test('foreign-tenant patients cannot be listed, read or updated',async()=>{
+    const foreignId='00000000-0000-4000-8000-000000000098';
+    await db.collection('patients').insertOne({id:foreignId,tenant_id:'other-tenant',branch_id:branch.id,medical_record_number:'FOREIGN-1',first_name:'Foreign',last_name:'Patient',deleted_at:null});
+    const rows=await request('/patients?search=Foreign','GET',null,staffLogin.data.token);
+    assert.equal(rows.status,200);assert.equal(rows.data.length,0);
+    assert.equal((await request(`/patients/${foreignId}`,'GET',null,staffLogin.data.token)).status,404);
+    assert.equal((await request(`/patients/${foreignId}/details`,'PUT',patientInput,staffLogin.data.token)).status,404);
+    await db.collection('patients').deleteOne({id:foreignId});
+  });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
   });

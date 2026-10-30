@@ -39,4 +39,6 @@ test('branch and inventory roles cannot escalate to another workspace',()=>{
   assert.equal(authorizedPortal({role:'doctor',role_codes:['DOCTOR']},'hospital_admin'),null);
   assert.equal(authorizedPortal({role:'doctor',role_codes:['DOCTOR']},'staff'),'doctor');
   assert.equal(authorizedPortal({role:'doctor',role_codes:['REVOKED']},'doctor'),null);
+  assert.equal(authorizedPortal({role:'laboratory',role_codes:['PATHOLOGIST']},'staff'),'lab_manager');
+  assert.equal(authorizedPortal({role:'laboratory',role_codes:['LAB_TECHNICIAN']},'lab_manager'),'lab_manager');
 });

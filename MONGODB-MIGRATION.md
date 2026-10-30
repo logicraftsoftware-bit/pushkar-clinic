@@ -6,14 +6,14 @@ This is an in-progress native MongoDB conversion, not a completed production rel
 
 `server/mongo/` contains a separate MongoDB backend with connection pooling, index initialization, a transaction helper, tenant-scoped repositories, scrypt password hashing, private first-administrator bootstrap, persistent login limits, revocable sessions, and native login/password-change/logout endpoints. Session validation checks current user activity, expiration, hospital status and session version. No SQL compatibility shim is used.
 
-Its API covers health, branding, administrator and staff sessions, module listing, plan creation/editing/listing, transactional clinic/branch/administrator provisioning, and clinic status changes. Suspending a clinic revokes its sessions. No default clinic or pricing data is seeded. Unconverted workflows explicitly return HTTP 501. The full application cannot yet be used with MongoDB.
+The native backend now includes authentication, plan and clinic provisioning, patient registration/detail editing/search/deletion, branch-scoped access, clinic branches/departments/wards/rooms/beds, staff login provisioning, doctor schedules, appointment slot lookup/booking, and transactional check-in/receipt posting. Duplicate patient overrides are audited; UHIDs are allocated from transactional counters. Unconverted endpoints still return HTTP 501. The full ERP is not ready to deploy.
 
 ## Still required before production
 
-- Remaining Super Admin dashboard/reports, settings/module management, clinic editing and operational staff provisioning.
+- Remaining Super Admin dashboard/reports, settings/module management, clinic editing, master deletion, custom roles and full staff frontend parity.
 - RBAC permissions, branch restrictions, access event streams and audit coverage for business operations.
-- Patient registration including duplicate checks, UHID allocation and registration payments.
-- Appointment, OPD/IPD, nursing, doctor, OT and dietary workflows.
+- Complete the remaining patient/frontend compatibility checks and accounting integrations.
+- Appointment editing/search parity, IPD admission/transfer/discharge, nursing, doctor consultation, OT and dietary workflows.
 - Invoices, payments, refunds, accounting, referral wallets and inventory transactions.
 - Laboratory catalogs, order/sample/result/verification workflows and report sharing.
 - Pharmacy, purchasing, HR, insurance and reporting.
@@ -42,4 +42,4 @@ The development command `npm --prefix server run start:mongo` starts only the in
 
 ## Verification boundaries
 
-Security helper tests run with Node's built-in test runner and require no database or dependency installation: `node --test server/mongo/tests/*.test.mjs`. GitHub CI also runs them. Syntax checks do not establish end-to-end compatibility. GitHub CI is configured to run integration tests against a disposable replica set for authentication, atomic provisioning and rollback, password revocation and suspended-clinic access. This integration suite has not yet run. Live connection testing still requires private hosting configuration; no live credentials or database writes were used during this implementation.
+Security helper tests run with Node's built-in test runner and require no database or dependency installation: `node --test server/mongo/tests/*.test.mjs`. GitHub CI also runs them. Syntax checks do not establish end-to-end compatibility. GitHub CI is configured to run integration tests against a disposable replica set for authentication, atomic provisioning and rollback, patient duplicate/tenant isolation, staff credential storage, concurrent appointment booking/check-in, password revocation and suspended-clinic access. This integration suite has not yet run. Live connection testing still requires private hosting configuration; no live credentials or database writes were used during this implementation.
