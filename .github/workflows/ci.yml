@@ -51,7 +51,7 @@ jobs:
 
   mongodb:
     name: Native MongoDB workflows
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -65,17 +65,11 @@ jobs:
       - name: Start disposable MongoDB replica set on GitHub runner
         run: |
           exec > >(tee /tmp/clinic-mongo-setup.log) 2>&1
-          docker run --detach --name mongo-test --publish 27017:27017 mongo:8.0 --replSet rs0 --bind_ip_all
-          for attempt in $(seq 1 30); do
-            if docker exec mongo-test mongosh --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
-            sleep 2
-          done
-          docker exec mongo-test mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
-          for attempt in $(seq 1 30); do
-            if docker exec mongo-test mongosh --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)'; then exit 0; fi
-            sleep 2
-          done
-          exit 1
+          mkdir -p "$RUNNER_TEMP/mongodb-bin" "$RUNNER_TEMP/mongo-data"
+          curl --fail --silent --show-error --location --retry 3 https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2404-8.0.32.tgz --output "$RUNNER_TEMP/mongodb.tgz"
+          tar -xzf "$RUNNER_TEMP/mongodb.tgz" --strip-components=1 -C "$RUNNER_TEMP/mongodb-bin"
+          "$RUNNER_TEMP/mongodb-bin/bin/mongod" --dbpath "$RUNNER_TEMP/mongo-data" --replSet rs0 --bind_ip 127.0.0.1 --port 27017 --wiredTigerCacheSizeGB 0.25 --fork --logpath /tmp/clinic-mongod.log
+          node server/mongo/ci-replica.mjs
       - name: Verify native MongoDB authentication and provisioning
         run: node server/mongo/integration.test.mjs 2>&1 | tee /tmp/clinic-mongo.log
         env:
@@ -89,11 +83,10 @@ jobs:
         run: |
           python3 - <<'PY'
           import pathlib
-          for name in ['setup', 'integration']:
-              path = pathlib.Path('/tmp/clinic-mongo-setup.log' if name == 'setup' else '/tmp/clinic-mongo.log')
+          for name in ['setup', 'server', 'integration']:
+              path = pathlib.Path({'setup':'/tmp/clinic-mongo-setup.log','server':'/tmp/clinic-mongod.log','integration':'/tmp/clinic-mongo.log'}[name])
               if path.exists():
                   content = path.read_text(errors='replace')[-6000:]
                   escaped = content.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
                   print(f'::error title=MongoDB {name}::{escaped}')
           PY
-          docker logs --tail 30 mongo-test || true

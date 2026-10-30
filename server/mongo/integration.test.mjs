@@ -116,6 +116,15 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,record_number:`OPD-CHECKIN-${appointment.id}`}),1);
     const stored=await db.collection('clinical_appointments').findOne({id:appointment.id});assert.equal(stored.paid_amount,100);assert.equal(stored.status,'Checked In');
   });
+  await t.test('appointment pages retain filtered totals, queue dates and printable identity fields',async()=>{
+    const result=await request(`/clinical/appointments?page=1&page_size=1&queue=1&date=${future}&search=Updated`,'GET',null,staffLogin.data.token);
+    assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.total,1);assert.equal(result.data.rows.length,1);
+    assert.equal(result.data.summary['Checked In'],1);assert.deepEqual(result.data.dates,[future]);
+    assert.equal(result.data.rows[0].medical_record_number,patient.medical_record_number);
+    assert.equal(result.data.rows[0]._doctor,undefined);assert.equal(result.data.rows[0].password_hash,undefined);
+    const punctuation=await request('/clinical/appointments?page=1&search=%5B','GET',null,staffLogin.data.token);
+    assert.equal(punctuation.status,200,JSON.stringify(punctuation.data));assert.equal(punctuation.data.total,0);
+  });
   await t.test('doctor availability cannot be removed when an appointment exists',async()=>{
     const deleted=await request(`/hospital-management/staff/${doctor.id}/appointment-schedule/${future}`,'DELETE',null,staffLogin.data.token);
     assert.equal(deleted.status,409);
