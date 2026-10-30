@@ -87,6 +87,39 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/patients/${foreignId}`,'GET',null,staffLogin.data.token)).status,404);
     await db.collection('branches').deleteOne({id:foreignId});
   });
+  let department,doctor,appointment;
+  const future=new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+  await t.test('clinic setup and staff creation do not store plaintext login passwords',async()=>{
+    const dept=await request('/hospital-management/departments','POST',{name:'Synthetic Medicine',code:'TESTMED',branch_id:branch.id},staffLogin.data.token);
+    assert.equal(dept.status,201,JSON.stringify(dept.data));department=dept.data;
+    const saved=await request('/hospital-management/staff/save','POST',{first_name:'Synthetic',last_name:'Doctor',staff_type:'Doctor',branch_ids:[branch.id],department_id:department.id,
+      personal:{mobile_number:'9999999996'},employment:{},account:{role:'DOCTOR',login_email:'doctor@example.invalid',username:'synthetic-doctor',password,mobile:'9999999996',account_status:'Active'},
+      professional:{medical_registration_number:'SYNTHETIC-ONLY',registration_fee:0,maintenance_fee:0,appointment_schedule:[{appointment_date:future,from_time:'10:00',to_time:'11:00',max_slots:6,slot_mode:'capacity'}]}},staffLogin.data.token);
+    assert.equal(saved.status,201,JSON.stringify(saved.data));doctor=saved.data;
+    assert.equal(doctor.account.password,undefined);
+    const stored=await db.collection('staff_members').findOne({id:doctor.id});assert.equal(stored.account.password,undefined);
+    assert.equal((await db.collection('users').findOne({id:doctor.user_id})).password_hash.startsWith('scrypt-v1$'),true);
+  });
+  await t.test('concurrent booking reserves a doctor slot only once',async()=>{
+    const input={branch_id:branch.id,department_id:department.id,doctor_id:doctor.user_id,patient_id:patient.id,appointment_date:future,appointment_time:'10:00',appointment_type:'OPD',visit_type:'New',consultation_fee:100,paid_amount:0,payment_mode:'Cash',charges:[]};
+    const attempts=await Promise.all([request('/clinical/appointments','POST',input,staffLogin.data.token),request('/clinical/appointments','POST',input,staffLogin.data.token)]);
+    assert.deepEqual(attempts.map(row=>row.status).sort(),[201,409],JSON.stringify(attempts));appointment=attempts.find(row=>row.status===201).data;
+    assert.equal(await db.collection('clinical_appointments').countDocuments({tenant_id:hospital.data.id}),1);
+    assert.equal(appointment.payment_status,'Unpaid');
+  });
+  await t.test('check-in cannot overcollect, skip payment, or post two receipts',async()=>{
+    const path=`/clinical/appointments/${appointment.id}/check-in`;
+    assert.equal((await request(path,'PATCH',{payment:{amount:101,method:'Cash'}},staffLogin.data.token)).status,400);
+    assert.equal((await request(`/clinical/appointments/${appointment.id}/status`,'PATCH',{status:'Checked In'},staffLogin.data.token)).status,409);
+    const attempts=await Promise.all([request(path,'PATCH',{payment:{amount:100,method:'Cash'}},staffLogin.data.token),request(path,'PATCH',{payment:{amount:100,method:'Cash'}},staffLogin.data.token)]);
+    assert.deepEqual(attempts.map(row=>row.status).sort(),[200,409],JSON.stringify(attempts));
+    assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,record_number:`OPD-CHECKIN-${appointment.id}`}),1);
+    const stored=await db.collection('clinical_appointments').findOne({id:appointment.id});assert.equal(stored.paid_amount,100);assert.equal(stored.status,'Checked In');
+  });
+  await t.test('doctor availability cannot be removed when an appointment exists',async()=>{
+    const deleted=await request(`/hospital-management/staff/${doctor.id}/appointment-schedule/${future}`,'DELETE',null,staffLogin.data.token);
+    assert.equal(deleted.status,409);
+  });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
   });

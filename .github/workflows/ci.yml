@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -21,6 +24,36 @@ jobs:
             server/package-lock.json
       - run: npm ci --include=dev --no-audit --no-fund
       - run: npm run build:hostinger 2>&1 | tee /tmp/clinic-build.log
+      - run: npm test 2>&1 | tee /tmp/clinic-tests.log
+      - name: Expose validation failure details in check annotations
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          for name in ['build', 'mongo', 'tests']:
+              path = pathlib.Path(f'/tmp/clinic-{name}.log')
+              if not path.exists():
+                  continue
+              lines = path.read_text(errors='replace').splitlines()
+              failures = [line for line in lines if any(term in line.lower() for term in ['error', 'failed', 'not ok', 'cannot find', 'assertion', 'actual:', 'expected:'])]
+              message = '\n'.join(failures[-25:])[-3500:] or '\n'.join(lines[-12:])[-2000:]
+              message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::error title=Clinic {name} validation::{message}')
+          PY
+
+  mongodb:
+    name: Native MongoDB workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm --prefix server ci --include=dev --no-audit --no-fund
       - run: npm --prefix server run test:mongo
       - name: Start disposable MongoDB replica set on GitHub runner
         run: |
@@ -43,20 +76,9 @@ jobs:
           MONGODB_DB: pushkar_test_ci
           JWT_SECRET: synthetic-ci-secret-for-disposable-tests-only
           FRONTEND_ORIGIN: https://erp.example.invalid
-      - run: npm test 2>&1 | tee /tmp/clinic-tests.log
-      - name: Expose validation failure details in check annotations
+      - name: Report MongoDB integration failure
         if: failure()
-        shell: bash
         run: |
-          python3 - <<'PY'
-          import pathlib
-          for name in ['build', 'mongo', 'tests']:
-              path = pathlib.Path(f'/tmp/clinic-{name}.log')
-              if not path.exists():
-                  continue
-              lines = path.read_text(errors='replace').splitlines()
-              failures = [line for line in lines if any(term in line.lower() for term in ['error', 'failed', 'not ok', 'cannot find', 'assertion', 'actual:', 'expected:'])]
-              message = '\n'.join(failures[-25:])[-3500:] or '\n'.join(lines[-12:])[-2000:]
-              message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::error title=Clinic {name} validation::{message}')
-          PY
+          if [ -f /tmp/clinic-mongo.log ]; then
+            python3 -c "import pathlib; s=pathlib.Path('/tmp/clinic-mongo.log').read_text(errors='replace')[-6000:]; print('::error title=MongoDB integration::'+s.replace('%','%25').replace(chr(10),'%0A').replace(chr(13),'%0D'))"
+          fi

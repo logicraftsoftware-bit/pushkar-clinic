@@ -48,7 +48,7 @@ export function authorizedPortal(account, requested) {
     assigned.includes('INVENTORY_MANAGER')&&!assigned.includes('RECEPTIONIST')?'inventory_manager':defaults[account.role];
   const portal=requested==='staff'?staff:requested;
   if(!portal || portalRoles[portal]!==account.role)return null;
-  if(assigned.length && !assigned.includes(portal.toUpperCase()))return null;
+  if(assigned.length && !assigned.includes(portal.toUpperCase()) && !(portal==='lab_manager'&&assigned.some(code=>['LAB_TECHNICIAN','PATHOLOGIST'].includes(code))))return null;
   if(!assigned.length && ['branch_admin','inventory_manager'].includes(portal))return null;
   return portal;
 }

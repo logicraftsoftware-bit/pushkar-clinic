@@ -13,7 +13,7 @@ export function initializeMongo() {
   ready ??= (async () => {
     await client.connect();
     await db.command({ ping: 1 });
-    for (const name of ['super_admin_users','hospitals','users','branches','patients','login_activity','audit_events']) {
+    for (const name of ['super_admin_users','hospitals','users','branches','patients','login_activity','audit_events','staff_members','departments','wards','rooms','beds','clinical_appointments','finance_records']) {
       await db.collection(name).createIndex({ id: 1 }, { unique: true });
     }
     // No patients, staff, partners or sample hospital records are seeded.
@@ -28,6 +28,15 @@ export function initializeMongo() {
       ['patients', { tenant_id: 1, normalized_name: 1, phone: 1 }, {}],
       ['rbac_roles', { tenant_id: 1, code: 1 }, { unique: true }],
       ['user_branch_access', { tenant_id: 1, user_id: 1, branch_id: 1 }, { unique: true }],
+      ['staff_members', { tenant_id: 1, branch_id: 1, staff_type: 1 }, {}],
+      ['departments', { tenant_id: 1, code: 1 }, { unique: true }],
+      ['wards', { tenant_id: 1, code: 1 }, { unique: true }],
+      ['rooms', { tenant_id: 1, branch_id: 1, room_number: 1 }, { unique: true }],
+      ['beds', { tenant_id: 1, branch_id: 1, bed_number: 1 }, { unique: true }],
+      ['users', { username: 1 }, { unique: true, partialFilterExpression: { username: { $type: 'string' } } }],
+      ['clinical_appointments', { tenant_id: 1, appointment_number: 1 }, { unique: true }],
+      ['clinical_appointments', { tenant_id: 1, doctor_id: 1, appointment_date: 1, appointment_time: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['Booked','Confirmed','Checked In','Waiting','In Consultation','Completed'] } } }],
+      ['finance_records', { tenant_id: 1, record_number: 1 }, { unique: true }],
       ['platform_settings', { key: 1 }, { unique: true }],
       ['subscription_plans', { id: 1 }, { unique: true }],
       ['subscription_plans', { code: 1 }, { unique: true }],
