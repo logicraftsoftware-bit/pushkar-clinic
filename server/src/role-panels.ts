@@ -652,7 +652,7 @@ router.post("/lab-own-orders", async (req: Authed, res) => {
     if(!pharmacy)return void res.status(400).json({error:'Selected refer pharmacy is unavailable'});
   }
   let totals: ReturnType<typeof labPharmacyBilling>;
-  try { totals = labPharmacyBilling(tests.map(test => test.amount),body.discount,body.paid,pharmacy ? body.pharmacy_discount_percentage ?? Number(pharmacy.discount_percentage||0) : 0); }
+  try { totals = labPharmacyBilling(tests.map(test => test.amount),body.discount,body.paid,pharmacy ? Number(pharmacy.discount_percentage||0) : 0); }
   catch(error) { return void res.status(400).json({error:error instanceof Error ? error.message : "Invalid billing amount"}); }
   const {subtotal,discount,paid,total,due,status} = totals;
   Object.assign(data,{referred_by:referredBy,referred_by_id:body.referred_by,source:body.source,center,center_id:body.center_id,executive,referral_partner_id:body.referral_partner_id,collector,collector_id:body.collector_id,payment_mode:body.payment_mode,discount_amount:discount,paid_amount:paid,due_amount:due,

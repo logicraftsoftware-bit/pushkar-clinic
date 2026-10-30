@@ -138,6 +138,35 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/patients/${foreignId}/details`,'PUT',patientInput,staffLogin.data.token)).status,404);
     await db.collection('patients').deleteOne({id:foreignId});
   });
+  let admission,secondBed;
+  await t.test('IPD admission atomically reserves a bed, snapshots its price and records its deposit',async()=>{
+    const ward=await request('/hospital-management/wards','POST',{name:'Synthetic Ward',code:'WARD1',branch_id:branch.id,department_id:department.id},staffLogin.data.token);
+    assert.equal(ward.status,201,JSON.stringify(ward.data));
+    const room=await request('/hospital-management/rooms','POST',{room_number:'TEST-ROOM',branch_id:branch.id,ward_id:ward.data.id,daily_charge:100},staffLogin.data.token);
+    assert.equal(room.status,201,JSON.stringify(room.data));
+    const bed=await request('/hospital-management/beds','POST',{bed_number:'TEST-BED-1',branch_id:branch.id,ward_id:ward.data.id,room_id:room.data.id,daily_charge:100},staffLogin.data.token);
+    assert.equal(bed.status,201,JSON.stringify(bed.data));
+    const other=await request('/hospital-management/beds','POST',{bed_number:'TEST-BED-2',branch_id:branch.id,ward_id:ward.data.id,room_id:room.data.id,daily_charge:200},staffLogin.data.token);
+    assert.equal(other.status,201,JSON.stringify(other.data));secondBed=other.data;
+    const body={branch_id:branch.id,patient_id:patient.id,admitted_at:new Date(Date.now()-1000).toISOString(),admission_type:'Planned',department_id:department.id,consultant_doctor_id:doctor.user_id,bed_id:bed.data.id,has_insurance:false,deposit_amount:50,payment_mode:'Cash',charges:[],discount:0};
+    const result=await request('/clinical/ipd','POST',body,staffLogin.data.token);
+    assert.equal(result.status,201,JSON.stringify(result.data));admission=result.data;
+    assert.equal(admission.registration_amount,0);assert.equal(admission.total_amount,100);assert.equal(admission.ipd_number,'IPD-000001');
+    assert.equal((await db.collection('beds').findOne({id:bed.data.id})).status,'Occupied');
+    assert.equal(await db.collection('ipd_bed_stays').countDocuments({admission_id:admission.id}),1);
+    assert.equal(await db.collection('finance_records').countDocuments({record_number:`IPD-DEPOSIT-${admission.id}`}),1);
+    const duplicate=await request('/clinical/ipd','POST',{...body,bed_id:secondBed.id},staffLogin.data.token);
+    assert.equal(duplicate.status,409,JSON.stringify(duplicate.data));assert.equal((await db.collection('beds').findOne({id:secondBed.id})).status,'Available');
+  });
+  await t.test('bed transfer closes the old price snapshot and allocates the new bed',async()=>{
+    const result=await request(`/clinical/ipd/${admission.id}/transfer`,'PUT',{transfer_type:'Bed Transfer',bed_id:secondBed.id,notes:'Synthetic transfer'},staffLogin.data.token);
+    assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.total_amount,300);
+    assert.equal((await db.collection('beds').findOne({id:admission.bed_id})).status,'Cleaning');
+    assert.equal((await db.collection('beds').findOne({id:secondBed.id})).status,'Occupied');
+    const detail=await request(`/clinical/ipd/${admission.id}/details`,'GET',null,staffLogin.data.token);
+    assert.equal(detail.status,200,JSON.stringify(detail.data));assert.equal(detail.data.bed_stays.length,2);assert.equal(detail.data.transfers.length,1);
+    assert.equal((await request(`/clinical/ipd/${admission.id}/status`,'PUT',{status:'Discharged'},staffLogin.data.token)).status,501);
+  });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
   });
