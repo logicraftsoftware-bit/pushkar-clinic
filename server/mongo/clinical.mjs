@@ -5,6 +5,8 @@ import {db,transaction} from './database.mjs';
 import {requirePermission,scopeFor,assertBranch,permissionsFor,writeAudit} from './access.mjs';
 import {doctorDay,doctorSlots,fiveMinuteDoctorSlots,availableDoctorSlots,upcomingDoctorSlots} from './doctor-availability.mjs';
 import {cents,appointmentTotal,paymentStatus} from './money.mjs';
+import {operationalSettings,configuredPrefix} from './settings.mjs';
+import {escapeSearch} from './search.mjs';
 const router=Router(),uuid=z.string().uuid();
 const date=z.string().date(),time=z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::00)?$/).transform(value=>value.slice(0,5));
 const amount=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
@@ -15,8 +17,7 @@ const appointmentInput=z.object({branch_id:uuid,department_id:uuid,patient_id:uu
   doctor_fee_selection:z.preprocess(value=>{if(typeof value==='string'){try{return JSON.parse(value);}catch{return value;}}return value;},z.object({registration_fee:z.boolean(),maintenance_fee:z.boolean()}).optional()),discount:amount.default(0),payment_mode:z.string().max(100).default(''),paid_amount:amount.default(0)});
 function failure(message,status=400){return Object.assign(new Error(message),{status});}
 async function methods(tenant,session){
-  const setting=await db.collection('hospital_settings').findOne({tenant_id:tenant,key:'payment_methods'},{session});
-  return Array.isArray(setting?.value)?setting.value:['Cash','UPI','Card','Bank Transfer'];
+  return (await operationalSettings(tenant,session)).payment_methods;
 }
 async function doctorFor(response,branch,department,doctorId,session){
   await assertBranch(response,branch,session);
@@ -61,8 +62,9 @@ router.get('/lookups',async(request,response)=>{
   for(const patient of patients)patient.name=`${patient.first_name} ${patient.last_name}`;
   const staff=await db.collection('staff_members').find({tenant_id:tenant,staff_type:'Doctor',status:'Active',branch_ids:{$in:visibleBranches.map(branch=>branch.id)}}).toArray();
   const doctors=[];
-  for(const row of staff){const user=await db.collection('users').findOne({id:row.user_id,tenant_id:tenant,is_active:true});if(user)doctors.push({id:user.id,name:`${user.first_name} ${user.last_name}`,branch_id:user.branch_id,branch_ids:row.branch_ids,department_id:row.department_id,...row.professional});}
-  response.json({current_branch_id:response.locals.account.branch_id,patients,branches:visibleBranches.map(({id,name})=>({id,name})),departments:await read('departments'),doctors,wards:await read('wards'),rooms:await read('rooms'),beds:await read('beds'),symptom_types:[],charges:await db.collection('hospital_charge_masters').find({tenant_id:tenant,kind:'charge'},{projection:{_id:0}}).toArray(),payment_methods:await methods(tenant),general_settings:{currency_symbol:'₹',date_format:'dd-mm-yyyy',time_format:'12 Hour'}});
+  for(const row of staff){const user=await db.collection('users').findOne({id:row.user_id,tenant_id:tenant,is_active:true});if(user)doctors.push({...row.professional,id:user.id,name:`${user.first_name} ${user.last_name}`,branch_id:user.branch_id,branch_ids:row.branch_ids,department_id:row.department_id});}
+  const runtime=await operationalSettings(tenant);
+  response.json({current_branch_id:response.locals.account.branch_id,patients,branches:visibleBranches.map(({id,name})=>({id,name})),departments:await read('departments'),doctors,wards:await read('wards'),rooms:await read('rooms'),beds:await read('beds'),symptom_types:await db.collection('hospital_diagnostic_masters').find({tenant_id:tenant,domain:'symptoms',kind:'type'},{projection:{_id:0,id:1,name:1}}).toArray(),charges:await db.collection('hospital_charge_masters').find({tenant_id:tenant,kind:'charge'},{projection:{_id:0}}).toArray(),payment_methods:runtime.payment_methods,general_settings:runtime.general});
 });
 router.get('/patient-search',requirePermission('appointment.view'),async(request,response)=>{
   const search=z.string().trim().min(1).max(150).parse(request.query.search??request.query.q),escaped=search.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -93,7 +95,7 @@ router.get('/appointments',requirePermission('appointment.view'),async(request,r
   pipeline.push({$set:{patient_name:{$concat:[{$ifNull:['$_patient.first_name','']},' ',{$ifNull:['$_patient.last_name','']}]},doctor_name:{$concat:[{$ifNull:['$_doctor.first_name','']},' ',{$ifNull:['$_doctor.last_name','']}]},department_name:'$_department.name',branch_name:'$_branch.name',medical_record_number:'$_patient.medical_record_number',patient_phone:'$_patient.phone',patient_address:'$_patient.address',patient_date_of_birth:'$_patient.date_of_birth',gender:'$_patient.sex',allergies:'$_patient.allergies',finding:'$_patient.existing_conditions',registration_fee_amount:'$_patient.registration_fee',registration_addon_amount:'$_patient.maintenance_fee',registration_discount_amount:'$_patient.discount',registration_amount:'$_patient.total_amount',registration_charges:'$_patient.registration_addons',_finished:{$cond:[{$in:['$status',['Completed','No Show']]},1,0]}}});
   const search=z.string().max(150).default('').parse(request.query.search).trim();
   if(search)for(const term of search.split(/\s+/)){
-    const expression={};expression.$regex=[...term].map(character=>'\\^$.*+?()[]{}|'.includes(character)?'\\'+character:character).join('');expression.$options='i';
+    const expression={};expression.$regex=escapeSearch(term);expression.$options='i';
     pipeline.push({$match:{$or:['appointment_number','token_number','status','appointment_date','patient_name','medical_record_number','patient_phone','doctor_name','department_name'].map(field=>({[field]:expression}))}});
   }
   const sort=queue?{_finished:1,slot_serial:1,appointment_date:-1,appointment_time:1,id:1}:{appointment_date:-1,appointment_time:-1,id:-1};
@@ -124,7 +126,7 @@ router.post('/appointments',requirePermission('appointment.create'),async(reques
     if(paid&&!(await methods(tenant,session)).includes(record.payment_mode))throw failure('Select a valid payment method.');
     record.payment_status=paymentStatus(total,paid);
     const counter=await db.collection('counters').findOneAndUpdate({_id:`${tenant}:appointment`},{$inc:{value:1}},{session,upsert:true,returnDocument:'after'});
-    record.appointment_number=`APT-${String(counter.value).padStart(6,'0')}`;
+    record.appointment_number=`${await configuredPrefix(tenant,'appointment_prefix','APT',session)}-${String(counter.value).padStart(6,'0')}`;
     const initials=`${doctor.user.first_name} ${doctor.user.last_name}`.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').toUpperCase();
     record.token_number=`${body.appointment_date.split('-').reverse().join('')}/${initials}/${doctor.department.name.replace(/[^a-z0-9]/gi,'').slice(0,5).toUpperCase()}/${String(slot.serial).padStart(3,'0')}`;
     await db.collection('clinical_appointments').insertOne({...record},{session});

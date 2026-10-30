@@ -5,6 +5,7 @@ import { db,transaction } from './database.mjs';
 import { patientInput } from './patient-schema.mjs';
 import { requirePermission,scopeFor,assertBranch,writeAudit,allowedBranches } from './access.mjs';
 import { publicRecord } from './security.mjs';
+import {configuredPrefix,operationalSettings} from './settings.mjs';
 
 const router=Router();
 const uuid=z.string().uuid();
@@ -51,12 +52,13 @@ router.get('/registration-settings',async(_request,response)=>{
   const tenant_id=response.locals.account.tenant_id;
   const settings=await db.collection('hospital_settings').find({tenant_id}).toArray();
   const value=key=>settings.find(row=>row.key===key)?.value;
+  const runtime=await operationalSettings(tenant_id);
   const charges=await db.collection('hospital_charge_masters').find({tenant_id,kind:'charge'},{projection:{_id:0,id:1,name:1,data:1}}).sort({name:1}).toArray();
   const partners=await db.collection('referral_partners').find({tenant_id,status:'Active'},{projection:{_id:0,id:1,partner_code:1,name:1,phone:1}}).sort({name:1}).toArray();
   const medicines=await db.collection('hospital_pharmacy_masters').find({tenant_id,kind:'medicine'},{projection:{name:1}}).limit(1000).toArray();
   response.json({registration_fee:Number(value('registration_fee')??0),registration_charges:charges.map(row=>({id:row.id,name:row.name,price:Number(row.data?.standard_charge??0)})),
     referral_partners:partners,medicines:medicines.map(row=>row.name),can_override_duplicates:response.locals.claims.portal==='hospital_admin',
-    payment_methods:value('payment_methods')??['Cash','UPI','Card','Bank Transfer'],currency_symbol:'₹',date_format:'dd-mm-yyyy',time_format:'12 Hour'});
+    payment_methods:runtime.payment_methods,currency_symbol:runtime.general.currency_symbol??'₹',date_format:runtime.general.date_format??'dd-mm-yyyy',time_format:runtime.general.time_format??'12 Hour'});
 });
 router.get('/:id',async(request,response)=>{
   const id=uuid.parse(request.params.id),filter=await scopeFor(response,{id,deleted_at:null});
@@ -88,8 +90,7 @@ router.post('/',async(request,response)=>{
       const ids=await allowedBranches(response.locals.account,response.locals.claims.portal,session);
       throw Object.assign(new Error('A possible duplicate patient already exists. Review the matching UHID.'),{status:409,code:'POSSIBLE_DUPLICATE_PATIENT',details:{can_override:canOverride,matches:duplicates.map(row=>ids===null||ids.includes(row.branch_id)?row:{restricted:true,medical_record_number:'Existing patient in another authorized workflow'})}});
     }
-    const setting=await db.collection('hospital_settings').findOne({tenant_id:tenant,key:'uhid_prefix'},{session});
-    const prefix=typeof setting?.value==='string'&&setting.value.trim()?setting.value.trim():'UHID';
+    const prefix=await configuredPrefix(tenant,'uhid_prefix','UHID',session);
     const now=new Date(),record={...data,id,tenant_id:tenant,medical_record_number:`${prefix}-${String(counter.value).padStart(6,'0')}`,created_at:now,updated_at:now,deleted_at:null};
     if(data.referral_partner_id)record.referral_tagged_at=now;
     await db.collection('patients').insertOne({...record},{session});

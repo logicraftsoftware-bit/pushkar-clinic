@@ -12,6 +12,10 @@ import patients from './patients.mjs';
 import management from './management.mjs';
 import clinical from './clinical.mjs';
 import inpatient from './inpatient.mjs';
+import settings from './settings.mjs';
+import finance from './finance.mjs';
+import diagnosticMasters from './diagnostic-masters.mjs';
+import laboratory from './laboratory.mjs';
 import { permissionsFor } from './access.mjs';
 
 const app = express();
@@ -139,16 +143,18 @@ app.get('/api/v1/access-control/me',authenticate('careframe-portal'),async(_requ
   response.json({permissions:await permissionsFor(account),roles,managed_roles:[]});
 });
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
-app.use('/api/v1/hospital-management',authenticate('careframe-portal'),management);
-app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical);
-app.use('/api/v1/clinical',authenticate('careframe-portal'),inpatient);
+app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosticMasters,management);
+app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);
+app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
+app.use('/api/v1/operations',authenticate('careframe-portal'),finance);
+app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.
 app.use('/api', (_request, response) => response.status(501).json({ code: 'MONGODB_WORKFLOW_PENDING', error: 'This workflow is not yet converted to MongoDB. This build is not ready for clinic use.' }));
 app.use((error, _request, response, _next) => {
   if (error instanceof z.ZodError) return response.status(400).json({ error: 'Check the submitted values.', fields: error.issues.map(issue => issue.path.join('.')) });
   if (error?.code === 11000) return response.status(409).json({ error: 'A record with these details already exists.' });
   if (error instanceof SyntaxError && 'body' in error) return response.status(400).json({ error: 'Invalid JSON.' });
-  if ([400,401,403,404,409,429].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
+  if ([400,401,403,404,409,429,501].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
   // Driver error messages can contain hosts or credentials. Do not print them.
   console.error('MongoDB request failed', error?.name ?? 'Error');
   response.status(500).json({ error: 'Request failed. Check the server configuration.' });

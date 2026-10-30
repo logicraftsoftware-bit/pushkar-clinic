@@ -167,6 +167,50 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(detail.status,200,JSON.stringify(detail.data));assert.equal(detail.data.bed_stays.length,2);assert.equal(detail.data.transfers.length,1);
     assert.equal((await request(`/clinical/ipd/${admission.id}/status`,'PUT',{status:'Discharged'},staffLogin.data.token)).status,501);
   });
+  let laboratoryOrder;
+  await t.test('laboratory billing snapshots branch prices and ignores forged pharmacy discounts',async()=>{
+    const master=await request('/hospital-management/diagnostic-masters/pathology/test','POST',{name:'Synthetic Blood Test',data:{test_type:'Pathology',amount:100,branch_prices:{[branch.id]:120},available_branch_ids:[branch.id]}},staffLogin.data.token);
+    assert.equal(master.status,201,JSON.stringify(master.data));
+    const pharmacy=await request('/hospital-management/refer-pharmacies','POST',{name:'Synthetic Referral Pharmacy',address:'Example Road',discount_percentage:50},staffLogin.data.token);
+    assert.equal(pharmacy.status,201,JSON.stringify(pharmacy.data));
+    const ordered=await request('/workspaces/lab-own-orders','POST',{patient_id:patient.id,test_ids:[master.data.id],center_id:branch.id,refer_pharmacy_id:pharmacy.data.id,pharmacy_discount_percentage:100,paid:20,payment_mode:'Cash',discount:0},staffLogin.data.token);
+    assert.equal(ordered.status,201,JSON.stringify(ordered.data));laboratoryOrder=ordered.data;
+    assert.equal(laboratoryOrder.bill.amount,120);assert.equal(laboratoryOrder.bill.total,60);assert.equal(laboratoryOrder.bill.due,40);
+    assert.equal(laboratoryOrder.data.pharmacy_discount_percentage,50);
+  });
+  await t.test('concurrent laboratory payment retries post one receipt for one request ID',async()=>{
+    const path=`/workspaces/work-items/${laboratoryOrder.id}/lab-bill`,key='00000000-0000-4000-8000-000000000088';
+    const invalid=await request(path,'PATCH',{payment_mode:'Cash',payment_amount:41,payment_request_id:key,discount:60},staffLogin.data.token);
+    assert.equal(invalid.status,400);
+    const input={payment_mode:'Cash',payment_amount:40,payment_request_id:key,discount:60};
+    const results=await Promise.all([request(path,'PATCH',input,staffLogin.data.token),request(path,'PATCH',input,staffLogin.data.token)]);
+    assert.deepEqual(results.map(row=>row.status),[200,200],JSON.stringify(results));
+    assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,invoice_id:laboratoryOrder.bill.id,kind:'payments'}),2);
+    assert.equal((await request(path,'GET',null,staffLogin.data.token)).data.due,0);
+    assert.equal((await request(path,'PATCH',{...input,payment_amount:39},staffLogin.data.token)).status,409);
+  });
+  await t.test('laboratory samples require generated barcodes before collection',async()=>{
+    const action=`/workspaces/work-items/${laboratoryOrder.id}`;
+    assert.equal((await request(action+'/sample-action','PATCH',{action:'collected'},staffLogin.data.token)).status,409);
+    assert.equal((await request(action+'/lab-action','PATCH',{action:'send_sample'},staffLogin.data.token)).status,200);
+    const generated=await request(action+'/sample-action','PATCH',{action:'generate_barcodes',collector:'Synthetic Technician'},staffLogin.data.token);
+    assert.equal(generated.status,200,JSON.stringify(generated.data));assert.equal(generated.data.data.barcodes.length,1);
+    const repeated=await request(action+'/sample-action','PATCH',{action:'generate_barcodes',collector:'Synthetic Technician'},staffLogin.data.token);
+    assert.equal(repeated.data.data.barcodes[0].value,generated.data.data.barcodes[0].value);
+    assert.equal((await request(action+'/sample-action','PATCH',{action:'collected'},staffLogin.data.token)).status,200);
+    assert.equal((await request(action+'/sample-action','PATCH',{action:'collected'},staffLogin.data.token)).status,409);
+    const list=await request('/workspaces/lab-orders?page=1','GET',null,staffLogin.data.token);
+    assert.equal(list.status,200,JSON.stringify(list.data));assert.equal(list.data.summary.total,1);assert.equal(list.data.summary.progress,1);assert.equal(list.data.summary.ready,0);
+  });
+  await t.test('operational prefixes apply only to new patients and receipts remain visible',async()=>{
+    assert.equal((await request('/hospital-admin/settings/PrefixSetting','PUT',{uhid_prefix:'NEWUHID'},staffLogin.data.token)).status,204);
+    const created=await request('/patients','POST',{...patientInput,first_name:'Another',last_name:'Synthetic',phone:'9999999991'},staffLogin.data.token);
+    assert.equal(created.status,201,JSON.stringify(created.data));assert.match(created.data.medical_record_number,/^NEWUHID-/);
+    assert.equal((await request(`/patients/${patient.id}`,'GET',null,staffLogin.data.token)).data.patient.medical_record_number,patient.medical_record_number);
+    const receipts=await request('/operations/finance/payments','GET',null,staffLogin.data.token);
+    assert.equal(receipts.status,200);assert.equal(receipts.data.reduce((sum,row)=>sum+row.amount,0),210);
+    assert.equal((await request('/hospital-admin/settings/constructor','PUT',{value:'bad'},staffLogin.data.token)).status,400);
+  });
   await t.test('staff tokens cannot access platform administration',async()=>{
     assert.equal((await request('/admin/hospitals','GET',null,staffLogin.data.token)).status,401);
   });

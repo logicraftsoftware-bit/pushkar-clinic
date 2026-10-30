@@ -6,6 +6,7 @@ import {admissionInput} from './admission-schema.mjs';
 import {scopeFor,assertBranch,requirePermission,writeAudit} from './access.mjs';
 import {cents} from './money.mjs';
 import {bedStayAmount,inpatientTotal} from './inpatient-billing.mjs';
+import {configuredPrefix,operationalSettings} from './settings.mjs';
 const router=Router(),uuid=z.string().uuid();
 const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(value);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -98,11 +99,10 @@ router.post('/ipd',requirePermission('ipd.create'),async(request,response)=>{
     const initial=cents(bed?.daily_charge??0)+charges.reduce((sum,charge)=>sum+cents(charge.amount),0);
     if(cents(input.discount)>initial||cents(input.paid_amount)>initial-cents(input.discount))throw failure('Discount or payment exceeds admission charges.');
     if(cents(input.paid_amount)+cents(input.deposit_amount)>0){
-      const methods=await db.collection('hospital_settings').findOne({tenant_id,key:'payment_methods'},{session});
-      if(!(methods?.value??['Cash','UPI','Card','Bank Transfer']).includes(input.payment_mode))throw failure('Select a valid payment method.');
+      if(!(await operationalSettings(tenant_id,session)).payment_methods.includes(input.payment_mode))throw failure('Select a valid payment method.');
     }
     const counter=await db.collection('counters').findOneAndUpdate({_id:`${tenant_id}:ipd`},{$inc:{value:1}},{session,upsert:true,returnDocument:'after'});
-    const now=new Date(),row={...input,charges,id:admissionId,tenant_id,branch_id,ipd_number:`IPD-${String(counter.value).padStart(6,'0')}`,admitted_at:admittedAt,
+    const now=new Date(),row={...input,charges,id:admissionId,tenant_id,branch_id,ipd_number:`${await configuredPrefix(tenant_id,'ipd_prefix','IPD',session)}-${String(counter.value).padStart(6,'0')}`,admitted_at:admittedAt,
       ward_id:bed?.ward_id??input.ward_id,room_id:bed?.room_id??input.room_id,bed_id:bed?.id??null,attendant:{name:input.attendant_name,phone:input.attendant_phone,relationship:input.attendant_relationship},
       consultation_fee:0,registration_amount:0,registration_fee_amount:0,registration_addon_amount:0,registration_deposit_amount:0,registration_discount_amount:0,status:'Admitted',active:true,created_at:now,updated_at:now};
     delete row.attendant_name;delete row.attendant_phone;delete row.attendant_relationship;

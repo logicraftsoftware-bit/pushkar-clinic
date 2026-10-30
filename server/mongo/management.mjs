@@ -68,7 +68,8 @@ router.post('/staff/save',async(request,response)=>{
   const account={...input.account},loginEmail=String(account.login_email??'').trim().toLowerCase(),username=String(account.username??'').trim().toLowerCase();
   if(Boolean(loginEmail)!==Boolean(username))throw failure('Provide both login email and username, or leave both blank.');
   if(loginEmail)z.string().email().parse(loginEmail);
-  const password=String(account.password??''),password_hash=password?await hashPassword(password):null;
+  const password=String(account.password??'');if(password)z.string().min(12).max(200).parse(password);
+  const password_hash=password?await hashPassword(password):null;
   delete account.password;delete account.password_hash;
   const staffId=input.id??randomUUID(),newUserId=randomUUID(),tenant_id=response.locals.account.tenant_id;
   const result=await transaction(async session=>{
