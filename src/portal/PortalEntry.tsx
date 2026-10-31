@@ -24,6 +24,7 @@ import type { Role } from "../data";
 import { updateBrowserPath } from "../navigation";
 import {PORTAL_SESSION_KEY,readTabSession,writeTabSession,clearTabSession,restoreTabSession,TAB_SESSION_EVENT} from '../tab-session';
 import "./portal.css";
+import "./portal-auth.css";
 
 type Portal =
   | "hospital_admin"
@@ -231,7 +232,7 @@ function PortalLogin({
               branding.name.charAt(0).toUpperCase()
             )}
           </span>
-          {branding.name}
+          <div className="portal-brand-copy"><strong>{branding.name}</strong><small>Clinic operations, simplified.</small></div>
         </div>
         <div className="story-copy">
           <small>CONNECTED HEALTHCARE OPERATIONS</small>
@@ -367,7 +368,7 @@ export default function PortalEntry() {
     if (window.location.pathname === "/") updateBrowserPath("/login", true);
     return <PortalLogin branding={branding} onLogin={setSession} />;
   }
-  if(session.forcePasswordChange)return <PasswordChange session={session} onChanged={()=>{const updated={...session,forcePasswordChange:false};writeTabSession(SESSION_KEY,JSON.stringify(updated));setSession(updated);}} />;
+  if(session.forcePasswordChange)return <PasswordChange branding={branding} session={session} onChanged={()=>{const updated={...session,forcePasswordChange:false};writeTabSession(SESSION_KEY,JSON.stringify(updated));setSession(updated);}} />;
   const role =
     portals.find((item) => item.value === session.user.portal)?.role ??
     "Hospital Admin";
@@ -409,12 +410,43 @@ export default function PortalEntry() {
   );
 }
 
-function PasswordChange({session,onChanged}:{session:Session;onChanged:()=>void}){
+function PasswordChange({session,onChanged,branding}:{session:Session;onChanged:()=>void;branding:PlatformBranding}){
+  const [visible,setVisible]=useState<Record<string,boolean>>({});
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();const values=new FormData(event.currentTarget);setError('');
     if(values.get('newPassword')!==values.get('confirmPassword')){setError('Passwords do not match.');return;}
     setBusy(true);try{const response=await fetch(API_URL+'/api/v1/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.token},body:JSON.stringify({currentPassword:values.get('currentPassword'),newPassword:values.get('newPassword')})});if(!response.ok){const data=await response.json();throw Error(data.error||'Unable to change password.');}onChanged();}catch(e){setError(e instanceof Error?e.message:'Unable to change password.');}finally{setBusy(false);}
   }
-  return <div className="portal-login-main"><form onSubmit={submit}><h2>Change your temporary password</h2><p>You must set a new password before opening your workspace.</p>{[['currentPassword','Temporary password'],['newPassword','New password'],['confirmPassword','Confirm new password']].map(([name,label])=><label className="portal-credential" key={name}><span>{label}</span><input name={name} type="password" required minLength={8} maxLength={200} autoComplete={name==='currentPassword'?'current-password':'new-password'}/></label>)}{error&&<div className="portal-error">{error}</div>}<button className="portal-submit" disabled={busy}>Change password</button><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('session-invalid',{detail:'Signed out.'}))}>Sign out</button></form></div>;
+  return (
+    <main className="password-setup">
+      <div className="password-setup-brand">
+        {branding.logo && <img src={branding.logo} alt="Pushkar Pharmaceutical" />}
+        <strong>{branding.name}</strong>
+      </div>
+      <form className="password-setup-card" onSubmit={submit} aria-busy={busy}>
+        <div className="password-setup-icon"><ShieldCheck aria-hidden="true" /></div>
+        <span className="password-setup-step">SECURE YOUR ACCOUNT</span>
+        <h1>Create your new password</h1>
+        <p>Welcome, {session.user.name}. Replace your temporary password to open your clinic workspace.</p>
+        <div className="password-setup-fields">
+          {([['currentPassword','Temporary password'],['newPassword','New password'],['confirmPassword','Confirm new password']] as const).map(([name,label]) => (
+            <label className="portal-credential" key={name}>
+              <span className="portal-field-label">{label}</span>
+              <div className="portal-input">
+                <LockKeyhole aria-hidden="true" />
+                <input name={name} type={visible[name] ? 'text' : 'password'} required minLength={name==='currentPassword'?8:12} maxLength={200} autoComplete={name==='currentPassword'?'current-password':'new-password'} placeholder={name==='currentPassword'?'Enter your temporary password':'At least 12 characters'} aria-describedby={name==='newPassword'?'password-requirements':undefined} />
+                <button className="portal-password-toggle" type="button" aria-label={`${visible[name]?'Hide':'Show'} ${label.toLowerCase()}`} aria-pressed={Boolean(visible[name])} onClick={()=>setVisible(old=>({...old,[name]:!old[name]}))}>{visible[name]?<EyeOff />:<Eye />}</button>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="password-requirements" id="password-requirements"><LockKeyhole aria-hidden="true" /><span>Use at least 12 characters and a password you don?t use elsewhere.</span></div>
+        {error && <div className="portal-error" role="alert">{error}</div>}
+        <button type="submit" className="portal-submit" disabled={busy}>{busy ? <><LoaderCircle className="spin" /> Updating password...</> : <>Save password & continue <ArrowRight /></>}</button>
+        <button className="password-signout" type="button" disabled={busy} onClick={()=>window.dispatchEvent(new CustomEvent('session-invalid',{detail:'Signed out.'}))}>Sign out and return to login</button>
+      </form>
+      <p className="password-setup-footer"><ShieldCheck aria-hidden="true" /> Protected access to your clinic workspace</p>
+    </main>
+  );
 }
