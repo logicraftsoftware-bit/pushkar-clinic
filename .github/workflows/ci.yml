@@ -89,7 +89,9 @@ jobs:
           for name in ['setup', 'server', 'integration']:
               path = pathlib.Path({'setup':'/tmp/clinic-mongo-setup.log','server':'/tmp/clinic-mongod.log','integration':'/tmp/clinic-mongo.log'}[name])
               if path.exists():
-                  content = path.read_text(errors='replace')[-6000:]
+                  lines = path.read_text(errors='replace').splitlines()
+                  failures = [i for i,line in enumerate(lines) if 'not ok ' in line]
+                  content = '\n'.join(line for i in failures for line in lines[max(0,i-1):i+23])[-6000:] if name == 'integration' and failures else '\n'.join(lines[-40:])[-6000:]
                   escaped = content.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
                   print(f'::error title=MongoDB {name}::{escaped}')
           PY

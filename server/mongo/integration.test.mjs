@@ -30,6 +30,9 @@ await initializeMongo();
 const server = app.listen(0, '127.0.0.1');
 await new Promise(resolve => server.once('listening', resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;
+const internalFetch=globalThis.fetch;
+globalThis.fetch=(url,options)=>{const target=new URL(String(url));if(target.protocol==='http:'&&target.hostname==='127.0.0.1')return internalFetch(url,options);throw new Error('External provider requests must be explicitly mocked in integration tests.');};
+
 const password = 'Synthetic-integration-password-123';
 const adminId = '00000000-0000-4000-8000-000000000001';
 await db.collection('super_admin_users').insertOne({ id: adminId, username: 'test-owner', display_name: 'Synthetic Owner', password_hash: await hashPassword(password), is_active: true, session_version: 0 });
@@ -458,7 +461,8 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await db.collection('clinical_appointments').findOne({id:appointment.id})).status,'Completed');
     const orders=await db.collection('role_work_items').find({tenant_id:hospital.data.id,workspace:'laboratory','data.consultation_record_id':completed.data.id}).toArray();assert.equal(orders.length,1);assert.equal(orders[0].data.tests[0].name,'Synthetic Blood Test');assert.equal(orders[0].data.tests[0].amount,120);
     const history=await request(`/doctor/patients/${patient.id}`,'GET',null,login.data.token);assert.equal(history.status,200);assert.ok(history.data.records.some(row=>row.id===completed.data.id));
-    assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);
+    const {config}=await import('./config.mjs'),savedKey=config.GROQ_API_KEY;config.GROQ_API_KEY='';
+    try{assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);}finally{config.GROQ_API_KEY=savedKey;}
   });
   await t.test('pharmacy purchases create priced batches and used stock cannot be removed by purchase editing',async()=>{
     const supplier=await request('/operations/pharmacy/suppliers','POST',{name:'Synthetic Medicine Supplier'},staffLogin.data.token);assert.equal(supplier.status,201,JSON.stringify(supplier.data));
