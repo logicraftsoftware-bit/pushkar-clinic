@@ -19,6 +19,7 @@ import laboratory from './laboratory.mjs';
 import platform from './platform.mjs';
 import labResults from './lab-results.mjs';
 import labReports,{publicReports} from './lab-reports.mjs';
+import accessControl from './access-control.mjs';
 import { permissionsFor } from './access.mjs';
 
 const app = express();
@@ -150,11 +151,7 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   response.status(204).end();
 });
 app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
-app.get('/api/v1/access-control/me',authenticate('careframe-portal'),async(_request,response)=>{
-  const account=response.locals.account;
-  const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
-  response.json({permissions:await permissionsFor(account),roles,managed_roles:[]});
-});
+app.use('/api/v1/access-control',authenticate('careframe-portal'),accessControl);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);

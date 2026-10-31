@@ -295,6 +295,31 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(receipts.status,200);assert.equal(receipts.data.reduce((sum,row)=>sum+row.amount,0),210);
     assert.equal((await request('/hospital-admin/settings/constructor','PUT',{value:'bad'},staffLogin.data.token)).status,400);
   });
+  await t.test('custom role changes revoke sessions and cannot alter system administrators or foreign accounts',async()=>{
+    const roleBody={name:'Synthetic Readonly Desk',code:'SYNTHETIC_READONLY',base_role:'RECEPTIONIST',status:'Active',role_level:20,permissions:['patient.view','menu.patients.view']};
+    const created=await request('/access-control/roles','POST',roleBody,staffLogin.data.token);assert.equal(created.status,201,JSON.stringify(created.data));
+    const list=await request('/access-control/roles','GET',null,staffLogin.data.token);assert.equal(list.status,200);
+    const primary=list.data.find(row=>row.code==='HOSPITAL_ADMIN');
+    assert.equal((await request('/access-control/roles','POST',{...roleBody,id:primary.id},staffLogin.data.token)).status,409);
+    assert.equal((await request('/access-control/roles','POST',{...roleBody,code:'UNKNOWN_PERMISSION',permissions:['not.a.permission']},staffLogin.data.token)).status,400);
+    const userId='00000000-0000-4000-8000-000000000094';
+    await db.collection('users').insertOne({id:userId,tenant_id:hospital.data.id,branch_id:branch.id,first_name:'Readonly',last_name:'Synthetic',username:'synthetic-readonly',email:'readonly@example.invalid',is_active:true,role:'receptionist',role_codes:['SYNTHETIC_READONLY'],portal_code:'RECEPTIONIST',password_hash:await hashPassword(password),session_version:0,force_password_change:false,created_at:new Date()});
+    const login=await request('/auth/login','POST',{identifier:'readonly@example.invalid',password,portal:'staff'});assert.equal(login.status,200,JSON.stringify(login.data));
+    assert.equal((await request('/patients','GET',null,login.data.token)).status,200);
+    assert.equal((await request('/patients','POST',patientInput,login.data.token)).status,403);
+    assert.equal((await request('/access-control/users','GET',null,login.data.token)).status,403);
+    const self=await db.collection('users').findOne({email:input.adminEmail});
+    assert.equal((await request(`/access-control/users/${self.id}`,'PUT',{is_active:false},staffLogin.data.token)).status,409);
+    assert.equal((await request('/access-control/users/00000000-0000-4000-8000-000000000099','PUT',{is_active:false},staffLogin.data.token)).status,404);
+    assert.equal((await request('/access-control/roles','POST',{...roleBody,id:created.data.id,code:'SYNTHETIC_RENAMED'},staffLogin.data.token)).status,200);
+    assert.equal((await request('/patients','GET',null,login.data.token)).status,401);
+    const renamed=await db.collection('users').findOne({id:userId});assert.deepEqual(renamed.role_codes,['SYNTHETIC_RENAMED']);
+    const relogin=await request('/auth/login','POST',{identifier:'readonly@example.invalid',password,portal:'staff'});assert.equal(relogin.status,200);
+    assert.equal((await request(`/access-control/users/${userId}`,'PUT',{is_active:false},staffLogin.data.token)).status,204);
+    assert.equal((await request('/patients','GET',null,relogin.data.token)).status,401);
+    const users=await request('/access-control/users','GET',null,staffLogin.data.token);assert.equal(users.status,200);assert.equal(users.data.find(row=>row.id===userId).password_hash,undefined);
+    assert.equal(await db.collection('audit_events').countDocuments({tenant_id:hospital.data.id,action:'account_access_updated',record_id:userId}),1);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

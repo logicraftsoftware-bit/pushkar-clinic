@@ -43,7 +43,7 @@ const portalRoles = {
 const defaults = {hospital_admin:'hospital_admin',accountant:'accountant',doctor:'doctor',nurse:'nurse',patient:'patient',hr:'hr_manager',laboratory:'lab_manager',pharmacist:'pharmacy_manager',radiology:'radiologist',receptionist:'receptionist'};
 export function authorizedPortal(account, requested) {
   if(!account)return null;
-  const assigned=account.role_codes ?? [];
+  const assigned=account.portal_code?[account.portal_code]:account.role_codes ?? [];
   const staff=assigned.includes('BRANCH_ADMIN')&&!assigned.includes('HOSPITAL_ADMIN')?'branch_admin':
     assigned.includes('INVENTORY_MANAGER')&&!assigned.includes('RECEPTIONIST')?'inventory_manager':defaults[account.role];
   const portal=requested==='staff'?staff:requested;

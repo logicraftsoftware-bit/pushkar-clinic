@@ -6,6 +6,7 @@ import {assertBranch,scopeFor,requirePermission,permissionsFor,writeAudit,allowe
 import {hashPassword,publicRecord} from './security.mjs';
 import {staffSaveBody,staffAccountActive} from './staff-validation.mjs';
 import {doctorSlots} from './doctor-availability.mjs';
+import {baseRoles,rolePortalCode} from './role-policy.mjs';
 const router=Router();
 const id=z.string().uuid();
 const optionalId=z.union([id,z.literal(''),z.null()]).optional().transform(value=>value||null);
@@ -60,7 +61,6 @@ router.get('/staff/list',requirePermission('staff.view'),async(request,response)
 router.get('/staff/roles',requirePermission('staff.view'),async(_request,response)=>{
   response.json(await db.collection('rbac_roles').find({tenant_id:response.locals.account.tenant_id,status:'Active'},{projection:{_id:0}}).sort({name:1}).toArray());
 });
-const baseRoles={HOSPITAL_ADMIN:'hospital_admin',BRANCH_ADMIN:'hospital_admin',DOCTOR:'doctor',HR_MANAGER:'hr',INVENTORY_MANAGER:'receptionist',LAB_MANAGER:'laboratory',LAB_TECHNICIAN:'laboratory',PATHOLOGIST:'laboratory',NURSE:'nurse',PHARMACY_MANAGER:'pharmacist',RADIOLOGIST:'radiology',RECEPTIONIST:'receptionist',ACCOUNTANT:'accountant',PATIENT:'patient'};
 router.post('/staff/save',async(request,response)=>{
   const input=staffSaveBody.parse(request.body);
   const granted=await permissionsFor(response.locals.account),needed=input.id?'staff.update':'staff.create';
@@ -88,18 +88,19 @@ router.post('/staff/save',async(request,response)=>{
     if(loginEmail){
       const selected=String(account.role??input.staff_type).trim();
       const role=await db.collection('rbac_roles').findOne({tenant_id,status:'Active',$or:[{code:selected.toUpperCase()},{name:{$regex:`^${selected.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`,$options:'i'}}]},{session});
-      if(!role||!baseRoles[role.code])throw failure('Select an active system role. Custom roles require the RBAC conversion.');
+      const portalCode=role&&rolePortalCode(role);
+      if(!portalCode)throw failure('Select an active role with a valid staff workspace.');
       if(!granted.includes('*')&&(role.permissions??[]).some(permission=>!granted.includes(permission)))throw failure('You cannot assign a role with permissions beyond your own.',403);
       const active=staffAccountActive(input.status,account.account_status);
       if(userId){
         const current=await db.collection('users').findOne({tenant_id,id:userId},{session});
         if(!current)throw failure('Staff login record not found.',404);
-        await db.collection('users').updateOne({tenant_id,id:userId},{$set:{username,email:loginEmail,phone:String(account.mobile??input.personal.mobile_number??''),first_name:input.first_name,last_name:input.last_name,role:baseRoles[role.code],role_codes:[role.code],branch_id:input.branch_ids[0],department_id:input.department_id,is_active:active,...(password_hash?{password_hash,force_password_change:true}:{}),updated_at:new Date()},$inc:{session_version:1}},{session});
+        await db.collection('users').updateOne({tenant_id,id:userId},{$set:{username,email:loginEmail,phone:String(account.mobile??input.personal.mobile_number??''),first_name:input.first_name,last_name:input.last_name,role:baseRoles[portalCode],portal_code:portalCode,role_codes:[role.code],branch_id:input.branch_ids[0],department_id:input.department_id,is_active:active,...(password_hash?{password_hash,force_password_change:true}:{}),updated_at:new Date()},$inc:{session_version:1}},{session});
         await db.collection('sessions').deleteMany({user_id:userId},{session});
       }else{
         if(!password_hash)throw failure('Provide a password of at least 12 characters for the new login.');
         userId=newUserId;
-        await db.collection('users').insertOne({id:userId,tenant_id,username,email:loginEmail,phone:String(account.mobile??input.personal.mobile_number??''),first_name:input.first_name,last_name:input.last_name,role:baseRoles[role.code],role_codes:[role.code],branch_id:input.branch_ids[0],department_id:input.department_id,is_active:active,password_hash,force_password_change:true,session_version:0,created_at:new Date()},{session});
+        await db.collection('users').insertOne({id:userId,tenant_id,username,email:loginEmail,phone:String(account.mobile??input.personal.mobile_number??''),first_name:input.first_name,last_name:input.last_name,role:baseRoles[portalCode],portal_code:portalCode,role_codes:[role.code],branch_id:input.branch_ids[0],department_id:input.department_id,is_active:active,password_hash,force_password_change:true,session_version:0,created_at:new Date()},{session});
       }
       await db.collection('user_branch_access').deleteMany({tenant_id,user_id:userId},{session});
       for(const branch_id of new Set(input.branch_ids))await db.collection('user_branch_access').insertOne({tenant_id,user_id:userId,branch_id},{session});
