@@ -90,3 +90,15 @@ jobs:
                   escaped = content.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
                   print(f'::error title=MongoDB {name}::{escaped}')
           PY
+      - name: Build frontend for native managed-hosting validation
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          npm run build
+      - name: Verify native managed-hosting entry point
+        run: node server/mongo/hosting-smoke.mjs
+        env:
+          MONGODB_INTEGRATION_TEST: 'true'
+          MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          MONGODB_DB: pushkar_test_hosting
+          JWT_SECRET: synthetic-ci-secret-for-disposable-tests-only
+          FRONTEND_ORIGIN: https://erp.example.invalid
