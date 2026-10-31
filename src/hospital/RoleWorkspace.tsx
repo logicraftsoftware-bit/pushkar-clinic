@@ -989,7 +989,8 @@ export function LabResultModal({ record, report, token, pageMode = false, return
   const {permissions}=useLiveAccess();
   const canEnter=permissions===null||permissions.has('lab.result.create');
 
-  const [tests, setTests] = useState<Row[]>(()=>report?normalizeLabResultFormats(record.tests??[]):defaultLabNumericResults(normalizeLabResultFormats(record.tests??[]),record.data||{})), [saving, setSaving] = useState(false); const [savedTests,setSavedTests]=useState<Row[]>(record.tests ?? []); const [saveMessage,setSaveMessage]=useState(""); const [collapsed,setCollapsed]=useState<number[]>(()=> (record.tests??[]).flatMap((test:Row,index:number)=> (focusTestId?test.test_id!==focusTestId:labTestComplete(test)&&!record.data?.disapproved_test_ids?.includes(test.test_id))?[index]:[])); const [history,setHistory]=useState<Row[]>(record.data?.result_history??[]); const [updatedAt,setUpdatedAt]=useState<string>(record.updated_at);
+  const [tests, setTests] = useState<Row[]>(()=>report||record.definition_revision?normalizeLabResultFormats(record.tests??[]):defaultLabNumericResults(normalizeLabResultFormats(record.tests??[]),record.data||{})), [saving, setSaving] = useState(false); const [savedTests,setSavedTests]=useState<Row[]>(record.tests ?? []); const [saveMessage,setSaveMessage]=useState(""); const [collapsed,setCollapsed]=useState<number[]>(()=> (record.tests??[]).flatMap((test:Row,index:number)=> (focusTestId?test.test_id!==focusTestId:labTestComplete(test)&&!record.data?.disapproved_test_ids?.includes(test.test_id))?[index]:[])); const [history,setHistory]=useState<Row[]>(record.data?.result_history??[]); const [updatedAt,setUpdatedAt]=useState<string>(record.updated_at);
+  const [definitionRevision,setDefinitionRevision]=useState<string|undefined>(record.definition_revision);
   function change(testIndex: number, parameterIndex: number, key: "value" | "remarks", value: string) {
     setTests((current) => current.map((test, ti) => ti !== testIndex ? test : { ...test, parameters: test.parameters.map((parameter: Row, pi: number) => pi !== parameterIndex ? parameter : { ...parameter, [key]: value }) }));
   }
@@ -997,10 +998,12 @@ export function LabResultModal({ record, report, token, pageMode = false, return
     if(!canEnter)return;
     setSaving(true);
     try {
-      const saved=await api(`/work-items/${record.id}/lab-results`, token, { method: "PATCH", body: JSON.stringify({ updated_at:updatedAt, results: defaultLabNumericResults(testIndex===undefined?tests:[tests[testIndex]],record.data||{}).map((test) => ({ test_id: test.test_id, parameters: test.parameters.map((parameter: Row) => ({ parameter_id: parameter.parameter_id, value: parameter.value, remarks: parameter.remarks || "" })) })) }) });
+      const selected=testIndex===undefined?tests:[tests[testIndex]];
+      const saved=await api(`/work-items/${record.id}/lab-results`, token, { method: "PATCH", body: JSON.stringify({ updated_at:updatedAt,definition_revision:definitionRevision, results: (definitionRevision?selected:defaultLabNumericResults(selected,record.data||{})).map((test) => ({ test_id: test.test_id, parameters: test.parameters.map((parameter: Row) => ({ parameter_id: parameter.parameter_id, value: parameter.value, remarks: parameter.remarks || "" })) })) }) });
       const persisted:Row[]=saved.data?.lab_results??[];
       setSavedTests(persisted);
       setUpdatedAt(saved.updated_at);
+      setDefinitionRevision(saved.definition_revision);
       setHistory(saved.data?.result_history??[]);
       setCollapsed(current=>Array.from(new Set([...current,...tests.flatMap((test,index)=>(testIndex===undefined||testIndex===index)&&labTestComplete(persisted.find(item=>item.test_id===test.test_id)||{})?[index]:[])])));
       setTests(current=>current.map((test,index)=>testIndex===undefined||index===testIndex?({...test,...persisted.find(item=>item.test_id===test.test_id)}):test));

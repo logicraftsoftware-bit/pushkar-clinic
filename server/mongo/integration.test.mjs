@@ -212,6 +212,45 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const list=await request('/workspaces/lab-orders?page=1','GET',null,staffLogin.data.token);
     assert.equal(list.status,200,JSON.stringify(list.data));assert.equal(list.data.summary.total,1);assert.equal(list.data.summary.progress,1);assert.equal(list.data.summary.ready,0);
   });
+  let resultRecord,parameter,signatory;
+  const signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jV2kAAAAASUVORK5CYII=';
+  await t.test('lab editors reject stale parameter definitions and retain reviewed reference snapshots',async()=>{
+    const unit=await request('/hospital-management/diagnostic-masters/pathology/unit','POST',{name:'Synthetic Unit',data:{}},staffLogin.data.token);assert.equal(unit.status,201);
+    const configured=await request('/hospital-management/diagnostic-masters/pathology/parameter','POST',{name:'Synthetic Measurement',data:{unit_id:unit.data.id,result_type_id:'1',reference_from:'1',reference_to:'99'}},staffLogin.data.token);assert.equal(configured.status,201);parameter=configured.data;
+    const testId=laboratoryOrder.data.tests[0].test_id;
+    assert.equal((await request(`/hospital-management/diagnostic-masters/pathology/test/${testId}`,'PUT',{name:'Synthetic Blood Test',data:{test_type:'Pathology',amount:120,parameter_ids:[parameter.id]}},staffLogin.data.token)).status,200);
+    const path=`/workspaces/work-items/${laboratoryOrder.id}/lab-results`;
+    const initial=await request(path+'?mode=entry','GET',null,staffLogin.data.token);assert.equal(initial.status,200,JSON.stringify(initial.data));assert.equal(initial.data.tests[0].parameters[0].value,'');
+    const body={updated_at:initial.data.updated_at,definition_revision:initial.data.definition_revision,results:[{test_id:testId,parameters:[{parameter_id:parameter.id,value:'12.34',remarks:''}]}]};
+    assert.equal((await request(`/hospital-management/diagnostic-masters/pathology/parameter/${parameter.id}`,'PUT',{name:parameter.name,data:{...parameter.data,reference_to:'88'}},staffLogin.data.token)).status,200);
+    assert.equal((await request(path,'PATCH',body,staffLogin.data.token)).status,409);
+    const refreshed=await request(path+'?mode=entry','GET',null,staffLogin.data.token);
+    const invalid=await request(path,'PATCH',{...body,definition_revision:refreshed.data.definition_revision,results:[{test_id:testId,parameters:[{parameter_id:parameter.id,value:'invalid',remarks:''}]}]},staffLogin.data.token);assert.equal(invalid.status,400);
+    const saved=await request(path,'PATCH',{...body,definition_revision:refreshed.data.definition_revision},staffLogin.data.token);assert.equal(saved.status,200,JSON.stringify(saved.data));resultRecord=saved.data;
+    assert.equal(resultRecord.data.result_status,'Completed');assert.equal(resultRecord.tests[0].parameters[0].reference_to,'88');
+    assert.equal((await request(path,'PATCH',{...body,definition_revision:refreshed.data.definition_revision},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/hospital-management/diagnostic-masters/pathology/parameter/${parameter.id}`,'PUT',{name:parameter.name,data:{...parameter.data,reference_to:'77'}},staffLogin.data.token)).status,200);
+    const frozen=await request(path,'GET',null,staffLogin.data.token);assert.equal(frozen.data.tests[0].parameters[0].reference_to,'88');
+  });
+  await t.test('pathologist approval requires a signed clinic profile and locks the selected clinical values',async()=>{
+    const profile={first_name:'Synthetic',last_name:'Pathologist',staff_type:'Pathologist',branch_ids:[branch.id],department_id:department.id,personal:{},employment:{},account:{account_status:'Active'},professional:{medical_registration_number:'SYNTHETIC-REG',digital_signature:signature}};
+    const signed=await request('/hospital-management/staff/save','POST',profile,staffLogin.data.token);assert.equal(signed.status,201,JSON.stringify(signed.data));signatory=signed.data;
+    const unsigned=await request('/hospital-management/staff/save','POST',{...profile,first_name:'Unsigned',professional:{medical_registration_number:'SYNTHETIC-UNSIGNED'}},staffLogin.data.token);assert.equal(unsigned.status,201);
+    const path=`/workspaces/lab/orders/${laboratoryOrder.id}/approve`,body={stage:'doctor',updated_at:resultRecord.updated_at,test_ids:[laboratoryOrder.data.tests[0].test_id],pathologist_ids:[signatory.id]};
+    assert.equal((await request(path,'PATCH',{...body,pathologist_ids:[unsigned.data.id]},staffLogin.data.token)).status,409);
+    assert.equal((await request(path,'PATCH',body,staffLogin.data.token)).status,200);
+    const resultsPath=`/workspaces/work-items/${laboratoryOrder.id}/lab-results`,reviewed=await request(resultsPath,'GET',null,staffLogin.data.token);resultRecord=reviewed.data;
+    assert.equal(resultRecord.data.doctor_approval.test_ids.length,1);assert.equal(resultRecord.report_signatories.find(row=>row.id===signatory.id).signature,signature);
+    const tampered=await request(resultsPath,'PATCH',{updated_at:resultRecord.updated_at,definition_revision:resultRecord.definition_revision,results:[{test_id:laboratoryOrder.data.tests[0].test_id,parameters:[{parameter_id:parameter.id,value:'13',remarks:''}]}]},staffLogin.data.token);assert.equal(tampered.status,409);
+    await db.collection('staff_members').updateOne({id:signatory.id},{$set:{'professional.digital_signature':'updated-profile-signature'}});
+    assert.equal((await request(resultsPath,'GET',null,staffLogin.data.token)).data.report_signatories.find(row=>row.id===signatory.id).signature,signature);
+    assert.equal((await request(`/workspaces/lab/orders/${laboratoryOrder.id}/process`,'PATCH',{action:'reject',note:'Synthetic rejection'},staffLogin.data.token)).status,409);
+  });
+  await t.test('disapproval preserves the reviewed result and reopens it with audit history',async()=>{
+    const response=await request(`/workspaces/lab/orders/${laboratoryOrder.id}/approve`,'PATCH',{stage:'disapprove',updated_at:resultRecord.updated_at,test_ids:[laboratoryOrder.data.tests[0].test_id]},staffLogin.data.token);assert.equal(response.status,200,JSON.stringify(response.data));
+    const opened=await request(`/workspaces/work-items/${laboratoryOrder.id}/lab-results`,'GET',null,staffLogin.data.token);
+    assert.equal(opened.data.data.doctor_approval,null);assert.equal(opened.data.tests[0].parameters[0].value,'12.34');assert.ok(opened.data.data.approval_history.at(-1).previous_approval);
+  });
   await t.test('operational prefixes apply only to new patients and receipts remain visible',async()=>{
     assert.equal((await request('/hospital-admin/settings/PrefixSetting','PUT',{uhid_prefix:'NEWUHID'},staffLogin.data.token)).status,204);
     const created=await request('/patients','POST',{...patientInput,first_name:'Another',last_name:'Synthetic',phone:'9999999991'},staffLogin.data.token);
