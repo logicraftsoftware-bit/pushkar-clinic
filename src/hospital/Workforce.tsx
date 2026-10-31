@@ -212,6 +212,8 @@ export default function Workforce({
     const raw = Object.fromEntries(new FormData(e.currentTarget)),
       data: R = {},
       body: R = { data };
+    if(edit?.updated_at)body.updated_at=edit.updated_at;
+    if(!edit?.id){const requestId=edit?._request_id??crypto.randomUUID();body.request_id=requestId;setEdit((current:R)=>current?{...current,_request_id:requestId}:current);}
     for (const [k, v] of Object.entries(raw)) {
       if (k.startsWith("data.")) data[k.slice(5)] = v;
       else body[k] = v;

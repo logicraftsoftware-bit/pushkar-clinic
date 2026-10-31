@@ -376,6 +376,19 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const admissionRow=await db.collection('ipd_admissions').findOne({id:admissionInvoice.data.admission_id});assert.equal(admissionInvoice.paid,Math.min(admissionRow.total_amount,admissionRow.paid_amount+admissionRow.deposit_amount));
     const labDownload=await request(`/operations/finance/lab-invoices/${laboratoryOrder.data.bill_id}`,'GET',null,staffLogin.data.token);assert.equal(labDownload.status,200,JSON.stringify(labDownload.data));assert.ok(labDownload.data.payments.length);
   });
+  await t.test('HR payroll computes net pay and insurance rejects foreign patients and excessive settlement',async()=>{
+    const payrollBody={employee_id:doctor.id,record_date:'2026-11',amount:999999,data:{basic_salary:100.10,allowances:20.20,overtime:5,deductions:10,tax:5},status:'Pending',request_id:'00000000-0000-4000-8000-000000000071'};
+    const payroll=await request('/workforce/hr/payroll','POST',payrollBody,staffLogin.data.token);assert.equal(payroll.status,201,JSON.stringify(payroll.data));assert.equal(payroll.data.amount,110.30);assert.equal(payroll.data.record_date,'2026-11-01');
+    const retried=await request('/workforce/hr/payroll','POST',payrollBody,staffLogin.data.token);assert.equal(retried.status,201);assert.equal(retried.data.id,payroll.data.id);
+    const edited=await request(`/workforce/hr/payroll/${payroll.data.id}`,'PUT',{...payroll.data,data:{...payroll.data.data,deductions:20}},staffLogin.data.token);assert.equal(edited.status,200,JSON.stringify(edited.data));assert.equal(edited.data.amount,100.30);
+    assert.equal((await request(`/workforce/hr/payroll/${payroll.data.id}`,'PUT',payroll.data,staffLogin.data.token)).status,409);
+    const claimBody={patient_id:patient.id,insurance_company:'Synthetic Insurer',claimed_amount:100,approved_amount:80,settled_amount:0,status:'Approved',documents:''};
+    const claim=await request('/workforce/insurance','POST',claimBody,staffLogin.data.token);assert.equal(claim.status,201,JSON.stringify(claim.data));assert.equal(claim.data.branch_id,branch.id);
+    assert.equal((await request('/workforce/insurance','POST',{...claimBody,settled_amount:81},staffLogin.data.token)).status,400);
+    assert.equal((await request('/workforce/insurance','POST',{...claimBody,patient_id:'00000000-0000-4000-8000-000000000099'},staffLogin.data.token)).status,400);
+    const claims=await request('/workforce/insurance','GET',null,staffLogin.data.token);assert.equal(claims.status,200);assert.equal(claims.data.length,1);assert.equal(claims.data[0].request_hash,undefined);
+    const lookups=await request('/workforce/lookups','GET',null,staffLogin.data.token);assert.equal(lookups.status,200);assert.ok(lookups.data.employees.some(row=>row.id===doctor.id));
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
