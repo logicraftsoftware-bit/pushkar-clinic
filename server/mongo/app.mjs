@@ -31,6 +31,8 @@ import nursing from './nursing.mjs';
 import pharmacyStock,{pharmacyMasters} from './pharmacy-stock.mjs';
 import pharmacySales from './pharmacy-sales.mjs';
 import dashboard from './dashboard.mjs';
+import ot from './ot.mjs';
+import hospitalMasters from './hospital-masters.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -166,7 +168,7 @@ app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,plat
 app.use('/api/v1/access-control',authenticate('careframe-portal'),accessControl);
 app.get('/api/v1/session/events',authenticate('careframe-portal'),accessEvents);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
-app.use('/api/v1/hospital-management',authenticate('careframe-portal'),pharmacyMasters,diagnosticMasters,management);
+app.use('/api/v1/hospital-management',authenticate('careframe-portal'),hospitalMasters,pharmacyMasters,diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient,receptionDischarge);
 app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
 app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory,pharmacyStock,pharmacySales);
@@ -174,6 +176,7 @@ app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
 app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge);
 app.use('/api/v1/dashboard',authenticate('careframe-portal'),dashboard);
+app.use('/api/v1/ot',authenticate('careframe-portal'),ot);
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports,nursing,nursingTasks);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.

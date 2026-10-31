@@ -211,6 +211,24 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(detail.status,200,JSON.stringify(detail.data));assert.equal(detail.data.bed_stays.length,2);assert.equal(detail.data.transfers.length,1);
     assert.equal((await request(`/clinical/ipd/${admission.id}/status`,'PUT',{status:'Discharged'},staffLogin.data.token)).status,501);
   });
+  await t.test('OT scheduling serializes conflicts and completed charges and consumption post once',async()=>{
+    const category=await request('/hospital-management/operation-masters/category','POST',{name:'Synthetic Surgery'},staffLogin.data.token);assert.equal(category.status,201,JSON.stringify(category.data));
+    const operation=await request('/hospital-management/operation-masters/operation','POST',{name:'Synthetic Procedure',category_id:category.data.id},staffLogin.data.token);assert.equal(operation.status,201);
+    const room=await request('/ot/rooms','POST',{name:'Synthetic Operating Room'},staffLogin.data.token);assert.equal(room.status,200,JSON.stringify(room.data));
+    const body={admission_id:admission.id,operation_id:operation.data.id,procedure_name:'Synthetic Procedure',surgeon_id:doctor.user_id,room_id:room.data.id,planned_start:future+'T12:00:00+05:30',expected_minutes:60};
+    const bookings=await Promise.all([request('/ot/cases','POST',body,staffLogin.data.token),request('/ot/cases','POST',body,staffLogin.data.token)]);assert.deepEqual(bookings.map(row=>row.status).sort(),[201,409],JSON.stringify(bookings));const booked=bookings.find(row=>row.status===201).data;
+    assert.equal((await request(`/ot/cases/${booked.id}/status`,'POST',{status:'Completed'},staffLogin.data.token)).status,409);
+    const supply=await request('/operations/inventory/items','POST',{branch_id:branch.id,data:{name:'Synthetic OT Supply'},quantity:10},staffLogin.data.token);assert.equal(supply.status,201);
+    const consumption={item_id:supply.data.id,item_name:'Synthetic OT Supply',quantity:2,unit_cost:5,request_id:'00000000-0000-4000-8000-000000000015'};
+    const used=await Promise.all([request(`/ot/cases/${booked.id}/consumables`,'POST',consumption,staffLogin.data.token),request(`/ot/cases/${booked.id}/consumables`,'POST',consumption,staffLogin.data.token)]);assert.deepEqual(used.map(row=>row.status),[201,201],JSON.stringify(used));assert.equal(used[0].data.id,used[1].data.id);assert.equal((await db.collection('inventory_records').findOne({id:supply.data.id})).quantity,8);
+    assert.equal((await request(`/ot/cases/${booked.id}/section/billing`,'PATCH',{ot_charges:10},staffLogin.data.token)).status,200);
+    for(const status of ['Pre-Op Ready','Checked In','In Surgery','Recovery','Completed']){const result=await request(`/ot/cases/${booked.id}/status`,'POST',{status},staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));}
+    assert.equal((await request(`/ot/cases/${booked.id}/status`,'POST',{status:'Completed'},staffLogin.data.token)).status,200);
+    const stored=await db.collection('ipd_admissions').findOne({id:admission.id}),charges=stored.charges.filter(row=>row.case_id===booked.id);assert.equal(charges.length,2);assert.equal(charges.reduce((sum,row)=>sum+row.amount,0),20);
+    assert.equal((await db.collection('ot_rooms').findOne({id:room.data.id})).status,'Cleaning');
+    assert.equal((await request(`/hospital-management/operation-masters/operation/${operation.data.id}`,'DELETE',null,staffLogin.data.token)).status,409);
+    const reports=await request('/ot/reports','GET',null,staffLogin.data.token);assert.equal(reports.status,200);assert.equal(reports.data.surgeons[0].completed,1);
+  });
   let laboratoryOrder;
   await t.test('laboratory billing snapshots branch prices and ignores forged pharmacy discounts',async()=>{
     const master=await request('/hospital-management/diagnostic-masters/pathology/test','POST',{name:'Synthetic Blood Test',data:{test_type:'Pathology',amount:100,branch_prices:{[branch.id]:120},available_branch_ids:[branch.id]}},staffLogin.data.token);

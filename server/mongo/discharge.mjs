@@ -59,6 +59,7 @@ receptionDischarge.post('/discharge-requests/:id/complete',requirePermission('ip
     if(item.status!=='Pending')throw failure('This discharge request is already processed.');
     const tenant_id=item.tenant_id,admission=await db.collection('ipd_admissions').findOne(await scopeFor(response,{id:item.data.admission_id,active:true,status:'Discharge Requested'},session),{session});if(!admission)throw failure('Active discharge-requested admission not found.');
     const clearance=await db.collection('role_work_items').findOne({tenant_id,workspace:'nurse',kind:'discharge-clearance','data.discharge_record_id':item.data.discharge_record_id},{session});if(clearance?.status!=='Completed')throw failure('Nursing clearance is pending.');
+    if(await db.collection('ot_cases').findOne({tenant_id,admission_id:admission.id,status:{$nin:['Completed','Cancelled']}},{session}))throw failure('An OT case is still active. Complete or cancel it before discharge.');
     const food=await db.collection('dietary_orders').find({tenant_id,admission_id:admission.id},{session}).toArray();
     if(food.some(row=>!['Delivered','Cancelled'].includes(row.kitchen_status)))throw failure('Kitchen orders are pending. Deliver or cancel them before discharge.');
     if(food.some(row=>row.delivery_status==='Delivered'&&row.amount>0&&!row.ledger_posted))throw failure('Delivered food charges have not been posted to the ledger.');
