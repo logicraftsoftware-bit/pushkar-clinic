@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {config} from './server/mongo/config.mjs';
+import {databaseDiagnostic} from './server/mongo/database-diagnostics.mjs';
 
 const frontend=fileURLToPath(new URL('./dist/',import.meta.url));
 const index=fileURLToPath(new URL('./dist/index.html',import.meta.url));
@@ -26,20 +27,21 @@ const server=app.listen(config.API_PORT,'0.0.0.0',()=>{
   void initializeBackend();
 });
 async function initializeBackend(){
+  let stage='backend-import';
   try{
     const database=await import('./server/mongo/database.mjs');client=database.client;
     const [{default:backend},{ensureInitialAdministrator}]=await Promise.all([import('./server/mongo/app.mjs'),import('./server/mongo/initial-administrator.mjs')]);
     if(stopping)return;
     await database.initializeMongo();
     if(stopping)return;
-    await ensureInitialAdministrator(config);
+    stage='owner-setup';await ensureInitialAdministrator(config);
     if(stopping)return;
     api=backend;console.log('MongoDB API ready.');
   }catch(error){
     if(stopping)return;
     phase='unavailable';
-    // Driver messages can include connection details. Log the error class only.
-    console.error(`Database initialization failed (${error?.name??'Error'}). Check Atlas Network Access and private database settings. Retrying.`);
+    const diagnostic=databaseDiagnostic(error,stage);
+    console.error(`Database initialization failed [stage=${diagnostic.stage}, code=${diagnostic.code??'unknown'}]. ${diagnostic.hint} Retrying.`);
     retryTimer=setTimeout(()=>{void initializeBackend();},5000);
   }
 }

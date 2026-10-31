@@ -10,11 +10,12 @@ export const client = new MongoClient(config.MONGODB_URI, {
 export const db = client.db(config.MONGODB_DB);
 let ready;
 export function initializeMongo() {
+  let stage='connect';
   ready ??= (async () => {
     await client.connect();
-    await db.command({ ping: 1 });
+    stage='ping';await db.command({ ping: 1 });
     for (const name of ['super_admin_users','hospitals','users','branches','patients','login_activity','audit_events','staff_members','departments','wards','rooms','beds','clinical_appointments','finance_records']) {
-      await db.collection(name).createIndex({ id: 1 }, { unique: true });
+      stage=`indexes:${name}`;await db.collection(name).createIndex({ id: 1 }, { unique: true });
     }
     // No patients, staff, partners or sample hospital records are seeded.
     for (const [collection, keys, settings] of [
@@ -136,12 +137,12 @@ export function initializeMongo() {
       ['audit_events', { tenant_id: 1, created_at: -1 }, {}],
       ['sessions', { expires_at: 1 }, { expireAfterSeconds: 0 }],
       ['login_limits', { expires_at: 1 }, { expireAfterSeconds: 0 }],
-    ]) await db.collection(collection).createIndex(keys, settings);
+    ]) {stage=`indexes:${collection}`;await db.collection(collection).createIndex(keys, settings);}
     // Product capabilities only; no clinic, account, pricing or patient data.
-    for (const [code,name] of [['opd','OPD & Appointments'],['ipd','IPD & Bed Management'],['laboratory','Laboratory'],['radiology','Radiology'],['pharmacy','Pharmacy'],['billing','Billing & Finance'],['hr','HR & Payroll'],['patient_portal','Patient Portal']]) {
+    stage='system-modules';for (const [code,name] of [['opd','OPD & Appointments'],['ipd','IPD & Bed Management'],['laboratory','Laboratory'],['radiology','Radiology'],['pharmacy','Pharmacy'],['billing','Billing & Finance'],['hr','HR & Payroll'],['patient_portal','Patient Portal']]) {
       await db.collection('platform_modules').updateOne({code},{$setOnInsert:{id:randomUUID(),code,name,is_active:true,created_at:new Date()}},{upsert:true});
     }
-  })().catch(error => { ready = undefined; throw error; });
+  })().catch(error => { ready = undefined; error.initializationStage=stage;throw error; });
   return ready;
 }
 export async function transaction(operation) {
