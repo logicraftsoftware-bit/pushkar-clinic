@@ -491,7 +491,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const after=await request(`/dashboard/hospital?from=${today}&to=${today}`,'GET',null,staffLogin.data.token);assert.equal(after.status,200);assert.equal(after.data.finance.totals.collected,before.data.finance.totals.collected);
     assert.equal((await request('/dashboard/hospital?from=2026-11-02&to=2026-11-01','GET',null,staffLogin.data.token)).status,400);
     assert.equal((await request('/dashboard/hospital?branchId=00000000-0000-4000-8000-000000000099','GET',null,staffLogin.data.token)).status,403);
-    assert.equal(after.data.totals.occupied,0);assert.ok(after.data.filters.departments.some(row=>row.id===department.id));
+    assert.equal(after.data.totals.occupied,0);assert.ok(after.data.filters.departments.some(row=>row.id===department.id));assert.ok(after.data.activityFeed.every(row=>typeof row.detail==='string'));
     await db.collection('finance_records').deleteOne({id:'00000000-0000-4000-8000-000000000021'});
   });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
