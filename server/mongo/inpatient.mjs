@@ -8,6 +8,7 @@ import {cents} from './money.mjs';
 import {bedStayAmount,inpatientTotal} from './inpatient-billing.mjs';
 import {configuredPrefix,operationalSettings} from './settings.mjs';
 import {syncAdmissionInvoice} from './finance-ledger.mjs';
+import {canonicalClinical} from './consultation-validation.mjs';
 const router=Router(),uuid=z.string().uuid();
 const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(value);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -132,8 +133,8 @@ router.put('/ipd/:id',requirePermission('ipd.update'),async(request,response)=>{
     if(cents(input.advance)!==cents(old.advance)||cents(input.paid_amount)<cents(old.paid_amount)||cents(input.deposit_amount)<cents(old.deposit_amount))throw failure('Recorded collections cannot be removed through editing.',409);
     const charges=z.array(z.object({amount:z.coerce.number().nonnegative().finite().max(99999999.99).multipleOf(0.01)}).passthrough()).max(200).parse(input.charges);
     const protectedCharges=(old.charges??[]).filter(charge=>charge.source);
-    for(const protectedCharge of protectedCharges)if(!charges.some(charge=>JSON.stringify(charge)===JSON.stringify(protectedCharge)))throw failure('Charges posted by other departments must be changed through their workflow.',409);
-    if(charges.some(charge=>charge.source&&!protectedCharges.some(previous=>JSON.stringify(previous)===JSON.stringify(charge))))throw failure('Department charges cannot be forged in admission editing.');
+    for(const protectedCharge of protectedCharges)if(!charges.some(charge=>canonicalClinical(charge)===canonicalClinical(protectedCharge)))throw failure('Charges posted by other departments must be changed through their workflow.',409);
+    if(charges.some(charge=>charge.source&&!protectedCharges.some(previous=>canonicalClinical(previous)===canonicalClinical(charge))))throw failure('Department charges cannot be forged in admission editing.');
     const now=new Date(Math.max(Date.now(),new Date(old.updated_at).getTime()+1)),{_id,...previous}=old;
     const row={...previous,...input,charges,admitted_at:old.admitted_at,attendant:{name:input.attendant_name,phone:input.attendant_phone,relationship:input.attendant_relationship},consultation_fee:0,registration_amount:0,registration_fee_amount:0,registration_addon_amount:0,registration_deposit_amount:0,registration_discount_amount:0,insurance_document:input.insurance_document||old.insurance_document,patient_documents:Object.keys(input.patient_documents).length?input.patient_documents:old.patient_documents,updated_at:now};
     delete row.attendant_name;delete row.attendant_phone;delete row.attendant_relationship;

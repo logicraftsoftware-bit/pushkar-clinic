@@ -229,6 +229,27 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/hospital-management/operation-masters/operation/${operation.data.id}`,'DELETE',null,staffLogin.data.token)).status,409);
     const reports=await request('/ot/reports','GET',null,staffLogin.data.token);assert.equal(reports.status,200);assert.equal(reports.data.surgeons[0].completed,1);
   });
+  await t.test('dietary NPO and holds cancel pending meals and delivery and reversal change charges once',async()=>{
+    const menu=await request('/dietary/menu','POST',{item_code:'SYNTHETIC-MEAL',item_name:'Synthetic Meal',category:'Normal Diet',meal_type:'Lunch',patient_rate:10,attendant_rate:15,guest_rate:20,staff_rate:5},staffLogin.data.token);assert.equal(menu.status,201,JSON.stringify(menu.data));
+    const diet={admission_id:admission.id,diet_type:'Normal Diet',instructions:'Synthetic diet'};assert.equal((await request('/dietary/diets','POST',diet,staffLogin.data.token)).status,201);
+    const body={admission_id:admission.id,menu_id:menu.data.id,order_type:'Patient Meal',quantity:1,billing_class:'Chargeable',request_id:'00000000-0000-4000-8000-000000000016'};
+    const placed=await request('/dietary/orders','POST',body,staffLogin.data.token);assert.equal(placed.status,201,JSON.stringify(placed.data));assert.equal(placed.data.amount,10);
+    assert.equal((await request('/dietary/orders','POST',body,staffLogin.data.token)).data.id,placed.data.id);
+    assert.equal((await request('/dietary/diets','POST',{...diet,diet_type:'NPO / Nil by Mouth'},staffLogin.data.token)).status,201);
+    assert.equal((await db.collection('dietary_orders').findOne({id:placed.data.id})).kitchen_status,'Cancelled');
+    assert.equal((await request('/dietary/orders','POST',{...body,request_id:'00000000-0000-4000-8000-000000000017'},staffLogin.data.token)).status,409);
+    assert.equal((await request('/dietary/diets','POST',diet,staffLogin.data.token)).status,201);
+    assert.equal((await request('/dietary/holds','POST',{admission_id:admission.id,reason:'Synthetic meal hold'},staffLogin.data.token)).status,201);
+    assert.equal((await request('/dietary/orders','POST',{...body,request_id:'00000000-0000-4000-8000-000000000017'},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/dietary/holds/${admission.id}/resume`,'POST',{},staffLogin.data.token)).status,200);
+    const ordered=await request('/dietary/orders','POST',{...body,request_id:'00000000-0000-4000-8000-000000000017'},staffLogin.data.token);assert.equal(ordered.status,201,JSON.stringify(ordered.data));
+    for(const status of ['Kitchen Accepted','Preparing','Ready','Out for Delivery','Delivered']){const result=await request(`/dietary/orders/${ordered.data.id}/status`,'PATCH',{status,received_by:'Synthetic Receiver'},staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));}
+    assert.equal((await request(`/dietary/orders/${ordered.data.id}/status`,'PATCH',{status:'Delivered',received_by:'Synthetic Receiver'},staffLogin.data.token)).status,200);
+    let stored=await db.collection('ipd_admissions').findOne({id:admission.id});assert.equal(stored.charges.filter(row=>row.order_id===ordered.data.id).length,1);
+    assert.equal((await request(`/dietary/orders/${ordered.data.id}/status`,'PATCH',{status:'Cancelled',remarks:'Synthetic reversal'},staffLogin.data.token)).status,200);
+    stored=await db.collection('ipd_admissions').findOne({id:admission.id});assert.equal(stored.charges.filter(row=>row.order_id===ordered.data.id).length,0);
+    const overview=await request('/dietary/overview','GET',null,staffLogin.data.token);assert.equal(overview.status,200,JSON.stringify(overview.data));assert.equal(overview.data.patients.length,1);assert.equal(overview.data.metrics.cancelled,2);
+  });
   let laboratoryOrder;
   await t.test('laboratory billing snapshots branch prices and ignores forged pharmacy discounts',async()=>{
     const master=await request('/hospital-management/diagnostic-masters/pathology/test','POST',{name:'Synthetic Blood Test',data:{test_type:'Pathology',amount:100,branch_prices:{[branch.id]:120},available_branch_ids:[branch.id]}},staffLogin.data.token);
