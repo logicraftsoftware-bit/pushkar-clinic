@@ -555,6 +555,19 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/referrals/partners/${partner.data.id}`,'PATCH',{...partner.data,status:'Suspended'},staffLogin.data.token)).status,200);
     assert.equal((await request('/referrals/broker-dashboard','GET',null,login.data.token)).status,401);
   });
+  await t.test('public registration uses revocable links and atomic request and slot reservations',async()=>{
+    const link=await request('/workspaces/self-registration-link','POST',{},staffLogin.data.token);assert.equal(link.status,200,JSON.stringify(link.data));
+    const path='/self-registration/'+encodeURIComponent(link.data.token),details=await request(path);assert.equal(details.status,200);assert.equal(details.data.hospital_name,input.name);
+    const lookup=await request(path+'/lookups');assert.equal(lookup.status,200,JSON.stringify(lookup.data));assert.ok(lookup.data.doctors.some(row=>row.id===doctor.user_id));assert.ok(lookup.data.doctors.every(row=>row.password_hash===undefined));
+    const slots=await request(path+`/slots?doctor_id=${doctor.user_id}&date=${future}`);assert.equal(slots.status,200);assert.ok(slots.data.some(row=>row.time==='10:50'));
+    const body={first_name:'Self',last_name:'Registration',phone:'9999999973',address:{line:'Synthetic registration address',city:'Test City',state:'Test State'},emergency_contact:{},registration_type:'OPD',doctor_id:doctor.user_id,department_id:department.id,appointment_date:future,appointment_time:'10:50',request_id:'00000000-0000-4000-8000-000000000008'};
+    const before=(await db.collection('counters').findOne({_id:`${hospital.data.id}:patient`})).value;
+    const attempts=await Promise.all([request(path,'POST',body),request(path,'POST',body)]);assert.deepEqual(attempts.map(row=>row.status),[201,201],JSON.stringify(attempts));assert.equal(attempts[0].data.id,attempts[1].data.id);assert.equal((await db.collection('counters').findOne({_id:`${hospital.data.id}:patient`})).value,before+1);
+    assert.equal(await db.collection('patients').countDocuments({tenant_id:hospital.data.id,phone:body.phone}),1);assert.equal(attempts[0].data.appointment.source,'Self Registration');
+    assert.equal((await request(path,'POST',{...body,phone:'9999999974',request_id:'00000000-0000-4000-8000-000000000009'})).status,409);
+    assert.equal((await request('/self-registration/'+encodeURIComponent(staffLogin.data.token))).status,401);
+    assert.equal((await request(`/workspaces/self-registration-link/${link.data.id}`,'DELETE',null,staffLogin.data.token)).status,204);assert.equal((await request(path)).status,401);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

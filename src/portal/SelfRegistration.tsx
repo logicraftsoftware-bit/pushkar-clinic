@@ -9,6 +9,7 @@ const LOCATION_API = "https://countriesnow.space/api/v0.1/countries";
 
 export default function SelfRegistration() {
   const token = decodeURIComponent(window.location.pathname.split("/self-registration/")[1] || "");
+  const [requestId] = useState(() => crypto.randomUUID());
   const [hospital, setHospital] = useState<Row | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -40,7 +41,7 @@ export default function SelfRegistration() {
   useEffect(()=>{const controller=new AbortController();fetch(`${LOCATION_API}/states`,{signal:controller.signal}).then(r=>r.ok?r.json():Promise.reject()).then(payload=>{const india=payload?.data?.find((country:Row)=>country.name==="India"),states=india?.states?.map((item:Row)=>String(item.name)).filter(Boolean);if(states?.length)setStateOptions(states)}).catch(()=>undefined);return()=>controller.abort()},[]);
   useEffect(()=>{if(!stateName){setCityOptions([]);return}setCityOptions(indiaLocations[stateName]??[]);const controller=new AbortController();fetch(`${LOCATION_API}/state/cities`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({country:"India",state:stateName}),signal:controller.signal}).then(r=>r.ok?r.json():Promise.reject()).then(payload=>{if(Array.isArray(payload?.data)&&payload.data.length)setCityOptions(payload.data.map(String))}).catch(()=>undefined);return()=>controller.abort()},[stateName]);
   const doctors=(lookups.doctors||[]).filter((doctor:Row)=>!departmentId||doctor.department_id===departmentId),selectedDoctor=(lookups.doctors||[]).find((doctor:Row)=>doctor.id===doctorId),fee=Number(selectedDoctor?.consultation_fee||0);
-  function registrationPayload(form:FormData){return {
+  function registrationPayload(form:FormData){return {request_id:requestId,
     first_name: form.get("first_name"), last_name: form.get("last_name"), sex: form.get("sex"), blood_group: form.get("blood_group"), phone: form.get("phone"), email: form.get("email"),
     address: { age_years:form.get("age_years"),age_months:form.get("age_months"),age_days:form.get("age_days"), line: form.get("address"), city: form.get("city"), state: form.get("state"), pin: form.get("pin") }, emergency_contact: { name: form.get("emergency_name"), phone: form.get("emergency_phone"), relationship: form.get("emergency_relationship") }, allergies: form.get("allergies"), existing_conditions: form.get("existing_conditions"), current_medication: form.get("current_medication"),
     registration_type:registrationType,department_id:departmentId||undefined,doctor_id:doctorId||undefined,appointment_date:appointmentDate||undefined,appointment_time:form.get("appointment_time")||undefined,reason:form.get("reason")||"",
@@ -55,7 +56,7 @@ export default function SelfRegistration() {
     try {
       const body=registrationPayload(form);
       if(registrationType==="IPD"||fee<=0){await finishRegistration(body);return;}
-      const orderResponse=await fetch(`${API}/api/v1/self-registration/${encodeURIComponent(token)}/payment-order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({doctor_id:doctorId})}),order=await orderResponse.json();
+      const orderResponse=await fetch(`${API}/api/v1/self-registration/${encodeURIComponent(token)}/payment-order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({doctor_id:doctorId,request_id:requestId})}),order=await orderResponse.json();
       if(!orderResponse.ok)throw new Error(order.error||"Unable to start payment");
       if(order.free){await finishRegistration(body);return;}
       if(!await loadRazorpay())throw new Error("Unable to load the secure payment window.");

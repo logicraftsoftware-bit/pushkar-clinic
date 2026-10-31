@@ -19,7 +19,7 @@ function failure(message,status=400){return Object.assign(new Error(message),{st
 async function methods(tenant,session){
   return (await operationalSettings(tenant,session)).payment_methods;
 }
-async function doctorFor(response,branch,department,doctorId,session){
+export async function doctorFor(response,branch,department,doctorId,session){
   await assertBranch(response,branch,session);
   const tenant=response.locals.account.tenant_id;
   const dept=await db.collection('departments').findOne({id:department,tenant_id:tenant,branch_id:branch,is_active:true},{session});
@@ -31,7 +31,7 @@ async function doctorFor(response,branch,department,doctorId,session){
   if(!dept||!user||!staff||(!assignment&&user.branch_id!==branch)||selectedDepartment!==department)throw failure('Select an active doctor assigned to this branch and department.');
   return {user,staff,department:dept,professional:{...professional,...branchFees}};
 }
-async function slotsFor(doctor,dayString,interval,exclude,session){
+export async function slotsFor(doctor,dayString,interval,exclude,session){
   const professional=doctor.professional,day=doctorDay(professional.appointment_schedule??[],professional.appointment_default_schedule,dayString,professional.appointment_unavailable_dates??[]);
   if(!day)return [];
   const bookings=await db.collection('clinical_appointments').find({tenant_id:doctor.user.tenant_id,doctor_id:doctor.user.id,appointment_date:dayString,...(exclude?{id:{$ne:exclude}}:{}),status:{$nin:['Cancelled','No Show']}},{session}).toArray();
@@ -42,7 +42,7 @@ async function slotsFor(doctor,dayString,interval,exclude,session){
   const next=Math.max(0,...bookings.map(row=>Number(row.slot_serial)||0))+1;
   return upcomingDoctorSlots(available.map(slot=>({...slot,serial:interval===5?next:slot.serial})),dayString);
 }
-async function receipt(response,row,amountCents,key,session){
+export async function receipt(response,row,amountCents,key,session){
   if(!amountCents)return;
   const now=new Date(),record_date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
   await db.collection('finance_records').insertOne({id:randomUUID(),tenant_id:row.tenant_id,branch_id:row.branch_id,patient_id:row.patient_id,kind:'payments',record_number:key,
