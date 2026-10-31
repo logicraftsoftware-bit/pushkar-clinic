@@ -12,7 +12,7 @@ The native backend now includes authentication, plan/clinic provisioning, patien
 
 Both jobs passed for commit `611a7bb`: [successful cloud validation](https://github.com/logicraftsoftware-bit/pushkar-clinic/actions/runs/41114440759). That run verified the existing frontend/backend build and legacy tests, plus the native MongoDB authentication, patients, staff/scheduling, concurrent appointments/check-in, IPD deposits, duplicate-admission rollback and bed transfer.
 
-The newer laboratory/settings and Super Admin extensions have syntax checks and dependency-free tests, but still need a successful cloud integration run. GitHub requested device sign-in again before their push could complete. No production Atlas connection or data was used.
+Laboratory billing/settings and Super Admin extensions passed both cloud jobs at commit `41985ba`: [cloud validation](https://github.com/logicraftsoftware-bit/pushkar-clinic/actions/runs/41162186198). Native result entry, reference-definition snapshots, stale-edit checks, signed doctor approval and approval locks passed MongoDB integration at `47a638a`. Canonical server-generated PDF sharing and retry-safe print confirmation are written; their integration run found an invalid synthetic PNG fixture, corrected in `6c32a0d`, and are awaiting a successful rerun. GitHub authentication and pushing now work. No production Atlas connection or data was used.
 
 ## Still required before production
 
@@ -21,7 +21,7 @@ The newer laboratory/settings and Super Admin extensions have syntax checks and 
 - Complete the remaining patient/frontend compatibility checks and accounting integrations.
 - Appointment editing, IPD admission edits and discharge clearance, nursing, doctor consultation, OT and dietary workflows.
 - General invoices/payments, cancellation approvals/refunds, accounting dashboards, referral wallets and inventory transactions. OPD check-in, IPD admission collections and lab receipt posting are implemented, pending the verification boundaries above.
-- Laboratory order edits, result entry, technician/doctor verification, QC, accreditation and report release/sharing. Catalog/order billing/payment/sample collection code must complete cloud validation before use.
+- Laboratory order edits, QC and accreditation remain unconverted. Result entry and technician/doctor verification are implemented with native integration coverage; canonical report release/sharing still needs successful cloud validation and frontend review.
 - Pharmacy, purchasing, HR, insurance and reporting.
 - Full route compatibility and tenant-isolation tests against a disposable MongoDB database.
 - Hostinger startup switch only after those checks pass.
