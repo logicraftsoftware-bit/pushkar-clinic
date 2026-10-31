@@ -8,6 +8,7 @@ const SelfRegistration = lazy(() => import("./portal/SelfRegistration"));
 import "./styles.css";
 import "./global-feedback.css";
 import "./required-fields.css";
+import "./pushkar-theme.css";
 import "sweetalert2/dist/sweetalert2.min.css";
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

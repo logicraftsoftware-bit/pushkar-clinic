@@ -125,7 +125,7 @@ app.get('/api/v1/health', async (_request, response) => {
 app.get('/api/v1/branding', async (_request, response) => {
   const settings = await db.collection('platform_settings').find({ is_public: true, key: { $in: ['platform_name','platform_logo'] } }).toArray();
   const values = Object.fromEntries(settings.map(row => [row.key, row.value]));
-  response.json({ name: values.platform_name ?? 'Pushkar Clinic', logo: values.platform_logo ?? '' });
+  response.json({ name: values.platform_name && values.platform_name !== 'careframe' ? values.platform_name : 'Pushkar Clinic ERP', logo: values.platform_logo || '/branding/pushkar-logo.png' });
 });
 app.post('/api/v1/admin/auth/login', rateLimit, async (request, response) => {
   const body = z.object({ username: z.string().trim().min(3).max(100), password: z.string().min(8).max(200) }).parse(request.body);

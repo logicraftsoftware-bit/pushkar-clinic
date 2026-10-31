@@ -10,8 +10,8 @@ const API_URL =
   (import.meta.env.PROD ? "" : "http://localhost:4000");
 
 export const defaultBranding: PlatformBranding = {
-  name: "careframe",
-  logo: "",
+  name: "Pushkar Clinic ERP",
+  logo: "/branding/pushkar-logo.png",
 };
 
 export function usePlatformBranding() {
@@ -22,7 +22,7 @@ export function usePlatformBranding() {
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then((value) => setBranding({
         name: String(value.name || defaultBranding.name),
-        logo: String(value.logo || ""),
+        logo: String(value.logo || defaultBranding.logo),
       }))
       .catch(() => undefined);
   }, []);

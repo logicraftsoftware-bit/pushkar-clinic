@@ -1357,7 +1357,7 @@ export default function SuperAdminApp() {
   }, []);
   const updateBranding = useCallback((key: string, value: unknown) => {
     setBranding((current) => ({
-      name: key === "platform_name" ? String(value || "careframe") : current.name,
+      name: key === "platform_name" ? String(value || "Pushkar Clinic ERP") : current.name,
       logo: key === "platform_logo" ? String(value || "") : current.logo,
     }));
   }, []);

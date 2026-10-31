@@ -1,0 +1,36 @@
+/* Pushkar's white wordmark sits on magenta; turquoise is the secondary accent.
+   Keep clinical danger, warning and success indicators in their semantic colours. */
+:root { --pushkar-pink: #c50078; --pushkar-bright: #ef0097; --pushkar-cyan: #00b7c9; --pushkar-tint: #fff0f8; }
+:root .sa-login-art, :root .portal-story {
+  background: radial-gradient(circle at 85% 15%, #ff45b9 0, transparent 40%), linear-gradient(145deg, #ef0097, #9d0061);
+}
+:root .sa-login-art :is(p, small, .eyebrow), :root .portal-story :is(p, footer, .story-copy > small) { color: #fff; }
+:root .sa-login-art h1 { max-width: 650px; }
+:root .sa-app > aside, :root .app .sidebar { background: #30132d; }
+:root .sa-adminscope, :root .app .workspace-card { background: #47203f; border-color: #69405e; }
+:root .sa-app aside nav :is(a, button).active, :root .app .nav-item.active,
+:root .sa-primary, :root .portal-login-main button[type="submit"], :root .app .btn.primary {
+  background: var(--pushkar-pink); color: #fff; border-color: var(--pushkar-pink);
+}
+:root .sa-primary:hover, :root .app .btn.primary:hover { background: #a60065; }
+:root .sa-primary:focus-visible, :root .portal-login-main button:focus-visible, :root .app button:focus-visible {
+  outline: 3px solid var(--pushkar-cyan); outline-offset: 3px;
+}
+:root .sa-brand { gap: 8px; }
+:root .sa-brandmark.has-logo, :root .portal-brand > span.has-logo, :root .logo-mark.custom {
+  width: 105px; height: 44px; min-width: 105px; flex: 0 0 105px; padding: 6px;
+  background: var(--pushkar-bright); border-radius: 8px; box-shadow: none;
+}
+:root .sa-brandmark.has-logo img, :root .portal-brand > span.has-logo img, :root .logo-mark.custom img {
+  display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 0;
+}
+:root .sa-brandname { max-width: none; white-space: normal; overflow: visible; font-size: 13px; line-height: 1.3; }
+:root .sa-brand em { display: none; }
+:root .portal-brand { flex-wrap: wrap; font-size: 19px; }
+:root .sa-login .sa-brandmark.has-logo, :root .portal-brand > span.has-logo { width: 160px; min-width: 160px; flex-basis: 160px; height: 66px; }
+:root .sa-login .sa-brandname { font-size: 20px; }
+:root .app .logo { gap: 8px; font-size: 13px; }
+:root .sidebar.collapsed .logo-mark.custom { width: 44px; min-width: 44px; flex-basis: 44px; }
+:root .branding-logo-preview { background: var(--pushkar-bright); }
+:root .platform-live, :root .portal-login-icon { border-color: #8bdce4; }
+@media (max-width: 440px) { :root .portal-brand { font-size: 17px; } }
