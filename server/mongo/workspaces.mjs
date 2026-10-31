@@ -1,10 +1,23 @@
 import {Router} from 'express';
-import {db} from './database.mjs';
-import {permissionsFor,scopeFor} from './access.mjs';
+import {z} from 'zod';
+import {randomUUID} from 'node:crypto';
+import {db,transaction} from './database.mjs';
+import {permissionsFor,scopeFor,assertBranch,writeAudit} from './access.mjs';
 const router=Router();
+const fail=(message,status=403)=>Object.assign(new Error(message),{status});
+const noteTypes={notifications:{workspace:'reception',permission:'menu.notifications.view'},'device integration':{workspace:'laboratory',permission:'lab.result.verify'},recruitment:{workspace:'hr',permission:'hr.manage'}};
+async function noteAccess(response,kind,session){const rule=noteTypes[kind.toLowerCase()],permissions=await permissionsFor(response.locals.account,session);if(!rule||!permissions.includes('*')&&!permissions.includes(rule.permission))throw fail('Use the dedicated clinical, stock or billing workflow for this record.');return rule;}
+router.post('/work-items',async(request,response)=>{
+  const body=z.object({kind:z.string().trim().min(1).max(100),title:z.string().trim().min(1).max(200),patient_id:z.string().uuid().nullable().optional(),status:z.literal('Pending').default('Pending'),priority:z.enum(['Normal','High','Urgent']).default('Normal'),data:z.object({details:z.string().trim().max(10000).default('')}).default({details:''})}).parse(request.body);
+  const result=await transaction(async session=>{const rule=await noteAccess(response,body.kind,session),account=response.locals.account;await assertBranch(response,account.branch_id,session);if(body.patient_id){const permissions=await permissionsFor(account,session);if(!permissions.includes('*')&&!permissions.includes('patient.view'))throw fail('Patient access required.');if(!await db.collection('patients').findOne(await scopeFor(response,{id:body.patient_id,deleted_at:null},session),{session}))throw fail('Patient unavailable.',404);}const now=new Date(),row={...body,id:randomUUID(),tenant_id:account.tenant_id,branch_id:account.branch_id,workspace:rule.workspace,created_by:account.id,occurred_at:now,created_at:now,updated_at:now};await db.collection('role_work_items').insertOne({...row},{session});await writeAudit(response,'workspace_note_created',row.id,session,{kind:row.kind});return row;});response.status(201).json(result);
+});
+router.patch('/work-items/:id',async(request,response)=>{
+  const id=z.string().uuid().parse(request.params.id),body=z.object({status:z.enum(['Pending','Completed']),data:z.object({details:z.string().trim().max(10000)}).optional()}).parse(request.body);
+  const row=await transaction(async session=>{const old=await db.collection('role_work_items').findOne(await scopeFor(response,{id},session),{session});if(!old)throw fail('Work item not found.',404);const rule=await noteAccess(response,old.kind,session);if(rule.workspace!==old.workspace)throw fail('Use the dedicated workflow for this record.',409);const permissions=await permissionsFor(response.locals.account,session);if(old.created_by!==response.locals.account.id&&!permissions.includes('*')&&!permissions.includes('hr.manage')&&!permissions.includes('lab.result.verify'))throw fail('Only the note owner can update this record.');const result=await db.collection('role_work_items').findOneAndUpdate({tenant_id:old.tenant_id,id},{$set:{status:body.status,data:{...old.data,...body.data},updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});await writeAudit(response,'workspace_note_updated',id,session);return result;});response.json(row);
+});
 router.get('/overview',async(_request,response)=>{
   const account=response.locals.account,permissions=await permissionsFor(account),can=code=>permissions.includes('*')||permissions.includes(code);
-  const workspace=({receptionist:'reception',nurse:'nurse',laboratory:'laboratory',radiology:'laboratory',pharmacist:'pharmacy',patient:'patient',hospital_admin:'all',accountant:'accounting',hr:'hr',hr_manager:'hr',branch_admin:'branch',inventory_manager:'inventory'})[response.locals.claims.portal]??account.role;
+  const workspace=({receptionist:'reception',nurse:'nurse',laboratory:'laboratory',lab_manager:'laboratory',radiology:'laboratory',radiologist:'laboratory',pharmacist:'pharmacy',pharmacy_manager:'pharmacy',patient:'patient',hospital_admin:'all',accountant:'accounting',hr:'hr',hr_manager:'hr',branch_admin:'branch',inventory_manager:'inventory'})[response.locals.claims.portal]??account.role;
   const patientPortal=account.role==='patient';
   let patientId=null;
   if(patientPortal){

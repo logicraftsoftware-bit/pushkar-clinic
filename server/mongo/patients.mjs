@@ -70,9 +70,9 @@ router.get('/:id',async(request,response)=>{
   const payments=await db.collection('payments').find(common,{projection:{_id:0}}).sort({created_at:-1}).toArray();
   response.json({patient,appointments,ipd,payments});
 });
-router.post('/',async(request,response)=>{
+export async function registerPatient(request,response,{requireTitle=true}={}){
   const input=patientInput.parse(request.body),data=normalize(input),tenant=response.locals.account.tenant_id;
-  if(!input.address.title)return response.status(400).json({field:'Title',error:'Select a patient title'});
+  if(requireTitle&&!input.address.title)return response.status(400).json({field:'Title',error:'Select a patient title'});
   const canOverride=response.locals.claims.portal==='hospital_admin';
   if(input.duplicate_override&&!canOverride)return response.status(403).json({error:'Hospital Admin approval is required to override a possible duplicate.'});
   const id=randomUUID();
@@ -98,8 +98,9 @@ router.post('/',async(request,response)=>{
     delete record.normalized_name;
     return record;
   });
-  response.status(201).json(result);
-});
+  response.status(201).json({...result,patient_name:`${result.first_name} ${result.last_name}`});
+}
+router.post('/',registerPatient);
 async function update(request,response,detailsOnly){
   if(Object.hasOwn(request.body??{},'medical_record_number'))return response.status(400).json({code:'IMMUTABLE_UHID',error:'UHID is system-generated and cannot be changed.'});
   const input=patientInput.parse(request.body),data=normalize(input),id=uuid.parse(request.params.id);

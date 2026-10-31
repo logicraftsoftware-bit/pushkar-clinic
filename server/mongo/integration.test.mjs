@@ -603,6 +603,14 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request('/workspaces/lab/qc/runs','POST',{control_id:control.data.id,value:10},staffLogin.data.token)).status,400);
     for(const route of ['/workspaces/lab/qc','/workspaces/lab/summary','/workspaces/lab/workflow?view=processing','/workspaces/lab/workflow-filter-options','/operations/pharmacy/forecast']){const result=await request(route,'GET',null,staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));}
   });
+  await t.test('laboratory registrations share UHID counters and generic notes cannot mutate clinical work',async()=>{
+    const body={first_name:'Laboratory',last_name:'Registration',phone:'9999999975',title:'Mr.',address:'Synthetic address',city:'Test City',state:'Test State'};
+    const created=await request('/workspaces/lab-patients','POST',body,staffLogin.data.token);assert.equal(created.status,201,JSON.stringify(created.data));assert.ok(created.data.medical_record_number);assert.equal(created.data.patient_name,'Laboratory Registration');assert.equal((await request('/workspaces/lab-patients','POST',body,staffLogin.data.token)).status,409);
+    for(const route of ['/workspaces/lab-recent-appointments','/workspaces/lab-referrals'])assert.equal((await request(route,'GET',null,staffLogin.data.token)).status,200);
+    const note=await request('/workspaces/work-items','POST',{kind:'Notifications',title:'Synthetic note',data:{details:'Synthetic task'}},staffLogin.data.token);assert.equal(note.status,201,JSON.stringify(note.data));assert.equal((await request(`/workspaces/work-items/${note.data.id}`,'PATCH',{status:'Completed'},staffLogin.data.token)).status,200);
+    assert.equal((await request(`/workspaces/work-items/${laboratoryOrder.id}`,'PATCH',{status:'Completed',data:{details:'forged'}},staffLogin.data.token)).status,403);
+    assert.equal((await request('/workspaces/work-items','POST',{kind:'orders',title:'Bypass diagnostic workflow',data:{details:'forged'}},staffLogin.data.token)).status,403);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

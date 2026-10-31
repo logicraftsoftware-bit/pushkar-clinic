@@ -87,6 +87,9 @@ export const patientInput = z
       .object({
         ...patientAgeFields,
         title: z.enum(["Mr.","Mrs.","Ms.","Miss","Master","Baby","Dr.",""]).optional(),
+        father_name:z.string().trim().max(150).optional(),
+        mother_name:z.string().trim().max(150).optional(),
+        district:z.string().trim().max(150).optional(),
         line: meaningfulText(500).default(""),
         city: meaningfulText(100).default(""),
         state: z.string().trim().max(100).default(""),

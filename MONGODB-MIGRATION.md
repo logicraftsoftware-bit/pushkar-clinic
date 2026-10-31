@@ -18,10 +18,10 @@ GitHub authentication and pushing work. No production Atlas connection, real acc
 
 ## Still required before production
 
-- Pharmacy dispensing/returns and forecasting; complete pharmacy frontend acceptance checks and document how bill generation relates to stock and collections.
-- Laboratory order edits and billing of clinician-requested orders, remaining queue filters, QC, accreditation and device workflows.
-- OT, dietary, referral partners/wallets, public self-registration and external integrations.
-- Other role dashboards and remaining reports, document/notification screens, charge/operation/bed master parity and print-template administration.
+- Pharmacy dispensing/returns; complete pharmacy frontend acceptance checks and document how bill generation relates to stock and collections.
+- Remaining laboratory status-report and device workflows; full frontend laboratory acceptance checks. Order edits, clinician-request billing, sample/billing filters, QC controls/runs and accreditation now have native routes.
+- External integrations and any remaining compatibility gaps found by the frontend route audit.
+- Remaining role reports and full dashboard acceptance checks. Shared staff overview, documents, task notes, charge/operation/bed masters and print-template settings now have native routes.
 - Full frontend route compatibility, stale-edit handling and tenant/branch acceptance checks across the implemented modules; complete any workflow-specific gaps found by that audit.
 - Optional clinical AI requires an explicitly configured provider. Its native routes currently return a configuration error and do not fabricate clinical text.
 - Full route compatibility and tenant-isolation tests against a disposable MongoDB database.

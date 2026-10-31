@@ -9,6 +9,7 @@ import {cents,paymentStatus} from './money.mjs';
 import {configuredPrefix,operationalSettings} from './settings.mjs';
 import {escapeSearch} from './search.mjs';
 import {awaitingLabSample,sampleCollectionRow} from './lab-sample-queue.mjs';
+import {registerPatient} from './patients.mjs';
 const router=Router(),uuid=z.string().uuid(),money=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 const escape=escapeSearch;
@@ -44,6 +45,18 @@ router.get('/lab-patients',async(request,response)=>{
   if(query.length<2)return response.json([]);
   const rows=await db.collection('patients').find({tenant_id:response.locals.account.tenant_id,deleted_at:null,$or:['first_name','last_name','medical_record_number','phone'].map(field=>({[field]:{$regex:escape(query),$options:'i'}}))},{projection:{_id:0,id:1,medical_record_number:1,first_name:1,last_name:1,phone:1,date_of_birth:1,sex:1,blood_group:1,email:1}}).limit(25).toArray();
   response.json(rows.map(row=>({...row,patient_name:`${row.first_name} ${row.last_name}`})));
+});
+router.post('/lab-patients',async(request,response)=>{
+  const body=z.object({first_name:z.string(),last_name:z.string(),phone:z.string().regex(/^\d{10}$/),date_of_birth:z.string().nullable().optional(),sex:z.enum(['male','female','other','unknown']).default('unknown'),blood_group:z.string().default(''),email:z.string().default(''),title:z.string().default(''),father_name:z.string().max(150).default(''),mother_name:z.string().max(150).default(''),state:z.string().max(100).default(''),district:z.string().max(150).default(''),city:z.string().max(150).default(''),age_years:z.number().int().min(0).max(150).default(0),age_months:z.number().int().min(0).max(11).default(0),age_days:z.number().int().min(0).max(30).default(0),address:z.string().max(1000).default(''),emergency_name:z.string().default(''),emergency_phone:z.string().default(''),allergies:z.string().max(2000).default('')}).parse(request.body);
+  request.body={first_name:body.first_name,last_name:body.last_name,phone:body.phone,date_of_birth:body.date_of_birth,sex:body.sex,blood_group:body.blood_group,email:body.email,allergies:body.allergies,branch_id:response.locals.account.branch_id,address:{line:body.address,title:body.title,state:body.state,city:body.city,district:body.district,father_name:body.father_name,mother_name:body.mother_name,age_years:body.age_years,age_months:body.age_months,age_days:body.age_days},emergency_contact:{name:body.emergency_name,phone:body.emergency_phone,relationship:body.emergency_name||body.emergency_phone?'Other':''}};
+  return registerPatient(request,response,{requireTitle:false});
+});
+router.get('/lab-recent-appointments',async(_request,response)=>{
+  const rows=await db.collection('clinical_appointments').find(await scopeFor(response,{appointment_type:'OPD',status:{$nin:['Cancelled','No Show','No_Show']}}),{projection:{_id:0}}).sort({appointment_date:-1,appointment_time:-1}).limit(100).toArray(),result=[];
+  for(const row of rows){const patient=await db.collection('patients').findOne({tenant_id:row.tenant_id,id:row.patient_id,deleted_at:null},{projection:{_id:0,id:1,first_name:1,last_name:1,medical_record_number:1,phone:1,sex:1,date_of_birth:1}});if(!patient)continue;const doctor=await db.collection('users').findOne({tenant_id:row.tenant_id,id:row.doctor_id},{projection:{first_name:1,last_name:1}});result.push({...patient,patient_name:`${patient.first_name} ${patient.last_name}`,appointment_id:row.id,appointment_date:row.appointment_date,appointment_time:row.appointment_time,appointment_number:row.appointment_number,doctor_id:row.doctor_id,doctor_name:doctor?`${doctor.first_name} ${doctor.last_name}`:''});}response.json(result);
+});
+router.get('/lab-referrals',async(_request,response)=>{
+  const rows=await db.collection('users').find(await scopeFor(response,{role:'doctor',is_active:true}),{projection:{_id:0,id:1,first_name:1,last_name:1}}).toArray();response.json(rows.map(row=>({id:row.id,name:`${row.first_name} ${row.last_name}`})).sort((a,b)=>a.name.localeCompare(b.name)));
 });
 router.get('/lab-registration-options',async(_request,response)=>{
   const tenant_id=response.locals.account.tenant_id,ids=await allowedBranches(response.locals.account,response.locals.claims.portal);
