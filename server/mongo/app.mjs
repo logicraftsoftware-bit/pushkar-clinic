@@ -18,6 +18,7 @@ import diagnosticMasters from './diagnostic-masters.mjs';
 import laboratory from './laboratory.mjs';
 import platform from './platform.mjs';
 import labResults from './lab-results.mjs';
+import labReports,{publicReports} from './lab-reports.mjs';
 import { permissionsFor } from './access.mjs';
 
 const app = express();
@@ -159,7 +160,8 @@ app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosti
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);
 app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
 app.use('/api/v1/operations',authenticate('careframe-portal'),finance);
-app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults);
+app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports);
+app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.
 app.use('/api', (_request, response) => response.status(501).json({ code: 'MONGODB_WORKFLOW_PENDING', error: 'This workflow is not yet converted to MongoDB. This build is not ready for clinic use.' }));
 app.use((error, _request, response, _next) => {

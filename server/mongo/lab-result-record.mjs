@@ -37,8 +37,10 @@ export async function resultRecord(row,session){
   const normalized=normalizeLabResultFormats(tests);
   const definition_revision=digest(normalized.map(test=>({...test,parameters:test.parameters.map(({value,remarks,...definition})=>definition)})));
   const profiles=await db.collection('staff_members').find({tenant_id,staff_type:{$in:['Pathologist','Radiologist']},status:'Active'},{session}).toArray();
-  let signatories=reportSignatories(row.data.doctor_approval??null,profiles,[]);
+  const signerIds=new Set([...approved].flatMap(id=>row.data.doctor_approval?.tests?.[id]?.pathologist_ids??row.data.doctor_approval?.pathologist_ids??[]));
+  let signatories=reportSignatories(row.data.doctor_approval?{...row.data.doctor_approval,pathologist_ids:[...signerIds]}:null,profiles,[]);
   signatories=signatories.map(profile=>profile.approved&&row.data.approved_signatories?.[profile.id]?{...row.data.approved_signatories[profile.id],approved:true}:profile);
+  for(const id of signerIds)if(!signatories.some(profile=>profile.id===id)&&row.data.approved_signatories?.[id])signatories.push({...row.data.approved_signatories[id],approved:true});
   const bill=row.data.bill_id?await db.collection('finance_records').findOne({tenant_id,id:row.data.bill_id},{session,projection:{_id:0}}):null;
   const hospital=await db.collection('hospitals').findOne({id:tenant_id},{session}),branch=await db.collection('branches').findOne({tenant_id,id:row.branch_id},{session});
   const template=await db.collection('hospital_print_templates').findOne({tenant_id,document_type:'pathology'},{session});

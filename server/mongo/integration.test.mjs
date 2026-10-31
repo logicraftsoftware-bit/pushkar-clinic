@@ -212,7 +212,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const list=await request('/workspaces/lab-orders?page=1','GET',null,staffLogin.data.token);
     assert.equal(list.status,200,JSON.stringify(list.data));assert.equal(list.data.summary.total,1);assert.equal(list.data.summary.progress,1);assert.equal(list.data.summary.ready,0);
   });
-  let resultRecord,parameter,signatory;
+  let resultRecord,parameter,signatory,reportSharePath;
   const signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jV2kAAAAASUVORK5CYII=';
   await t.test('lab editors reject stale parameter definitions and retain reviewed reference snapshots',async()=>{
     const unit=await request('/hospital-management/diagnostic-masters/pathology/unit','POST',{name:'Synthetic Unit',data:{}},staffLogin.data.token);assert.equal(unit.status,201);
@@ -246,10 +246,26 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(resultsPath,'GET',null,staffLogin.data.token)).data.report_signatories.find(row=>row.id===signatory.id).signature,signature);
     assert.equal((await request(`/workspaces/lab/orders/${laboratoryOrder.id}/process`,'PATCH',{action:'reject',note:'Synthetic rejection'},staffLogin.data.token)).status,409);
   });
+  await t.test('print confirmations are retry-safe and public shares contain server-generated reviewed PDFs',async()=>{
+    const basePath=`/workspaces/work-items/${laboratoryOrder.id}`;
+    const print={test_ids:[laboratoryOrder.data.tests[0].test_id],revision:resultRecord.report_revision,request_id:'00000000-0000-4000-8000-000000000087'};
+    const printed=await Promise.all([request(basePath+'/lab-report-print','POST',print,staffLogin.data.token),request(basePath+'/lab-report-print','POST',print,staffLogin.data.token)]);
+    assert.deepEqual(printed.map(row=>row.status),[200,200],JSON.stringify(printed));assert.equal(printed[0].data.events.length,1);
+    assert.equal((await request(basePath+'/lab-report-print','POST',{...print,revision:'0'.repeat(64)},staffLogin.data.token)).status,409);
+    const body={pdf:Buffer.from('%PDF-1.4\nFORGED_REPORT').toString('base64'),filename:'Synthetic-Report.pdf',updated_at:resultRecord.updated_at};
+    const shared=await request(basePath+'/lab-report-share','POST',body,staffLogin.data.token);assert.equal(shared.status,201,JSON.stringify(shared.data));
+    const report=await fetch(new URL(shared.data.path,base));assert.equal(report.status,200);assert.match(report.headers.get('content-type'),/application\/pdf/);
+    const bytes=Buffer.from(await report.arrayBuffer());assert.equal(bytes.subarray(0,5).toString(),'%PDF-');assert.equal(bytes.includes(Buffer.from('FORGED_REPORT')),false);
+    await db.collection('report_shares').updateMany({order_id:laboratoryOrder.id},{$set:{expires_at:new Date(Date.now()-1000)}});
+    assert.equal((await fetch(new URL(shared.data.path,base))).status,404);
+    const current=await request(basePath+'/lab-report-share','POST',body,staffLogin.data.token);assert.equal(current.status,201,JSON.stringify(current.data));reportSharePath=current.data.path;
+    const reports=await request('/workspaces/lab-orders?stage=Reports','GET',null,staffLogin.data.token);assert.equal(reports.status,200);assert.equal(reports.data.total,1);assert.equal(reports.data.rows[0].report_available,true);
+  });
   await t.test('disapproval preserves the reviewed result and reopens it with audit history',async()=>{
     const response=await request(`/workspaces/lab/orders/${laboratoryOrder.id}/approve`,'PATCH',{stage:'disapprove',updated_at:resultRecord.updated_at,test_ids:[laboratoryOrder.data.tests[0].test_id]},staffLogin.data.token);assert.equal(response.status,200,JSON.stringify(response.data));
     const opened=await request(`/workspaces/work-items/${laboratoryOrder.id}/lab-results`,'GET',null,staffLogin.data.token);
     assert.equal(opened.data.data.doctor_approval,null);assert.equal(opened.data.tests[0].parameters[0].value,'12.34');assert.ok(opened.data.data.approval_history.at(-1).previous_approval);
+    if(reportSharePath)assert.equal((await fetch(new URL(reportSharePath,base))).status,404);
   });
   await t.test('operational prefixes apply only to new patients and receipts remain visible',async()=>{
     assert.equal((await request('/hospital-admin/settings/PrefixSetting','PUT',{uhid_prefix:'NEWUHID'},staffLogin.data.token)).status,204);

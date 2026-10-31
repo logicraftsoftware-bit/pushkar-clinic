@@ -8,6 +8,7 @@ import {labPharmacyBilling} from './lab-billing.mjs';
 import {cents,paymentStatus} from './money.mjs';
 import {configuredPrefix,operationalSettings} from './settings.mjs';
 import {escapeSearch} from './search.mjs';
+import {awaitingLabSample,sampleCollectionRow} from './lab-sample-queue.mjs';
 const router=Router(),uuid=z.string().uuid(),money=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 const escape=escapeSearch;
@@ -86,14 +87,24 @@ router.post('/lab-own-orders',async(request,response)=>{
 });
 router.get('/lab-orders',async(request,response)=>{
   const stage=z.string().max(100).default('').parse(request.query.stage),extra={workspace:'laboratory'};
-  const stages={'Sample Collection':['sample collection'],Results:['results'],Verification:['verification'],Reports:['reports'],'Lab Orders':['orders'],'Lab POS':['pos']};
+  const stages={'Lab Orders':['orders'],'Lab POS':['pos']};
   if(stages[stage])extra.kind={$in:stages[stage]};
+  if(stage==='Sample Collection'){
+    extra['data.collected_at']=null;extra['data.cancellation_request_id']=null;
+    extra.$or=[{kind:{$in:['orders','pos','sample collection']},status:{$in:['Pending','Awaiting Payment','Paid','Partially Paid','Unpaid','Payment not required','Awaiting Sample']},'data.barcodes.0':{$exists:false},'data.processing_status':{$in:[null,'']},'data.result_status':{$in:[null,'','Pending']},'data.tests.0':{$exists:true}},{kind:'sample collection',status:'Barcode Generated'}];
+  }
+  if(stage==='Results'){extra['data.collected_at']={$type:'string'};extra.status={$nin:['Cancelled','Rejected']};}
+  if(stage==='Verification')extra['data.result_status']={$in:['Completed','Partially Completed']};
+  if(stage==='Reports'){extra['data.result_status']={$in:['Completed','Partially Completed']};extra['data.doctor_approval']={$type:'object'};}
+  const type=z.enum(['','orders','pos','sample collection','results','verification','reports']).default('').parse(request.query.order_type);
+  if(type)extra.kind=type;
+  if(request.query.from||request.query.to)extra.occurred_at={...(request.query.from?{$gte:new Date(z.string().date().parse(request.query.from)+'T00:00:00+05:30')}:{}),...(request.query.to?{$lte:new Date(z.string().date().parse(request.query.to)+'T23:59:59.999+05:30')}:{})};
   if(request.query.center_id)extra.branch_id=uuid.parse(request.query.center_id);
   const filter=await scopeFor(response,extra),search=z.string().max(150).default('').parse(request.query.search);
   if(search)filter.$and.push({$or:['title','data.customer_name','data.medical_record_number','data.bill_number'].map(field=>({[field]:{$regex:escape(search),$options:'i'}}))});
   const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
   const rows=await db.collection('role_work_items').find(filter,{projection:{_id:0,'data.lab_results':0,'data.result_history':0}}).sort({occurred_at:-1}).skip((page-1)*pageSize).limit(pageSize).toArray();
-  for(const row of rows){const bill=await billFor(row);row.bill_id=bill.id;row.bill_number=bill.record_number;row.bill_total=bill.total;row.bill_paid=bill.paid;row.bill_due=bill.due;row.bill_status=bill.status;row.report_available=false;row.patient_name=row.data.customer_name;row.medical_record_number=row.data.medical_record_number;}
+  for(let index=0;index<rows.length;index++){const row=rows[index],bill=await billFor(row);row.bill_id=bill.id;row.bill_number=bill.record_number;row.bill_total=bill.total;row.bill_paid=bill.paid;row.bill_due=bill.due;row.bill_status=bill.status;row.report_available=Boolean(row.data.doctor_approval?.test_ids?.length&&bill.status==='Paid'&&Number(bill.due)===0&&Number(bill.paid)>=Number(bill.total));row.patient_name=row.data.customer_name;row.medical_record_number=row.data.medical_record_number;if(stage==='Sample Collection')rows[index]=sampleCollectionRow(row);}
   const alive={$not:[{$in:['$status',['Cancelled','Rejected']]}]},collected={$ne:[{$ifNull:['$data.collected_at',null]},null]},resultComplete={$in:['$data.result_status',['Completed','Partially Completed']]};
   const metrics={total:true,awaiting:{$and:[alive,{$not:[collected]}]},progress:{$and:[alive,collected,{$not:[resultComplete]}]},ready:{$and:[alive,resultComplete,{$ne:[{$ifNull:['$data.doctor_approval',null]},null]}]},unpaid:{$and:[alive,{$gt:['$data.due_amount',0]}]}};
   const current=day().slice(0,7),parts=day().split('-').map(Number),previous=new Date(Date.UTC(parts[0],parts[1]-2,1)).toISOString().slice(0,7),month={$dateToString:{date:'$occurred_at',format:'%Y-%m',timezone:'Asia/Kolkata'}};
@@ -148,7 +159,7 @@ router.patch('/work-items/:id/sample-action',requirePermission('lab.result.creat
     const row=await orderFor(response,uuid.parse(request.params.id),session),data={...row.data};let kind,status;
     if(row.status==='Cancelled'||row.data.cancellation_request_id)throw failure('Cancelled orders cannot be collected.',409);
     if(body.action==='generate_barcodes'){
-      if(row.kind!=='sample collection'||!['Awaiting Sample','Barcode Generated'].includes(row.status))throw failure('Samples must be awaiting collection.',409);
+      if(!awaitingLabSample(row)&&!(row.kind==='sample collection'&&row.status==='Barcode Generated'&&data.barcodes?.length&&!data.collected_at))throw failure('Samples must be awaiting collection.',409);
       if(!body.collector)throw failure('Enter the sample collector.');
       if(!data.tests?.length)throw failure('This order has no tests.',409);
       data.barcodes??=data.tests.map((test,index)=>({test_id:test.test_id,test_name:test.name,value:`LAB-${randomUUID()}-${index+1}`}));
