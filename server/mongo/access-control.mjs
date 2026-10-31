@@ -16,6 +16,7 @@ async function lockActor(response,permission,session) {
   return granted;
 }
 router.get('/me',async(_request,response)=>{
+  if(response.locals.account.role==='broker')return response.json({permissions:['menu.dashboard.view','menu.reports.view','menu.billing.view'],roles:[],managed_roles:[]});
   const account=response.locals.account,permissions=await permissionsFor(account);
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
   const managed_roles=permissions.some(code=>['*','roles.manage','staff.view'].includes(code))?await db.collection('rbac_roles').find({tenant_id:account.tenant_id,is_system:false},{projection:{_id:0,id:1,name:1,code:1,is_system:1}}).sort({name:1}).toArray():[];

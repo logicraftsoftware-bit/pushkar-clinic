@@ -34,6 +34,7 @@ import dashboard from './dashboard.mjs';
 import ot from './ot.mjs';
 import hospitalMasters from './hospital-masters.mjs';
 import dietary from './dietary.mjs';
+import referrals from './referrals.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -82,14 +83,15 @@ function authenticate(audience) {
       });
     } catch { return response.status(401).json({ error: 'Session expired or invalid.' }); }
     if (typeof claims !== 'object' || typeof claims.sub !== 'string' || typeof claims.jti !== 'string') return response.status(401).json({ error: 'Session expired or invalid.' });
-    const session = await db.collection('sessions').findOne({ _id: claims.jti, user_id: claims.sub, audience, expires_at: { $gt: new Date() } });
-    const admin = audience === 'careframe-superadmin';
-    const account = await db.collection(admin ? 'super_admin_users' : 'users').findOne({ id: claims.sub, ...(admin ? {} : { tenant_id: claims.tenantId }) });
+    const session = await db.collection('sessions').findOne({ _id: claims.jti, user_id: claims.sub, audience:claims.aud, expires_at: { $gt: new Date() } });
+    const admin = claims.aud === 'careframe-superadmin',broker=claims.aud==='careframe-broker';
+    let account = await db.collection(admin ? 'super_admin_users' : broker?'referral_partners':'users').findOne({ id: claims.sub, ...(admin ? {} : { tenant_id: claims.tenantId }) });
+    if(broker&&account)account={...account,is_active:account.status==='Active',role:'broker',first_name:account.name,last_name:''};
     if (!session || !account?.is_active || account.deleted_at || (account.session_version ?? 0) !== claims.version) return response.status(401).json({ error: 'Account access revoked.' });
     if (!admin) {
       if (claims.role !== account.role || claims.branchId !== account.branch_id) return response.status(401).json({ error: 'Account access changed. Sign in again.' });
-      if (!authorizedPortal(account, claims.portal)) return response.status(401).json({ error: 'Workspace access revoked.' });
-      if (!await hasActiveRole(account)) return response.status(401).json({ error: 'Role access revoked.' });
+      if (broker?claims.role!=='broker'||claims.portal!=='broker':!authorizedPortal(account, claims.portal)) return response.status(401).json({ error: 'Workspace access revoked.' });
+      if (!broker&&!await hasActiveRole(account)) return response.status(401).json({ error: 'Role access revoked.' });
       const branch = await db.collection('branches').findOne({ id: account.branch_id, tenant_id: account.tenant_id, is_active: true });
       if (!branch) return response.status(401).json({ error: 'Branch access revoked.' });
       const hospital = await db.collection('hospitals').findOne({ id: account.tenant_id });
@@ -126,6 +128,12 @@ app.get('/api/v1/admin/me', authenticate('careframe-superadmin'), (_request, res
 app.post('/api/v1/auth/login', rateLimit, async (request, response) => {
   const body = loginSchema.parse(request.body);
   const identifier = body.identifier.toLowerCase();
+  if(body.portal==='broker'){
+    const candidates=await db.collection('referral_partners').find({status:'Active',$or:[{phone:body.identifier},{email:identifier}]}).limit(2).toArray(),partner=candidates.length===1?candidates[0]:null,hospital=partner?await db.collection('hospitals').findOne({id:partner.tenant_id}):null,branch=partner?await db.collection('branches').findOne({tenant_id:partner.tenant_id,id:partner.branch_id,is_active:true}):null;
+    if(!partner||!branch||!activeAccount({...partner,is_active:true},hospital)||!await verifyPassword(body.password,partner.password_hash))return response.status(401).json({error:'Invalid partner login or clinic access.'});
+    const token=await issueSession(partner,'careframe-broker',{tenantId:partner.tenant_id,branchId:partner.branch_id,role:'broker',portal:'broker'});
+    return response.json({token,forcePasswordChange:false,user:{id:partner.id,name:partner.name,email:partner.email,phone:partner.phone,role:'broker',portal:'broker'},hospital:{id:hospital.id,name:hospital.name,code:hospital.code,logoUrl:hospital.logo_url??'',status:hospital.status,branchId:branch.id,branchName:branch.name},modules:[]});
+  }
   const candidates = await db.collection('users').find({ $or: [{ email: identifier }, { phone: body.identifier }], is_active: true }).limit(2).toArray();
   const account = candidates.length === 1 ? candidates[0] : null;
   const hospital = account ? await db.collection('hospitals').findOne({ id: account.tenant_id }) : null;
@@ -157,7 +165,7 @@ app.post('/api/v1/auth/change-password', authenticate('careframe-portal'), async
   });
   response.status(204).end();
 });
-app.post('/api/v1/auth/logout', authenticate('careframe-portal'), async (_request, response) => {
+app.post('/api/v1/auth/logout', authenticate(['careframe-portal','careframe-broker']), async (_request, response) => {
   await db.collection('sessions').deleteOne({ _id: response.locals.claims.jti, user_id: response.locals.account.id });
   response.status(204).end();
 });
@@ -166,8 +174,8 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   response.status(204).end();
 });
 app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
-app.use('/api/v1/access-control',authenticate('careframe-portal'),accessControl);
-app.get('/api/v1/session/events',authenticate('careframe-portal'),accessEvents);
+app.use('/api/v1/access-control',authenticate(['careframe-portal','careframe-broker']),accessControl);
+app.get('/api/v1/session/events',authenticate(['careframe-portal','careframe-broker']),accessEvents);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),hospitalMasters,pharmacyMasters,diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient,receptionDischarge);
@@ -179,6 +187,7 @@ app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge
 app.use('/api/v1/dashboard',authenticate('careframe-portal'),dashboard);
 app.use('/api/v1/ot',authenticate('careframe-portal'),ot);
 app.use('/api/v1/dietary',authenticate('careframe-portal'),dietary);
+app.use('/api/v1/referrals',authenticate(['careframe-portal','careframe-broker']),referrals);
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports,nursing,nursingTasks);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.

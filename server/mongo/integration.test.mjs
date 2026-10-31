@@ -533,6 +533,28 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(after.data.totals.occupied,0);assert.ok(after.data.filters.departments.some(row=>row.id===department.id));assert.ok(after.data.activityFeed.every(row=>typeof row.detail==='string'));
     await db.collection('finance_records').deleteOne({id:'00000000-0000-4000-8000-000000000021'});
   });
+  await t.test('referral broker sessions cannot access staff data and wallet credits withdrawals and reversals post once',async()=>{
+    const partner=await request('/referrals/partners','POST',{name:'Synthetic Referral Partner',phone:'9999999971',password,minimum_withdrawal:1},staffLogin.data.token);assert.equal(partner.status,201,JSON.stringify(partner.data));assert.equal(partner.data.password_hash,undefined);
+    const referred=await request('/patients','POST',{...patientInput,first_name:'Referral',last_name:'Synthetic',phone:'9999999972',referral_partner_id:partner.data.id,referral_consent:true},staffLogin.data.token);assert.equal(referred.status,201,JSON.stringify(referred.data));
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const rule=await request('/referrals/rules','POST',{partner_id:partner.data.id,service_type:'All',commission_type:'Percentage',rate:10,effective_from:today},staffLogin.data.token);assert.equal(rule.status,201,JSON.stringify(rule.data));
+    const invoice=await request('/operations/finance/invoices','POST',{patient_id:referred.data.id,total:100,paid:100,data:{services:'Synthetic referral service',payment_method:'Cash'}},staffLogin.data.token);assert.equal(invoice.status,201);
+    const dashboard=await request('/referrals/admin-dashboard','GET',null,staffLogin.data.token);assert.equal(dashboard.status,200,JSON.stringify(dashboard.data));const commission=dashboard.data.commissions.find(row=>row.invoice_id===invoice.data.id);assert.ok(commission);assert.equal(commission.commission_amount,10);assert.equal(commission.status,'Eligible');
+    const approved=await Promise.all([request(`/referrals/commissions/${commission.id}/action`,'POST',{action:'approve'},staffLogin.data.token),request(`/referrals/commissions/${commission.id}/action`,'POST',{action:'approve'},staffLogin.data.token)]);assert.deepEqual(approved.map(row=>row.status),[200,200],JSON.stringify(approved));assert.equal(await db.collection('referral_wallet_transactions').countDocuments({commission_id:commission.id,transaction_type:'Commission Credit'}),1);
+    const login=await request('/auth/login','POST',{identifier:partner.data.phone,password,portal:'broker'});assert.equal(login.status,200,JSON.stringify(login.data));
+    assert.equal((await request('/patients','GET',null,login.data.token)).status,401);assert.equal((await request('/referrals/partners','GET',null,login.data.token)).status,403);assert.equal((await request('/access-control/me','GET',null,login.data.token)).status,200);
+    const balance=await request('/referrals/broker-dashboard','GET',null,login.data.token);assert.equal(balance.status,200,JSON.stringify(balance.data));assert.equal(balance.data.summary.available_balance,10);assert.equal(balance.data.partner.password_hash,undefined);
+    const amounts=await Promise.all([request('/referrals/withdrawals','POST',{amount:6,method:'Cash',request_id:'00000000-0000-4000-8000-000000000010'},login.data.token),request('/referrals/withdrawals','POST',{amount:6,method:'Cash',request_id:'00000000-0000-4000-8000-000000000011'},login.data.token)]);assert.deepEqual(amounts.map(row=>row.status).sort(),[201,409],JSON.stringify(amounts));const withdrawal=amounts.find(row=>row.status===201).data;
+    assert.equal((await request(`/referrals/withdrawals/${withdrawal.id}/action`,'POST',{action:'approve'},staffLogin.data.token)).status,200);
+    for(let attempt=0;attempt<2;attempt++)assert.equal((await request(`/referrals/withdrawals/${withdrawal.id}/action`,'POST',{action:'pay',payment_reference:'SYNTHETIC-TEST-NO-EXTERNAL-PAYMENT'},staffLogin.data.token)).status,200);
+    assert.equal(await db.collection('referral_wallet_transactions').countDocuments({withdrawal_id:withdrawal.id,transaction_type:'Withdrawal Debit'}),1);
+    await db.collection('patients').updateOne({id:referred.data.id},{$set:{referral_consent:false}});
+    assert.equal((await request('/operations/finance/refunds','POST',{invoice_id:invoice.data.id,amount:100,data:{payment_method:'Cash',reason:'Synthetic reversal'}},staffLogin.data.token)).status,201);
+    for(let attempt=0;attempt<2;attempt++){const wallet=await request('/referrals/broker-dashboard','GET',null,login.data.token);assert.equal(wallet.status,200,JSON.stringify(wallet.data));assert.equal(wallet.data.summary.available_balance,-6);assert.equal(wallet.data.referrals.length,0);}
+    assert.equal(await db.collection('referral_wallet_transactions').countDocuments({commission_id:commission.id,transaction_type:'Refund Reversal'}),1);
+    assert.equal((await request(`/referrals/partners/${partner.data.id}`,'PATCH',{...partner.data,status:'Suspended'},staffLogin.data.token)).status,200);
+    assert.equal((await request('/referrals/broker-dashboard','GET',null,login.data.token)).status,401);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

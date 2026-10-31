@@ -15,14 +15,15 @@ export function accessEvents(request,response) {
     pending=true;
     try {
       const [session,account]=await Promise.all([
-        db.collection('sessions').findOne({_id:claims.jti,user_id:claims.sub,audience:'careframe-portal',expires_at:{$gt:new Date()}}),
-        db.collection('users').findOne({id:claims.sub,tenant_id:claims.tenantId}),
+        db.collection('sessions').findOne({_id:claims.jti,user_id:claims.sub,audience:claims.aud,expires_at:{$gt:new Date()}}),
+        db.collection(claims.aud==='careframe-broker'?'referral_partners':'users').findOne({id:claims.sub,tenant_id:claims.tenantId}),
       ]);
       const hospital=account?await db.collection('hospitals').findOne({id:account.tenant_id}):null;
       const branch=account?await db.collection('branches').findOne({tenant_id:account.tenant_id,id:account.branch_id,is_active:true}):null;
       if(stopped)return;
       response.write('data: refresh\n\n');
-      if(!session||!branch||!activeAccount(account,hospital)||(account.session_version??0)!==claims.version||account.role!==claims.role||account.branch_id!==claims.branchId||!authorizedPortal(account,claims.portal)||!await hasActiveRole(account))close();
+      const broker=claims.aud==='careframe-broker',live=broker&&account?{...account,is_active:account.status==='Active',role:'broker'}:account;
+      if(!session||!branch||!activeAccount(live,hospital)||(live.session_version??0)!==claims.version||live.role!==claims.role||live.branch_id!==claims.branchId||(!broker&&(!authorizedPortal(live,claims.portal)||!await hasActiveRole(live))))close();
     }catch{close();}
     finally{pending=false;}
   }
