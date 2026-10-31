@@ -25,6 +25,7 @@ import inventory from './inventory.mjs';
 import financePosting from './finance-posting.mjs';
 import workforce from './workforce.mjs';
 import cancellations from './cancellations.mjs';
+import doctor from './doctor.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -166,6 +167,7 @@ app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
 app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory);
 app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
+app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor);
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.
@@ -174,7 +176,7 @@ app.use((error, _request, response, _next) => {
   if (error instanceof z.ZodError) return response.status(400).json({ error: 'Check the submitted values.', fields: error.issues.map(issue => issue.path.join('.')) });
   if (error?.code === 11000) return response.status(409).json({ error: 'A record with these details already exists.' });
   if (error instanceof SyntaxError && 'body' in error) return response.status(400).json({ error: 'Invalid JSON.' });
-  if ([400,401,403,404,409,429,501].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
+  if ([400,401,403,404,409,422,429,501,503].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
   // Driver error messages can contain hosts or credentials. Do not print them.
   console.error('MongoDB request failed', error?.name ?? 'Error');
   response.status(500).json({ error: 'Request failed. Check the server configuration.' });

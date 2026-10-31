@@ -408,6 +408,19 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const events=await request(`/cancellations/${submitted.data.id}/events`,'GET',null,staffLogin.data.token);assert.equal(events.status,200);assert.deepEqual(events.data.map(row=>row.action),['Requested','Approved','Refund Paid']);
     const list=await request('/cancellations?stage=refunds','GET',null,staffLogin.data.token);assert.equal(list.status,200);assert.equal(list.data.rows[0].status,'Completed');assert.equal(list.data.pending_refund,0);
   });
+  await t.test('doctor consultations preserve one completed record and one receiving-department order',async()=>{
+    await db.collection('users').updateOne({id:doctor.user_id},{$set:{force_password_change:false}});
+    const login=await request('/auth/login','POST',{identifier:'doctor@example.invalid',password,portal:'doctor'});assert.equal(login.status,200,JSON.stringify(login.data));
+    const overview=await request('/doctor/overview','GET',null,login.data.token);assert.equal(overview.status,200,JSON.stringify(overview.data));assert.ok(overview.data.appointments.some(row=>row.id===appointment.id));
+    const record={patient_id:patient.id,appointment_id:appointment.id,record_type:'consultation',data:{encounter_status:'Completed',diagnosis:'Synthetic clinical test record',lab_tests:[{test_id:laboratoryOrder.data.tests[0].test_id,name:'Forged test name',amount:9999}]}};
+    const completed=await request('/doctor/records','POST',record,login.data.token);assert.equal(completed.status,201,JSON.stringify(completed.data));
+    const repeated=await request('/doctor/records','POST',record,login.data.token);assert.equal(repeated.status,201,JSON.stringify(repeated.data));assert.equal(completed.data.id,repeated.data.id);
+    assert.equal((await request('/doctor/records','POST',{...record,data:{...record.data,diagnosis:'Changed after completion'}},login.data.token)).status,409);
+    assert.equal((await db.collection('clinical_appointments').findOne({id:appointment.id})).status,'Completed');
+    const orders=await db.collection('role_work_items').find({tenant_id:hospital.data.id,workspace:'laboratory','data.consultation_record_id':completed.data.id}).toArray();assert.equal(orders.length,1);assert.equal(orders[0].data.tests[0].name,'Synthetic Blood Test');assert.equal(orders[0].data.tests[0].amount,120);
+    const history=await request(`/doctor/patients/${patient.id}`,'GET',null,login.data.token);assert.equal(history.status,200);assert.ok(history.data.records.some(row=>row.id===completed.data.id));
+    assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
