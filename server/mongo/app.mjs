@@ -22,6 +22,7 @@ import labReports,{publicReports} from './lab-reports.mjs';
 import accessControl from './access-control.mjs';
 import {accessEvents} from './live-access.mjs';
 import inventory from './inventory.mjs';
+import financePosting from './finance-posting.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -160,7 +161,7 @@ app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);
 app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
-app.use('/api/v1/operations',authenticate('careframe-portal'),finance,inventory);
+app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory);
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.

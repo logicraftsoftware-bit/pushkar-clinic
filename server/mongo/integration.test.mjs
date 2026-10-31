@@ -356,6 +356,26 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const low=await request('/operations/inventory/low-stock','GET',null,staffLogin.data.token);assert.equal(low.status,200);assert.equal(low.data.some(row=>row.id===source.data.id),false);
     const events=await fetch(`${base}/session/events`,{headers:{Authorization:`Bearer ${staffLogin.data.token}`}});assert.equal(events.status,200);assert.match(events.headers.get('content-type'),/text\/event-stream/);const reader=events.body.getReader();const first=await reader.read();assert.match(new TextDecoder().decode(first.value),/data: refresh/);await reader.cancel();
   });
+  await t.test('general invoices post initial receipts and concurrent payment retries cannot overcollect',async()=>{
+    const invoice=await request('/operations/finance/invoices','POST',{patient_id:patient.id,total:120,paid:20,data:{services:'Synthetic Service',payment_method:'Cash'},request_id:'00000000-0000-4000-8000-000000000081'},staffLogin.data.token);
+    assert.equal(invoice.status,201,JSON.stringify(invoice.data));assert.equal(invoice.data.due,100);assert.equal(invoice.data.status,'Partially Paid');
+    const initial=await db.collection('finance_records').find({invoice_id:invoice.data.id,kind:'payments'}).toArray();assert.equal(initial.length,1);assert.equal(initial[0].amount,20);
+    const body={invoice_id:invoice.data.id,patient_id:patient.id,amount:100,data:{payment_method:'Cash'},request_id:'00000000-0000-4000-8000-000000000082'};
+    const payments=await Promise.all([request('/operations/finance/payments','POST',body,staffLogin.data.token),request('/operations/finance/payments','POST',body,staffLogin.data.token)]);
+    assert.deepEqual(payments.map(row=>row.status),[201,201],JSON.stringify(payments));assert.equal(payments[0].data.id,payments[1].data.id);
+    const paid=await db.collection('finance_records').findOne({id:invoice.data.id});assert.equal(paid.paid,120);assert.equal(paid.due,0);
+    assert.equal((await request('/operations/finance/payments','POST',{...body,request_id:'00000000-0000-4000-8000-000000000083'},staffLogin.data.token)).status,409);
+    assert.equal((await request('/operations/finance/payments','POST',{...body,amount:1},staffLogin.data.token)).status,409);
+    assert.equal((await request('/operations/finance/refunds','POST',{invoice_id:invoice.data.id,amount:121,data:{payment_method:'Cash',reason:'Synthetic correction'}},staffLogin.data.token)).status,409);
+    const refund=await request('/operations/finance/refunds','POST',{invoice_id:invoice.data.id,amount:40,data:{payment_method:'Cash',reason:'Synthetic correction'}},staffLogin.data.token);assert.equal(refund.status,201,JSON.stringify(refund.data));
+    const expense=await request('/operations/finance/expenses','POST',{amount:10,data:{payee:'Synthetic Vendor',payment_method:'Cash'}},staffLogin.data.token);assert.equal(expense.status,201,JSON.stringify(expense.data));
+    assert.equal((await request(`/operations/finance/payments/${payments[0].data.id}`,'PUT',{amount:1},staffLogin.data.token)).status,409);
+    const reports=await request('/operations/finance/reports','GET',null,staffLogin.data.token);assert.equal(reports.status,200,JSON.stringify(reports.data));assert.equal(reports.data[0].refunds,40);assert.equal(reports.data[0].expenses,10);
+    const all=await request('/operations/finance/all','GET',null,staffLogin.data.token);assert.equal(all.status,200);assert.ok(all.data.some(row=>row.data?.admission_id));assert.ok(all.data.every(row=>row.request_hash===undefined));
+    const admissionInvoice=all.data.find(row=>row.kind==='invoices'&&row.data.admission_id);
+    const admissionRow=await db.collection('ipd_admissions').findOne({id:admissionInvoice.data.admission_id});assert.equal(admissionInvoice.paid,Math.min(admissionRow.total_amount,admissionRow.paid_amount+admissionRow.deposit_amount));
+    const labDownload=await request(`/operations/finance/lab-invoices/${laboratoryOrder.data.bill_id}`,'GET',null,staffLogin.data.token);assert.equal(labDownload.status,200,JSON.stringify(labDownload.data));assert.ok(labDownload.data.payments.length);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

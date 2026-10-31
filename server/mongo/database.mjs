@@ -37,6 +37,8 @@ export function initializeMongo() {
       ['clinical_appointments', { tenant_id: 1, appointment_number: 1 }, { unique: true }],
       ['clinical_appointments', { tenant_id: 1, doctor_id: 1, appointment_date: 1, appointment_time: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['Booked','Confirmed','Checked In','Waiting','In Consultation','Completed'] } } }],
       ['finance_records', { tenant_id: 1, record_number: 1 }, { unique: true }],
+      ['finance_records', { tenant_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } }],
+      ['finance_records', { tenant_id: 1, kind: 1, 'data.admission_id': 1 }, { unique: true, partialFilterExpression: { kind: 'invoices', 'data.admission_id': { $type: 'string' } } }],
       ['inventory_records', { id: 1 }, { unique: true }],
       ['inventory_records', { tenant_id: 1, record_code: 1 }, { unique: true }],
       ['inventory_records', { tenant_id: 1, request_id: 1 }, { unique: true, partialFilterExpression: { request_id: { $type: 'string' } } }],
