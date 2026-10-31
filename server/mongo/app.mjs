@@ -30,6 +30,7 @@ import {doctorDischarge,receptionDischarge,nursingTasks} from './discharge.mjs';
 import nursing from './nursing.mjs';
 import pharmacyStock,{pharmacyMasters} from './pharmacy-stock.mjs';
 import pharmacySales from './pharmacy-sales.mjs';
+import dashboard from './dashboard.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -172,6 +173,7 @@ app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePos
 app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
 app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge);
+app.use('/api/v1/dashboard',authenticate('careframe-portal'),dashboard);
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports,nursing,nursingTasks);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.

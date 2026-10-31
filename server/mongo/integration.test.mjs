@@ -484,6 +484,16 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(await db.collection('ipd_bed_stays').countDocuments({admission_id:stored.id,ended_at:null}),0);
     assert.equal((await request(`/clinical/discharge-requests/${item.request_id}/complete`,'POST',{},staffLogin.data.token)).status,409);
   });
+  await t.test('hospital dashboard uses actual scoped records and validates branch and date filters',async()=>{
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const before=await request(`/dashboard/hospital?from=${today}&to=${today}`,'GET',null,staffLogin.data.token);assert.equal(before.status,200,JSON.stringify(before.data));assert.equal(before.data.range.days,1);assert.equal(before.data.trendData.length,1);assert.equal(before.data.metrics.length,4);assert.ok(before.data.finance.totals.collected>0);
+    await db.collection('finance_records').insertOne({id:'00000000-0000-4000-8000-000000000021',tenant_id:'foreign-tenant',branch_id:branch.id,kind:'payments',record_number:'FOREIGN-DASHBOARD',amount:999999,record_date:today,created_at:new Date()});
+    const after=await request(`/dashboard/hospital?from=${today}&to=${today}`,'GET',null,staffLogin.data.token);assert.equal(after.status,200);assert.equal(after.data.finance.totals.collected,before.data.finance.totals.collected);
+    assert.equal((await request('/dashboard/hospital?from=2026-11-02&to=2026-11-01','GET',null,staffLogin.data.token)).status,400);
+    assert.equal((await request('/dashboard/hospital?branchId=00000000-0000-4000-8000-000000000099','GET',null,staffLogin.data.token)).status,403);
+    assert.equal(after.data.totals.occupied,0);assert.ok(after.data.filters.departments.some(row=>row.id===department.id));
+    await db.collection('finance_records').deleteOne({id:'00000000-0000-4000-8000-000000000021'});
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

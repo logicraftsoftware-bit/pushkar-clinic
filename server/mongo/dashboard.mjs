@@ -1,0 +1,49 @@
+import {Router} from 'express';
+import {z} from 'zod';
+import {db,transaction} from './database.mjs';
+import {scopeFor,assertBranch,allowedBranches,requirePermission} from './access.mjs';
+import {cents} from './money.mjs';
+import {hospitalDay,syncAdmissionInvoice} from './finance-ledger.mjs';
+const router=Router(),offset=(day,count)=>new Date(new Date(day+'T00:00:00Z').getTime()+count*86400000).toISOString().slice(0,10);
+const total=(rows,kind,field)=>rows.filter(row=>row.kind===kind).reduce((sum,row)=>sum+cents(row[field]),0)/100;
+function group(rows,key,value){const result=new Map();for(const row of rows){const name=key(row);result.set(name,(result.get(name)??0)+value(row));}return [...result].map(([name,value])=>({name,value}));}
+router.get('/hospital',requirePermission('billing.view'),async(request,response)=>{
+  const to=z.string().date().default(hospitalDay()).parse(request.query.to),from=z.string().date().default(offset(to,-29)).parse(request.query.from),days=Math.round((new Date(to)-new Date(from))/86400000)+1;
+  if(days<1||days>366)return response.status(400).json({error:'Select a date range of 1 to 366 days.'});
+  const branchId=z.union([z.string().uuid(),z.literal('')]).optional().parse(request.query.branchId),departmentId=z.union([z.string().uuid(),z.literal('')]).optional().parse(request.query.departmentId),tenant_id=response.locals.account.tenant_id;
+  if(branchId)await assertBranch(response,branchId);
+  const branch=branchId?{branch_id:branchId}:{},scope=extra=>scopeFor(response,{$and:[branch,extra]});
+  if(departmentId&&!await db.collection('departments').findOne(await scope({id:departmentId})))return response.status(403).json({error:'Department is outside your branch access.'});
+  await transaction(async session=>{const rows=await db.collection('ipd_admissions').find(await scopeFor(response,branch,session),{session}).toArray();for(const row of rows)await syncAdmissionInvoice(row,session);});
+  const previousFrom=offset(from,-days),previousTo=offset(from,-1);
+  const [patients,beds,appointments,admissions,ledger,claims,departments,activity]=await Promise.all([
+    db.collection('patients').find(await scope({deleted_at:null,created_at:{$gte:new Date(previousFrom+'T00:00:00+05:30'),$lt:new Date(offset(to,1)+'T00:00:00+05:30')}}),{projection:{created_at:1}}).toArray(),
+    db.collection('beds').find(await scope({}),{projection:{status:1,ward_id:1}}).toArray(),
+    db.collection('clinical_appointments').find(await scope(departmentId?{department_id:departmentId}:{}),{projection:{_id:0,id:1,patient_id:1,doctor_id:1,department_id:1,status:1,appointment_date:1,appointment_time:1,token_number:1}}).toArray(),
+    db.collection('ipd_admissions').find(await scope({}),{projection:{id:1,department_id:1,consultant_doctor_id:1}}).toArray(),
+    db.collection('finance_records').find(await scope({record_date:{$gte:previousFrom,$lte:to}}),{projection:{_id:0,kind:1,status:1,data:1,amount:1,total:1,paid:1,due:1,record_date:1,invoice_id:1}}).toArray(),
+    db.collection('insurance_claims').find(await scope({}),{projection:{status:1,claimed_amount:1,approved_amount:1,settled_amount:1}}).toArray(),
+    db.collection('departments').find(await scope({is_active:true}),{projection:{_id:0,id:1,name:1,branch_id:1}}).toArray(),
+    db.collection('audit_events').find(await scope({}),{projection:{_id:0,action:1,created_at:1,actor_id:1}}).sort({created_at:-1}).limit(12).toArray(),
+  ]);
+  const appointmentMap=new Map(appointments.map(row=>[row.id,row])),admissionMap=new Map(admissions.map(row=>[row.id,row]));
+  function encounter(row){const data=row.data??{},appointment=appointmentMap.get(data.appointment_id),admission=admissionMap.get(data.admission_id);return {department_id:appointment?.department_id??admission?.department_id??data.department_id,doctor_id:appointment?.doctor_id??admission?.consultant_doctor_id??data.doctor_id};}
+  const posted=ledger.filter(row=>row.kind!=='pharmacy-bill'||row.status==='Bill Generated'),selected=departmentId?posted.filter(row=>encounter(row).department_id===departmentId):posted,current=selected.filter(row=>row.record_date>=from),previous=selected.filter(row=>row.record_date<from);
+  const collected=total(current,'payments','amount'),billed=total(current,'invoices','total')+total(current,'pharmacy-bill','total'),expenses=total(current,'expenses','amount'),refunds=total(current,'refunds','amount'),outstanding=total(current,'invoices','due'),previousRevenue=total(previous,'payments','amount');
+  if(departmentId){const wards=await db.collection('wards').find(await scope({department_id:departmentId}),{projection:{id:1}}).toArray(),ids=new Set(wards.map(row=>row.id));for(let index=beds.length-1;index>=0;index--)if(!ids.has(beds[index].ward_id))beds.splice(index,1);}
+  const count=patients.filter(row=>hospitalDay(row.created_at)>=from).length,previousCount=patients.length-count,occupied=beds.filter(row=>row.status==='Occupied').length;
+  const waiting=appointments.filter(row=>row.appointment_date>=from&&row.appointment_date<=to&&['Booked','Confirmed','Checked In','Waiting','In Consultation'].includes(row.status));
+  const queue=[];for(const row of waiting.slice(0,50)){const patient=await db.collection('patients').findOne({tenant_id,id:row.patient_id}),doctor=await db.collection('users').findOne({tenant_id,id:row.doctor_id});queue.push({...row,patient:patient?`${patient.first_name} ${patient.last_name}`.toUpperCase():'',patient_name:patient?`${patient.first_name} ${patient.last_name}`.toUpperCase():'',doctor:doctor?`${doctor.first_name} ${doctor.last_name}`:'',time:row.appointment_time,tone:row.status.toLowerCase()});}
+  const trendData=[],trend=[];
+  for(let index=0;index<days;index++){const day=offset(from,index),prior=offset(previousFrom,index),rows=current.filter(row=>row.record_date===day),collection=total(rows,'payments','amount'),expense=total(rows,'expenses','amount'),refund=total(rows,'refunds','amount');trendData.push({day,revenue:collection,previous:total(previous.filter(row=>row.record_date===prior),'payments','amount')});trend.push({label:day,revenue:total(rows,'invoices','total')+total(rows,'pharmacy-bill','total'),collection,expense,outstanding:total(rows,'invoices','due'),profit:collection-expense-refund,refunds:refund});}
+  const paymentModes=group(current.filter(row=>row.kind==='payments'),row=>String(row.data?.payment_method??row.data?.payment_mode??'Unspecified'),row=>cents(row.amount)/100),expenseCategories=group(current.filter(row=>row.kind==='expenses'),row=>String(row.data?.category||'Uncategorized'),row=>cents(row.amount)/100);
+  const receivableAging=group(current.filter(row=>row.kind==='invoices'&&row.due>0),row=>{const age=Math.floor((new Date(to)-new Date(row.record_date))/86400000);return age<=30?'0-30 days':age<=60?'31-60 days':age<=90?'61-90 days':'90+ days';},row=>cents(row.due)/100);
+  const claimStatuses=group(claims,row=>row.status,()=>1),doctorRevenue=[];
+  for(const row of group(current.filter(row=>row.kind==='payments'&&encounter(row).doctor_id),row=>encounter(row).doctor_id,row=>cents(row.amount)/100)){const user=await db.collection('users').findOne({tenant_id,id:row.name});doctorRevenue.push({name:user?`${user.first_name} ${user.last_name}`:'Unassigned',value:row.value});}
+  const deptRevenue=group(current.filter(row=>row.kind==='payments'&&encounter(row).department_id),row=>encounter(row).department_id,row=>cents(row.amount)/100),departmentTotal=deptRevenue.reduce((sum,row)=>sum+row.value,0),colors=['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+  const departmentChart=deptRevenue.map((row,index)=>({name:departments.find(department=>department.id===row.name)?.name??'Unassigned',amount:row.value,value:departmentTotal?row.value/departmentTotal*100:0,color:colors[index%colors.length]}));
+  const change=(value,prior)=>prior?`${((value-prior)/prior*100).toFixed(1)}%`:value?'New':'0%';
+  const ids=await allowedBranches(response.locals.account,response.locals.claims.portal),branches=await db.collection('branches').find({tenant_id,is_active:true,...(ids===null?{}:{id:{$in:ids}})},{projection:{_id:0,id:1,name:1}}).toArray();
+  response.json({metrics:[{label:'Patients registered',value:String(count),change:change(count,previousCount),tone:'blue'},{label:'Revenue collected',value:`INR ${collected.toLocaleString('en-IN')}`,change:change(collected,previousRevenue),tone:'violet'},{label:'Bed occupancy',value:`${beds.length?Math.round(occupied/beds.length*100):0}%`,change:`${occupied} / ${beds.length}`,tone:'orange'},{label:'Waiting patients',value:String(waiting.length),change:'In selected period',tone:'green'}],totals:{revenue:collected,previousRevenue,patients:count,waiting:waiting.length,occupied,beds:beds.length},trendData,departments:departmentChart,queue,activityFeed:activity.map(row=>({title:row.action,description:row.action,occurredAt:row.created_at})),finance:{totals:{billed,collected,expenses,outstanding,tpaReceivable:claims.reduce((sum,row)=>sum+Math.max(0,cents(row.approved_amount)-cents(row.settled_amount)),0)/100,refunds,cashBalance:paymentModes.filter(row=>row.name==='Cash').reduce((sum,row)=>sum+row.value,0)-current.filter(row=>['expenses','refunds'].includes(row.kind)&&row.data?.payment_method==='Cash').reduce((sum,row)=>sum+cents(row.amount)/100,0),bankBalance:paymentModes.filter(row=>row.name!=='Cash').reduce((sum,row)=>sum+row.value,0)-current.filter(row=>['expenses','refunds'].includes(row.kind)&&row.data?.payment_method!=='Cash').reduce((sum,row)=>sum+cents(row.amount)/100,0),activeClaims:claims.filter(row=>!['Settled','Rejected'].includes(row.status)).length,netProfit:collected-expenses-refunds,collectionEfficiency:billed?collected/billed*100:0},trend,paymentModes,expenseCategories,receivableAging,claimStatuses,doctorRevenue},filters:{branches,departments},range:{from,to,days},generatedAt:new Date().toISOString()});
+});
+export default router;
