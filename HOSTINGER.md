@@ -22,6 +22,8 @@ Use the managed **Node.js web app** on Cloud Startup for `erp.pushkarpharmaceuti
 
 The server serves React and the MongoDB API on one port. Hostinger supplies `PORT`. Set `TRUST_PROXY_HOPS=1` for the hosting reverse proxy so login limits use the forwarded client IP; adjust only if Hostinger specifies a different proxy chain. Keep `VITE_API_URL` unset. Use Hostinger's [Node.js guide](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/) and [private environment settings](https://www.hostinger.com/support/how-to-add-environment-variables-during-node-js-application-deployment/).
 
+The HTTP listener starts before database initialization to meet Hostinger's three-second startup limit. React pages can load during an Atlas outage; API requests return a JSON 503 until connection, indexes and first-owner setup finish. Initialization retries automatically. TLS/SSL server-selection failures require checking Atlas Network Access for the hosting server's outbound IP and the private Atlas URI; adding your computer's IP does not allow the hosting server. See [Atlas connection troubleshooting](https://www.mongodb.com/docs/atlas/troubleshoot-connection/).
+
 ## Atlas and first owner
 
 Set `MONGODB_URI`, `MONGODB_DB=pushkar_clinic`, `FRONTEND_ORIGIN=https://erp.pushkarpharmaceutical.com`, a new random `JWT_SECRET` of at least 32 characters, and `NODE_ENV=production`. The URI template is in [.env.example](.env.example). Enter values without surrounding quotes.
