@@ -67,7 +67,7 @@ router.get('/:id',async(request,response)=>{
   const common=await scopeFor(response,{patient_id:id});
   const appointments=await db.collection('clinical_appointments').find(common,{projection:{_id:0}}).sort({appointment_date:-1}).toArray();
   const ipd=await db.collection('ipd_admissions').find(common,{projection:{_id:0}}).sort({admitted_at:-1}).toArray();
-  const payments=await db.collection('payments').find(common,{projection:{_id:0}}).sort({created_at:-1}).toArray();
+  const payments=await db.collection('finance_records').find(await scopeFor(response,{patient_id:id,kind:'payments'}),{projection:{_id:0}}).sort({created_at:-1}).toArray();
   response.json({patient,appointments,ipd,payments});
 });
 export async function registerPatient(request,response,{requireTitle=true}={}){

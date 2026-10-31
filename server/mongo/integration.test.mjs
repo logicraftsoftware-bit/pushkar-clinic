@@ -348,6 +348,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const created=await request('/patients','POST',{...patientInput,first_name:'Another',last_name:'Synthetic',phone:'9999999991'},staffLogin.data.token);
     assert.equal(created.status,201,JSON.stringify(created.data));assert.match(created.data.medical_record_number,/^NEWUHID-/);
     assert.equal((await request(`/patients/${patient.id}`,'GET',null,staffLogin.data.token)).data.patient.medical_record_number,patient.medical_record_number);
+    const patientLedger=await request(`/patients/${patient.id}`,'GET',null,staffLogin.data.token);assert.ok(patientLedger.data.payments.length>0);assert.ok(patientLedger.data.payments.every(row=>row.patient_id===patient.id&&row.kind==='payments'));
     const receipts=await request('/operations/finance/payments','GET',null,staffLogin.data.token);
     assert.equal(receipts.status,200);assert.equal(receipts.data.reduce((sum,row)=>sum+row.amount,0),210);
     assert.equal((await request('/hospital-admin/settings/constructor','PUT',{value:'bad'},staffLogin.data.token)).status,400);
