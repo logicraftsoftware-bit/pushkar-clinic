@@ -26,6 +26,7 @@ import financePosting from './finance-posting.mjs';
 import workforce from './workforce.mjs';
 import cancellations from './cancellations.mjs';
 import doctor from './doctor.mjs';
+import {doctorDischarge,receptionDischarge,nursingTasks} from './discharge.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -162,13 +163,13 @@ app.use('/api/v1/access-control',authenticate('careframe-portal'),accessControl)
 app.get('/api/v1/session/events',authenticate('careframe-portal'),accessEvents);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosticMasters,management);
-app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);
+app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient,receptionDischarge);
 app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
 app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory);
 app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
-app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor);
-app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports);
+app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge);
+app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labResults,labReports,nursingTasks);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.
 app.use('/api', (_request, response) => response.status(501).json({ code: 'MONGODB_WORKFLOW_PENDING', error: 'This workflow is not yet converted to MongoDB. This build is not ready for clinic use.' }));

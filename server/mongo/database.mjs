@@ -55,6 +55,7 @@ export function initializeMongo() {
       ['doctor_clinical_records', { tenant_id: 1, appointment_id: 1 }, { unique: true, partialFilterExpression: { record_type: 'consultation', appointment_id: { $type: 'string' } } }],
       ['doctor_clinical_records', { tenant_id: 1, branch_id: 1, patient_id: 1, created_at: -1 }, {}],
       ['role_work_items', { tenant_id: 1, workspace: 1, 'data.consultation_record_id': 1 }, { unique: true, partialFilterExpression: { 'data.consultation_record_id': { $type: 'string' } } }],
+      ['role_work_items', { tenant_id: 1, workspace: 1, kind: 1, 'data.admission_id': 1 }, { unique: true, partialFilterExpression: { workspace: 'reception', kind: 'ipd_discharge', status: 'Pending' } }],
       ['finance_records', { tenant_id: 1, 'data.refund_payment_key': 1 }, { unique: true, partialFilterExpression: { kind: 'refunds', 'data.refund_payment_key': { $type: 'string' } } }],
       ['ipd_admissions', { id: 1 }, { unique: true }],
       ['ipd_admissions', { tenant_id: 1, ipd_number: 1 }, { unique: true }],

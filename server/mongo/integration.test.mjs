@@ -421,6 +421,25 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const history=await request(`/doctor/patients/${patient.id}`,'GET',null,login.data.token);assert.equal(history.status,200);assert.ok(history.data.records.some(row=>row.id===completed.data.id));
     assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);
   });
+  await t.test('admission edits preserve bed snapshots and discharge requires both nursing and bill clearance',async()=>{
+    let stored=await db.collection('ipd_admissions').findOne({tenant_id:hospital.data.id,patient_id:patient.id,active:true});
+    const body={...stored,admitted_at:stored.admitted_at.toISOString(),updated_at:stored.updated_at.toISOString(),reason_diagnosis:'Synthetic updated admission'};
+    const edited=await request(`/clinical/ipd/${stored.id}`,'PUT',body,staffLogin.data.token);assert.equal(edited.status,200,JSON.stringify(edited.data));assert.equal(edited.data.bed_id,stored.bed_id);
+    assert.equal((await request(`/clinical/ipd/${stored.id}`,'PUT',body,staffLogin.data.token)).status,409);
+    const recommendation=await request(`/doctor/ipd/${stored.id}/discharge-request`,'POST',{diagnosis:'Synthetic final diagnosis',advice:'Synthetic test instructions'},staffLogin.data.token);assert.equal(recommendation.status,201,JSON.stringify(recommendation.data));
+    assert.equal((await request(`/doctor/ipd/${stored.id}/discharge-request`,'POST',{diagnosis:'Duplicate'},staffLogin.data.token)).status,409);
+    const requests=await request('/clinical/discharge-requests','GET',null,staffLogin.data.token);assert.equal(requests.status,200,JSON.stringify(requests.data));const item=requests.data.find(row=>row.id===stored.id&&row.request_status==='Pending');assert.ok(item);
+    assert.equal((await request(`/clinical/discharge-requests/${item.request_id}/complete`,'POST',{},staffLogin.data.token)).status,409);
+    const clearance=await db.collection('role_work_items').findOne({tenant_id:hospital.data.id,workspace:'nurse',kind:'discharge-clearance','data.discharge_record_id':recommendation.data.id});
+    const cleared=await request(`/workspaces/nursing-station/tasks/${clearance.id}`,'PATCH',{status:'Completed',note:'Synthetic nursing clearance'},staffLogin.data.token);assert.equal(cleared.status,200,JSON.stringify(cleared.data));
+    assert.equal((await request(`/clinical/discharge-requests/${item.request_id}/complete`,'POST',{},staffLogin.data.token)).status,409);
+    const invoice=await db.collection('finance_records').findOne({tenant_id:hospital.data.id,kind:'invoices','data.admission_id':stored.id});assert.ok(invoice.due>0);
+    const payment=await request('/operations/finance/payments','POST',{invoice_id:invoice.id,amount:invoice.due,data:{payment_method:'Cash'},request_id:'00000000-0000-4000-8000-000000000051'},staffLogin.data.token);assert.equal(payment.status,201,JSON.stringify(payment.data));
+    const completed=await request(`/clinical/discharge-requests/${item.request_id}/complete`,'POST',{},staffLogin.data.token);assert.equal(completed.status,204,JSON.stringify(completed.data));
+    stored=await db.collection('ipd_admissions').findOne({id:stored.id});assert.equal(stored.active,false);assert.equal(stored.status,'Discharged');assert.equal((await db.collection('beds').findOne({id:stored.bed_id})).status,'Cleaning');
+    assert.equal(await db.collection('ipd_bed_stays').countDocuments({admission_id:stored.id,ended_at:null}),0);
+    assert.equal((await request(`/clinical/discharge-requests/${item.request_id}/complete`,'POST',{},staffLogin.data.token)).status,409);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

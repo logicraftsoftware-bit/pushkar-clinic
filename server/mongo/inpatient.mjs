@@ -7,6 +7,7 @@ import {scopeFor,assertBranch,requirePermission,writeAudit} from './access.mjs';
 import {cents} from './money.mjs';
 import {bedStayAmount,inpatientTotal} from './inpatient-billing.mjs';
 import {configuredPrefix,operationalSettings} from './settings.mjs';
+import {syncAdmissionInvoice} from './finance-ledger.mjs';
 const router=Router(),uuid=z.string().uuid();
 const day=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(value);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -114,6 +115,39 @@ router.post('/ipd',requirePermission('ipd.create'),async(request,response)=>{
     await writeAudit(response,'ipd_admitted',admissionId,session);
     return recalculated;
   });response.status(201).json(saved);
+});
+router.put('/ipd/:id',requirePermission('ipd.update'),async(request,response)=>{
+  const identity=uuid.parse(request.params.id),input=admissionInput.extend({updated_at:z.string().datetime()}).parse(request.body);
+  const saved=await transaction(async session=>{
+    const filter=await scopeFor(response,{id:identity,active:true},session),old=await db.collection('ipd_admissions').findOne(filter,{session});
+    if(!old)throw failure('Active admission not found.',404);
+    if(new Date(old.updated_at).toISOString()!==input.updated_at||old.status!==input.status)throw failure('Admission changed. Refresh before editing.',409);
+    if(input.patient_id!==old.patient_id||input.branch_id!==old.branch_id)throw failure('The admission patient and branch cannot be changed.');
+    const requestedAt=new Date(/Z$|[+-]\d{2}:\d{2}$/.test(input.admitted_at)?input.admitted_at:input.admitted_at+'+05:30');
+    if(Math.floor(requestedAt.getTime()/60000)!==Math.floor(new Date(old.admitted_at).getTime()/60000))throw failure('Admission time is a billing snapshot and cannot be changed.');
+    if(input.bed_id!==old.bed_id||input.ward_id!==old.ward_id||input.room_id!==old.room_id)throw failure('Use bed transfer to change the admission location.');
+    if(input.expected_discharge){z.string().date().parse(input.expected_discharge);if(input.expected_discharge<day(new Date()))throw failure('Expected discharge cannot be before the current hospital date.');}
+    await consultant(response,input.department_id,input.consultant_doctor_id,old.branch_id,session);
+    for(const field of ['advance','deposit_amount','paid_amount','discount'])cents(input[field]);
+    if(cents(input.advance)!==cents(old.advance)||cents(input.paid_amount)<cents(old.paid_amount)||cents(input.deposit_amount)<cents(old.deposit_amount))throw failure('Recorded collections cannot be removed through editing.',409);
+    const charges=z.array(z.object({amount:z.coerce.number().nonnegative().finite().max(99999999.99).multipleOf(0.01)}).passthrough()).max(200).parse(input.charges);
+    const protectedCharges=(old.charges??[]).filter(charge=>charge.source);
+    for(const protectedCharge of protectedCharges)if(!charges.some(charge=>JSON.stringify(charge)===JSON.stringify(protectedCharge)))throw failure('Charges posted by other departments must be changed through their workflow.',409);
+    if(charges.some(charge=>charge.source&&!protectedCharges.some(previous=>JSON.stringify(previous)===JSON.stringify(charge))))throw failure('Department charges cannot be forged in admission editing.');
+    const now=new Date(Math.max(Date.now(),new Date(old.updated_at).getTime()+1)),{_id,...previous}=old;
+    const row={...previous,...input,charges,admitted_at:old.admitted_at,attendant:{name:input.attendant_name,phone:input.attendant_phone,relationship:input.attendant_relationship},consultation_fee:0,registration_amount:0,registration_fee_amount:0,registration_addon_amount:0,registration_deposit_amount:0,registration_discount_amount:0,insurance_document:input.insurance_document||old.insurance_document,patient_documents:Object.keys(input.patient_documents).length?input.patient_documents:old.patient_documents,updated_at:now};
+    delete row.attendant_name;delete row.attendant_phone;delete row.attendant_relationship;
+    const stays=await db.collection('ipd_bed_stays').find({tenant_id:row.tenant_id,admission_id:identity},{session}).toArray(),totals=inpatientTotal(stays,charges,input.discount,now);
+    const gross=cents(totals.bed_amount)+charges.reduce((sum,charge)=>sum+cents(charge.amount),0);
+    if(cents(input.discount)>gross||cents(input.paid_amount)>cents(totals.total_amount))throw failure('Discount or payment exceeds admission charges.');
+    const increments=[['PAYMENT',cents(input.paid_amount)-cents(old.paid_amount)],['DEPOSIT',cents(input.deposit_amount)-cents(old.deposit_amount)]];
+    if(increments.some(([,value])=>value>0)&&!(await operationalSettings(row.tenant_id,session)).payment_methods.includes(input.payment_mode))throw failure('Select a configured payment method.');
+    await db.collection('ipd_admissions').replaceOne(filter,{...row,total_amount:totals.total_amount,bed_daily_charge:totals.bed_amount},{session});
+    for(const [kind,value] of increments)if(value>0)await db.collection('finance_records').insertOne({id:randomUUID(),tenant_id:row.tenant_id,branch_id:row.branch_id,patient_id:row.patient_id,kind:'payments',record_number:`IPD-EDIT-${kind}-${identity}-${kind==='DEPOSIT'?cents(input.deposit_amount):cents(input.paid_amount)}`,data:{admission_id:identity,ipd_number:row.ipd_number,source:kind==='DEPOSIT'?'IPD Deposit':'IPD Admission',is_deposit:kind==='DEPOSIT',payment_method:input.payment_mode,transaction_reference:input.payment_reference},amount:value/100,total:value/100,paid:value/100,due:0,status:'Paid',record_date:day(now),created_by:response.locals.account.id,created_at:now},{session});
+    const bill=await syncAdmissionInvoice(row,session);
+    await writeAudit(response,'ipd_updated',identity,session,{paid_increment:increments[0][1]/100,deposit_increment:increments[1][1]/100});
+    return {...row,total_amount:bill.total,bed_daily_charge:totals.bed_amount,admission_payment_status:bill.status==='Paid'?'Paid':'Unpaid'};
+  });response.json(saved);
 });
 router.put('/ipd/:id/transfer',requirePermission('ipd.update'),async(request,response)=>{
   const admissionId=uuid.parse(request.params.id),optional=z.union([uuid,z.literal(''),z.null()]).optional().transform(value=>value||null);
