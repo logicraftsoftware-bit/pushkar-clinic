@@ -41,7 +41,7 @@ export const admissionInput = z.object({
   policy_number: z.string().default(""),
   insurance_document: z.string().max(7000000).default(""),
   expected_discharge: z
-    .union([z.string(), z.literal("")])
+    .union([z.string(), z.null()])
     .optional()
     .transform((v) => v || null),
   status: z.string().default("Admitted"),

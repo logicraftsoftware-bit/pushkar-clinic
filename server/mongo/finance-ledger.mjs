@@ -17,7 +17,7 @@ export async function syncAdmissionInvoice(admission,session) {
   if(previous)await db.collection('finance_records').replaceOne({tenant_id,id:previous.id},row,{session});
   else await db.collection('finance_records').insertOne({...row},{session});
   await db.collection('finance_records').updateMany({tenant_id,kind:'payments','data.admission_id':admission.id},{$set:{invoice_id:row.id}},{session});
-  await db.collection('ipd_admissions').updateOne({tenant_id,id:admission.id},{$set:{total_amount:totals.total_amount,bed_daily_charge:totals.bed_amount,admission_payment_status:paymentStatus(total,paid)}},{session});
+  await db.collection('ipd_admissions').updateOne({tenant_id,id:admission.id},{$set:{total_amount:totals.total_amount,bed_daily_charge:totals.bed_amount,admission_payment_status:paymentStatus(total,paid)==='Paid'?'Paid':'Unpaid'}},{session});
   return row;
 }
 

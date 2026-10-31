@@ -421,6 +421,23 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const history=await request(`/doctor/patients/${patient.id}`,'GET',null,login.data.token);assert.equal(history.status,200);assert.ok(history.data.records.some(row=>row.id===completed.data.id));
     assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);
   });
+  await t.test('nursing charts are ward-scoped and concurrent medication recording creates one outcome',async()=>{
+    const admission=await db.collection('ipd_admissions').findOne({tenant_id:hospital.data.id,patient_id:patient.id,active:true});
+    const nurse=await request('/hospital-management/staff/save','POST',{first_name:'Synthetic',last_name:'Nurse',staff_type:'Nurse',branch_ids:[branch.id],department_id:department.id,personal:{},employment:{},professional:{ward_assignment:admission.ward_id},account:{role:'NURSE',login_email:'nurse@example.invalid',username:'synthetic-nurse',password,account_status:'Active'}},staffLogin.data.token);assert.equal(nurse.status,201,JSON.stringify(nurse.data));
+    await db.collection('users').updateOne({id:nurse.data.user_id},{$set:{force_password_change:false}});
+    const login=await request('/auth/login','POST',{identifier:'nurse@example.invalid',password,portal:'nurse'});assert.equal(login.status,200,JSON.stringify(login.data));
+    const station=await request('/workspaces/nursing-station','GET',null,login.data.token);assert.equal(station.status,200);assert.ok(station.data.patients.some(row=>row.admission_id===admission.id));
+    const clinical={patient_id:patient.id,admission_id:admission.id,type:'vitals',data:{temperature:37,pulse:75,systolic:120,diastolic:80,spo2:98,respiratory_rate:16,pain_score:0}};
+    assert.equal((await request('/workspaces/nursing-station/clinical','POST',{...clinical,data:{...clinical.data,administered_at:'2000-01-01'}},login.data.token)).status,400);
+    const chart=await request('/workspaces/nursing-station/clinical','POST',clinical,login.data.token);assert.equal(chart.status,201,JSON.stringify(chart.data));assert.deepEqual(chart.data.data.alerts,[]);
+    assert.equal((await request('/workspaces/nursing-station/notes','POST',{patient_id:'00000000-0000-4000-8000-000000000099',admission_id:admission.id,text:'Foreign patient'},login.data.token)).status,404);
+    const plan=await request('/workspaces/nursing-station/medications','POST',{patient_id:patient.id,admission_id:admission.id,name:'Synthetic medicine',dose:'Synthetic dose',schedule:'Once',first_due_at:new Date(Date.now()+60000).toISOString(),end_date:''},login.data.token);assert.equal(plan.status,201,JSON.stringify(plan.data));
+    const body={outcome:'Given',notes:'Synthetic administration',scheduled_at:plan.data.occurred_at};
+    const entries=await Promise.all([request(`/workspaces/nursing-station/medications/${plan.data.id}/administer`,'POST',body,login.data.token),request(`/workspaces/nursing-station/medications/${plan.data.id}/administer`,'POST',body,login.data.token)]);
+    assert.deepEqual(entries.map(row=>row.status),[201,201],JSON.stringify(entries));assert.equal(entries[0].data.id,entries[1].data.id);
+    assert.equal((await request(`/workspaces/nursing-station/medications/${plan.data.id}/administer`,'POST',{...body,outcome:'Missed'},login.data.token)).status,409);
+    assert.equal((await db.collection('role_work_items').findOne({id:plan.data.id})).status,'Completed');
+  });
   await t.test('admission edits preserve bed snapshots and discharge requires both nursing and bill clearance',async()=>{
     let stored=await db.collection('ipd_admissions').findOne({tenant_id:hospital.data.id,patient_id:patient.id,active:true});
     const body={...stored,admitted_at:stored.admitted_at.toISOString(),updated_at:stored.updated_at.toISOString(),reason_diagnosis:'Synthetic updated admission'};
