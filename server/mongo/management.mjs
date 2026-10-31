@@ -14,11 +14,11 @@ const text=z.string().trim().min(1).max(200);
 const amount=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
 const phone=z.string().regex(/^\d{10}$|^$/);
 const schemas={
-  branches:z.object({name:text,code:text,branch_type:z.string().default(''),manager_name:z.string().default(''),email:z.union([z.string().email(),z.literal('')]).default(''),phone:phone.default(''),emergency_phone:phone.default(''),address_line:z.string().max(1000).default(''),city:z.string().default(''),state:z.string().default(''),pin_code:z.string().default(''),bed_capacity:z.coerce.number().int().nonnegative().default(0),is_active:z.boolean().default(true)}),
-  departments:z.object({name:text,code:text,branch_id:id,hod_name:z.string().default(''),location:z.string().default(''),phone_extension:z.string().regex(/^\d{0,10}$/).default(''),description:z.string().max(2000).default(''),is_active:z.boolean().default(true)}),
-  wards:z.object({name:text,code:text,branch_id:id,department_id:optionalId,ward_type:z.string().default(''),floor:z.string().default(''),capacity:z.coerce.number().int().nonnegative().default(0),is_active:z.boolean().default(true)}),
-  rooms:z.object({room_number:text,branch_id:id,ward_id:id,room_type:z.string().default(''),floor:z.string().default(''),daily_charge:amount.default(0),is_active:z.boolean().default(true)}),
-  beds:z.object({bed_number:text,branch_id:id,ward_id:id,room_id:id,bed_type:z.string().default(''),bed_type_id:optionalId,bed_group_id:optionalId,daily_charge:amount.default(0),status:z.enum(['Available','Occupied','Reserved','Cleaning','Maintenance']).default('Available')}),
+  branches:z.object({name:text,code:text,branch_type:z.string().prefault(''),manager_name:z.string().prefault(''),email:z.union([z.string().email(),z.literal('')]).prefault(''),phone:phone.prefault(''),emergency_phone:phone.prefault(''),address_line:z.string().max(1000).prefault(''),city:z.string().prefault(''),state:z.string().prefault(''),pin_code:z.string().prefault(''),bed_capacity:z.coerce.number().int().nonnegative().prefault(0),is_active:z.boolean().prefault(true)}),
+  departments:z.object({name:text,code:text,branch_id:id,hod_name:z.string().prefault(''),location:z.string().prefault(''),phone_extension:z.string().regex(/^\d{0,10}$/).prefault(''),description:z.string().max(2000).prefault(''),is_active:z.boolean().prefault(true)}),
+  wards:z.object({name:text,code:text,branch_id:id,department_id:optionalId,ward_type:z.string().prefault(''),floor:z.string().prefault(''),capacity:z.coerce.number().int().nonnegative().prefault(0),is_active:z.boolean().prefault(true)}),
+  rooms:z.object({room_number:text,branch_id:id,ward_id:id,room_type:z.string().prefault(''),floor:z.string().prefault(''),daily_charge:amount.prefault(0),is_active:z.boolean().prefault(true)}),
+  beds:z.object({bed_number:text,branch_id:id,ward_id:id,room_id:id,bed_type:z.string().prefault(''),bed_type_id:optionalId,bed_group_id:optionalId,daily_charge:amount.prefault(0),status:z.enum(['Available','Occupied','Reserved','Cleaning','Maintenance']).prefault('Available')}),
   'refer-pharmacies':z.object({name:text,address:z.string().trim().min(1).max(2000),discount_percentage:z.coerce.number().min(0).max(100).multipleOf(0.01)}),
 };
 const resource=z.enum(Object.keys(schemas));
@@ -139,7 +139,7 @@ router.get('/staff/:id/appointment-schedule',requirePermission('staff.view'),asy
   response.json({default_schedule:professional.appointment_default_schedule??null,unavailable_dates:professional.appointment_unavailable_dates??[],schedule:(professional.appointment_schedule??[]).map(row=>({...row,booked:counts[row.appointment_date]??0}))});
 });
 router.put('/staff/:id/appointment-schedule',requirePermission('staff.update'),async(request,response)=>{
-  const body=z.object({appointment_date:z.string().date(),from_time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),to_time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),max_slots:z.coerce.number().int().min(1).max(1000),slot_mode:z.enum(['capacity','duration']).default('capacity')}).parse(request.body);
+  const body=z.object({appointment_date:z.string().date(),from_time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),to_time:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),max_slots:z.coerce.number().int().min(1).max(1000),slot_mode:z.enum(['capacity','duration']).prefault('capacity')}).parse(request.body);
   if(body.to_time<=body.from_time)throw failure('End time must be after start time.');
   const saved=await transaction(async session=>{
     const filter=await scopeFor(response,{id:id.parse(request.params.id),staff_type:'Doctor'},session),staff=await db.collection('staff_members').findOne(filter,{session});

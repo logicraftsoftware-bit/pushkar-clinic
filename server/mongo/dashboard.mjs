@@ -8,7 +8,7 @@ const router=Router(),offset=(day,count)=>new Date(new Date(day+'T00:00:00Z').ge
 const total=(rows,kind,field)=>rows.filter(row=>row.kind===kind).reduce((sum,row)=>sum+cents(row[field]),0)/100;
 function group(rows,key,value){const result=new Map();for(const row of rows){const name=key(row);result.set(name,(result.get(name)??0)+value(row));}return [...result].map(([name,value])=>({name,value}));}
 router.get('/hospital',requirePermission('billing.view'),async(request,response)=>{
-  const to=z.string().date().default(hospitalDay()).parse(request.query.to),from=z.string().date().default(offset(to,-29)).parse(request.query.from),days=Math.round((new Date(to)-new Date(from))/86400000)+1;
+  const to=z.string().date().prefault(hospitalDay()).parse(request.query.to),from=z.string().date().prefault(offset(to,-29)).parse(request.query.from),days=Math.round((new Date(to)-new Date(from))/86400000)+1;
   if(days<1||days>366)return response.status(400).json({error:'Select a date range of 1 to 366 days.'});
   const branchId=z.union([z.string().uuid(),z.literal('')]).optional().parse(request.query.branchId),departmentId=z.union([z.string().uuid(),z.literal('')]).optional().parse(request.query.departmentId),tenant_id=response.locals.account.tenant_id;
   if(branchId)await assertBranch(response,branchId);

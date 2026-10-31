@@ -20,7 +20,7 @@ async function permitted(req:Req,code:string){const a=req.portalUser!;return a.r
 router.get('/test-status-report',async(req:Req,res)=>{
   if(!await permitted(req,'lab.order.view'))return void res.status(403).json({error:'Laboratory report access required'});
   const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>!Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value,'Invalid date');
-  const filter=z.object({from:day,to:day,test_id:z.string().uuid().or(z.literal('')).default(''),status:z.enum(['all','pending','conducted']).default('all'),search:z.string().trim().max(150).default(''),test_search:z.string().trim().max(150).default(''),page:z.coerce.number().int().min(1).max(100000).default(1)}).safeParse(req.query);
+  const filter=z.object({from:day,to:day,test_id:z.string().uuid().or(z.literal('')).prefault(''),status:z.enum(['all','pending','conducted']).prefault('all'),search:z.string().trim().max(150).prefault(''),test_search:z.string().trim().max(150).prefault(''),page:z.coerce.number().int().min(1).max(100000).prefault(1)}).safeParse(req.query);
   if(!filter.success)return void res.status(400).json({error:'Select valid dates, test and status filters'});
   const {from,to,test_id,status,search,test_search,page}=filter.data;
   if(from>to)return void res.status(400).json({error:'From Date must be on or before To Date'});
@@ -39,8 +39,8 @@ router.get("/pathologists",async(req:Req,res)=>{
   res.json({rows:rows.rows,self_pathologist_id:actor.rows.find(row=>["Pathologist","Radiologist"].includes(row.staff_type))?.id||null});
 });
 router.get("/workflow",async(req:Req,res)=>{
-  const a=req.portalUser!,view=String(req.query.view||"status"),search=z.string().trim().max(150).default("").parse(req.query.search);
-  const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('');
+  const a=req.portalUser!,view=String(req.query.view||"status"),search=z.string().trim().max(150).prefault("").parse(req.query.search);
+  const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).prefault('');
   const from=day.parse(req.query.from),to=day.parse(req.query.to);
   if(from&&to&&from>to)return void res.status(400).json({error:'From Date must be on or before To Date'});
   const page=Math.max(1,Number(req.query.page)||1),stage:Record<string,string>={processing:"AND w.data->>'collected_at' IS NOT NULL AND coalesce(w.data->>'processing_status','') NOT IN ('Accepted','Rejected')",worksheet:"AND w.data->>'collected_at' IS NOT NULL AND w.status<>'Rejected'",verification:"AND w.data->>'result_status' IN ('Completed','Partially Completed')",reports:"AND w.data->'doctor_approval' IS NOT NULL AND w.data->'doctor_approval'<>'null'::jsonb"};
@@ -65,7 +65,7 @@ router.get("/summary",async(req:Req,res)=>{
 });
 router.patch("/orders/:id/process",async(req:Req,res)=>{
   if(!await permitted(req,"lab.result.create"))return void res.status(403).json({error:"Sample processing permission required"});
-  const b=z.object({action:z.enum(["receive","accept","reject"]),note:z.string().trim().max(2000).default("")}).parse(req.body),a=req.portalUser!;
+  const b=z.object({action:z.enum(["receive","accept","reject"]),note:z.string().trim().max(2000).prefault("")}).parse(req.body),a=req.portalUser!;
   if(b.action==="reject"&&!b.note)return void res.status(400).json({error:"Enter the reason for rejecting the sample"});
   const state={receive:"Received",accept:"Accepted",reject:"Rejected"}[b.action];
   const result=await pool.query(`UPDATE role_work_items SET status=CASE WHEN $1='Rejected' THEN 'Rejected' ELSE status END,data=data||$2::jsonb,updated_at=now() WHERE id=$3 AND tenant_id=$4 AND workspace='laboratory' AND data->>'collected_at' IS NOT NULL AND (data->'doctor_approval' IS NULL OR data->'doctor_approval'='null'::jsonb) AND coalesce(data->>'processing_status','')<>'Rejected' RETURNING id`,[state,JSON.stringify({processing_status:state,processing_note:b.note,processing_at:new Date().toISOString(),processing_by:a.sub}),req.params.id,a.tenantId]);
@@ -73,7 +73,7 @@ router.patch("/orders/:id/process",async(req:Req,res)=>{
   res.json({status:state});
 });
 router.patch("/orders/:id/approve",async(req:Req,res)=>{
-  const b=z.object({stage:z.enum(["doctor","technician","return","disapprove"]),updated_at:z.string().optional(),test_ids:z.array(z.string().min(1)).max(300).default([]),pathologist_ids:z.array(z.string().uuid()).max(6).default([]),test_pathologists:z.record(z.string(),z.string().uuid()).optional(),note:z.string().trim().max(2000).default("")}).parse(req.body),a=req.portalUser!;
+  const b=z.object({stage:z.enum(["doctor","technician","return","disapprove"]),updated_at:z.string().optional(),test_ids:z.array(z.string().min(1)).max(300).prefault([]),pathologist_ids:z.array(z.string().uuid()).max(6).prefault([]),test_pathologists:z.record(z.string(),z.string().uuid()).optional(),note:z.string().trim().max(2000).prefault("")}).parse(req.body),a=req.portalUser!;
   if(!await permitted(req,b.stage==="return"?"lab.result.create":"lab.result.verify"))return void res.status(403).json({error:"Laboratory approval permission required"});
   if(b.stage==="return"&&!b.note)return void res.status(400).json({error:"Enter the reason for returning the result"});
   const client=await pool.connect();
@@ -111,7 +111,7 @@ router.post("/qc/controls",async(req:Req,res)=>{
 });
 router.post("/qc/runs",async(req:Req,res)=>{
   const a=req.portalUser!;if(!await permitted(req,"lab.result.create"))return void res.status(403).json({error:"QC recording permission required"});
-  const b=z.object({control_id:z.string().uuid(),value:z.coerce.number().finite(),note:z.string().trim().max(2000).default("")}).parse(req.body);
+  const b=z.object({control_id:z.string().uuid(),value:z.coerce.number().finite(),note:z.string().trim().max(2000).prefault("")}).parse(req.body);
   const control=await pool.query(`SELECT * FROM lab_qc_controls WHERE id=$1 AND tenant_id=$2 AND status='Active' AND expires_on>=(now() AT TIME ZONE 'Asia/Kolkata')::date`,[b.control_id,a.tenantId]);
   if(!control.rowCount)return void res.status(400).json({error:"Select an active, unexpired QC control"});
   const evaluated=qcEvaluation(b.value,Number(control.rows[0].target),Number(control.rows[0].sd));
@@ -130,7 +130,7 @@ router.get("/masters/:kind",async(req:Req,res)=>{
 });
 router.patch("/masters/:id/accreditation",async(req:Req,res)=>{
   const a=req.portalUser!;if(!await permitted(req,"lab.result.verify"))return void res.status(403).json({error:"Laboratory configuration permission required"});
-  const b=z.object({accredited:z.boolean(),scope:z.string().trim().max(500).default(""),valid_until:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()}).parse(req.body);
+  const b=z.object({accredited:z.boolean(),scope:z.string().trim().max(500).prefault(""),valid_until:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()}).parse(req.body);
   if(b.accredited&&(!b.scope||!b.valid_until))return void res.status(400).json({error:"Enter the accreditation scope and validity date"});
   const result=await pool.query(`UPDATE hospital_diagnostic_masters SET data=data||$1::jsonb,updated_at=now() WHERE id=$2 AND tenant_id=$3 AND domain='pathology' AND kind='test' RETURNING id`,[JSON.stringify({nabl_accredited:b.accredited,nabl_scope:b.scope,nabl_valid_until:b.valid_until}),req.params.id,a.tenantId]);
   if(!result.rowCount)return void res.status(404).json({error:"Laboratory test not found"});res.json({status:"Updated"});

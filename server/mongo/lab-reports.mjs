@@ -37,7 +37,7 @@ router.post('/work-items/:id/lab-report-print',async(request,response)=>{
   });response.json({events});
 });
 router.post('/work-items/:id/lab-report-share',async(request,response)=>{
-  const body=z.object({pdf:z.string().max(16000000).optional(),filename:z.string().max(120).default('Lab-Report.pdf'),updated_at:z.string().datetime()}).parse(request.body),id=uuid.parse(request.params.id),token=randomBytes(32).toString('hex');
+  const body=z.object({pdf:z.string().max(16000000).optional(),filename:z.string().max(120).prefault('Lab-Report.pdf'),updated_at:z.string().datetime()}).parse(request.body),id=uuid.parse(request.params.id),token=randomBytes(32).toString('hex');
   // Generate from the reviewed server record; never publish client-uploaded PDF content.
   const snapshot=await releaseRecord(response,id),revision=snapshot.record.report_revision;
   if(Date.parse(body.updated_at)!==new Date(snapshot.row.updated_at).getTime())throw failure('Report changed. Reopen it before sharing.');

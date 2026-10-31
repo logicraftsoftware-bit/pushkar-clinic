@@ -42,7 +42,7 @@ router.get('/finance/lab-invoices/:id',requirePermission('billing.view'),async(r
 });
 router.get('/finance/:kind',requirePermission('billing.view'),async(request,response)=>{
   const kind=z.enum(['invoices','payments','expenses','refunds','pharmacy-bill','outstanding','reports','all','reception-accounting']).parse(request.params.kind);
-  const date=z.union([z.string().date(),z.literal('')]).default(''),from=date.parse(request.query.from),to=date.parse(request.query.to);
+  const date=z.union([z.string().date(),z.literal('')]).prefault(''),from=date.parse(request.query.from),to=date.parse(request.query.to);
   if(from&&to&&from>to)return response.status(400).json({error:'From Date must be on or before To Date.'});
   if(['invoices','outstanding','reports','all','reception-accounting'].includes(kind))await transaction(async session=>{
     const admissions=await db.collection('ipd_admissions').find(await scopeFor(response,{},session),{session}).toArray();
@@ -64,7 +64,7 @@ router.get('/lookups',async(request,response)=>{
   const tenant_id=response.locals.account.tenant_id,ids=await allowedBranches(response.locals.account,response.locals.claims.portal),permissions=await permissionsFor(response.locals.account);
   const has=code=>permissions.includes('*')||permissions.includes(code),billing=has('billing.view'),stock=has('inventory.view');
   if(!billing&&!stock)return response.status(403).json({error:'Billing or inventory access required.'});
-  const requested=z.string().max(300).default(billing?'branches,patients,invoices':'branches,items,categories,suppliers,users').parse(request.query.keys).split(',').filter(Boolean);
+  const requested=z.string().max(300).prefault(billing?'branches,patients,invoices':'branches,items,categories,suppliers,users').parse(request.query.keys).split(',').filter(Boolean);
   const result={};
   for(const key of new Set(requested)){
     if(key==='branches')result.branches=await db.collection('branches').find({tenant_id,is_active:true,...(ids===null?{}:{id:{$in:ids}})},{projection:{_id:0,id:1,name:1}}).toArray();

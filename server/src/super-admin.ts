@@ -101,7 +101,7 @@ router.post('/crm-connections', requireCrmIntegration, asyncRoute(async (request
   const body = z.object({
     tenantId: z.string().uuid(),
     clinicExternalId: z.string().trim().min(1).max(200),
-    clinicName: z.string().trim().max(200).default(''),
+    clinicName: z.string().trim().max(200).prefault(''),
   }).parse(request.body)
   const rawKey = `cfc_${randomBytes(32).toString('base64url')}`
   const keyHash = createHash('sha256').update(rawKey).digest('hex')
@@ -163,7 +163,7 @@ router.get('/dashboard', asyncRoute(async (_request, response) => {
 const planInput = z.object({
   name: z.string().min(2).max(120),
   code: z.string().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
-  description: z.string().max(1000).default(''),
+  description: z.string().max(1000).prefault(''),
   monthlyPrice: z.coerce.number().nonnegative(),
   yearlyPrice: z.coerce.number().nonnegative(),
   trialDays: z.coerce.number().int().min(0).max(365),
@@ -172,7 +172,7 @@ const planInput = z.object({
   maxDoctors: z.coerce.number().int().positive(),
   storageLimitGb: z.coerce.number().int().positive(),
   aiUsageLimit: z.coerce.number().int().nonnegative(),
-  moduleIds: z.array(z.string().uuid()).default([]),
+  moduleIds: z.array(z.string().uuid()).prefault([]),
   status: z.enum(['active', 'inactive']),
 })
 
@@ -323,7 +323,7 @@ const hospitalInput = z.object({
   state: z.string().min(2).max(100),
   pinCode: z.string().min(3).max(20),
   country: z.string().min(2).max(100),
-  gstin: z.string().max(30).optional().default(''),
+  gstin: z.string().max(30).optional().prefault(''),
   branchName: z.string().min(2).max(160),
   planId: z.string().uuid(),
   subscriptionStartDate: z.string().date(),
@@ -516,7 +516,7 @@ router.get('/modules', asyncRoute(async (_request, response) => {
 router.post('/modules', asyncRoute(async (request, response) => {
   const body = z.object({
     code: z.string().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
-    name: z.string().min(2).max(100), description: z.string().max(500).default(''),
+    name: z.string().min(2).max(100), description: z.string().max(500).prefault(''),
   }).parse(request.body)
   const result = await pool.query(
     `INSERT INTO platform_modules (code, name, description) VALUES ($1, $2, $3) RETURNING *`,

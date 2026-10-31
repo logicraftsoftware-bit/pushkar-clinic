@@ -21,7 +21,7 @@ async function financeDataset(response,from,to){
   return {period:{from,to},totals:total,monthly:data.monthly.map(({_id,...row})=>({month:_id,...row})),branches,statuses:data.statuses.map(({_id,...row})=>({..._id,...row})),categories:data.categories.map(({_id,...row})=>({category:_id,...row})),receivable_aging:data.aging.map(({_id,...row})=>({bucket:_id,...row}))};
 }
 router.post('/chat',async(request,response)=>{
-  const body=z.object({message:z.string().trim().min(1).max(2000),history:z.array(z.object({role:z.enum(['user','assistant']),content:z.string().trim().min(1).max(2000)})).max(8).default([])}).parse(request.body),account=response.locals.account,permissions=await permissionsFor(account),can=code=>permissions.includes('*')||permissions.includes(code);
+  const body=z.object({message:z.string().trim().min(1).max(2000),history:z.array(z.object({role:z.enum(['user','assistant']),content:z.string().trim().min(1).max(2000)})).max(8).prefault([])}).parse(request.body),account=response.locals.account,permissions=await permissionsFor(account),can=code=>permissions.includes('*')||permissions.includes(code);
   const financeAllowed=can('billing.view')&&['hospital_admin','accountant'].includes(response.locals.claims.portal);
   if(!financeAllowed&&financeWords.test(body.message))return response.json({answer:'Financial information is not available from this workspace. Contact an authorized Hospital Admin or Accountant.'});
   await aiLimit(response);

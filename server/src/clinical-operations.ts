@@ -210,7 +210,7 @@ router.use(async (req: R, res, next) => {
 });
 router.get("/lookups", async (req: R, res) => {
   const t = req.portalUser!.tenantId;
-  const patientMode=z.enum(['all','none','recent']).default('all').parse(req.query.patients);
+  const patientMode=z.enum(['all','none','recent']).prefault('all').parse(req.query.patients);
   const branchIds = await accessibleBranchIds(req.portalUser!);
   const [p, b, d, u, w, rm, be] = await Promise.all([
     patientMode==='none'?Promise.resolve({rows:[]}):pool.query(
@@ -265,7 +265,7 @@ router.get("/lookups", async (req: R, res) => {
   });
 });
 router.get('/patient-search',async(req:R,res)=>{
-  const search=z.string().trim().max(150).default('').parse(req.query.search);
+  const search=z.string().trim().max(150).prefault('').parse(req.query.search);
   const patientId=z.string().uuid().optional().parse(req.query.patient_id);
   if(!patientId&&!search)return void res.json([]);
   const sql=clinicalPatientLookupSql.replace('FROM patients WHERE','FROM patients p WHERE').replace('ORDER BY first_name,last_name,id',
@@ -309,27 +309,27 @@ const ap = z.object({
   slot_interval:z.coerce.number().refine(value=>value===5).optional(),
   appointment_type: z.string(),
   visit_type: z.string(),
-  reason: z.string().default(""),
-  consultation_fee: z.coerce.number().default(0),
+  reason: z.string().prefault(""),
+  consultation_fee: z.coerce.number().prefault(0),
   payment_status: z.string(),
   source: z.string(),
-  token_number: z.string().default(""),
+  token_number: z.string().prefault(""),
   status: z.string(),
-  notes: z.string().default(""),
-  symptoms:z.array(z.string()).optional().default([]),
-  charges:z.array(z.unknown()).optional().default([]),
+  notes: z.string().prefault(""),
+  symptoms:z.array(z.string()).optional().prefault([]),
+  charges:z.array(z.unknown()).optional().prefault([]),
   doctor_fee_selection:z.preprocess(value=>{if(typeof value==='string'){try{return JSON.parse(value);}catch{return value;}}return value;},z.object({registration_fee:z.boolean(),maintenance_fee:z.boolean()}).optional()),
-  discount:z.coerce.number().min(0).default(0),
-  payment_mode:z.string().default(""),
-  paid_amount:z.coerce.number().min(0).default(0),
+  discount:z.coerce.number().min(0).prefault(0),
+  payment_mode:z.string().prefault(""),
+  paid_amount:z.coerce.number().min(0).prefault(0),
 });
 router.get("/appointments", async (req: R, res) => {
   const branchIds = await accessibleBranchIds(req.portalUser!);
   if(req.query.page!==undefined){
     const {page,pageSize,search}=listPagination(req.query);
-    const doctors=z.preprocess(value=>typeof value==='string'?value.split(',').filter(Boolean):value,z.array(z.string().uuid()).max(100).default([])).parse(req.query.doctor_ids);
-    const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('').parse(req.query.date);
-    const queue=z.enum(['0','1']).default('0').parse(req.query.queue)==='1';
+    const doctors=z.preprocess(value=>typeof value==='string'?value.split(',').filter(Boolean):value,z.array(z.string().uuid()).max(100).prefault([])).parse(req.query.doctor_ids);
+    const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).prefault('').parse(req.query.date);
+    const queue=z.enum(['0','1']).prefault('0').parse(req.query.queue)==='1';
     const where=`a.tenant_id=$1 AND ($2::uuid[] IS NULL OR a.branch_id=ANY($2)) AND ${search?appointmentListSearchSql:'$3::text[] IS NOT NULL'}
       AND (cardinality($4::uuid[])=0 OR a.doctor_id=ANY($4)) AND ($5::date IS NULL OR a.appointment_date=$5) AND (NOT $6::boolean OR a.status<>'Cancelled')`;
     const args=[req.portalUser!.tenantId,branchIds,listSearchPatterns(search),doctors,date||null,queue];
@@ -508,7 +508,7 @@ router.patch("/appointments/:id/check-in", async (req: R, res) => {
 });
 const appointmentStatusBody=z.object({
   status:z.enum(["Booked","Confirmed","Checked In","Waiting","In Consultation","Completed","Cancelled","No Show"]),
-  cancellation_reason:z.string().trim().max(500).optional().default(""),
+  cancellation_reason:z.string().trim().max(500).optional().prefault(""),
 });
 const appointmentTransitions:Record<string,string[]>={
   "booked":["Confirmed","Checked In","Cancelled","No Show"],
@@ -544,44 +544,44 @@ const ipd = z.object({
   admission_type: z.string(),
   department_id: optionalId,
   consultant_doctor_id: optionalId,
-  reason_diagnosis: z.string().default(""),
+  reason_diagnosis: z.string().prefault(""),
   ward_id: optionalId,
   room_id: optionalId,
   bed_id: optionalId,
-  attendant_name: z.string().default(""),
-  attendant_phone: z.string().trim().regex(/^\d{10}$/, "Attendant phone number must contain exactly 10 digits").or(z.literal("")).default(""),
-  attendant_relationship: z.string().default(""),
-  insurance_tpa: z.string().default(""),
-  advance: z.coerce.number().default(0),
-  deposit_amount: z.coerce.number().min(0).default(0),
-  charges: z.array(z.unknown()).optional().default([]),
-  paid_amount: z.coerce.number().min(0).default(0),
-  consultation_fee: z.coerce.number().min(0).default(0),
-  bed_daily_charge: z.coerce.number().min(0).default(0),
-  patient_documents: z.record(z.string(),z.object({name:z.string().max(255),type:z.string().max(100),data:z.string().max(4000000)})).optional().default({}),
-  payment_mode: z.string().default(""),
-  payment_reference: z.string().default(""),
-  discount: z.coerce.number().min(0).default(0),
-  discount_remarks: z.string().default(""),
-  admission_payment_status: z.enum(["Paid", "Unpaid"]).default("Unpaid"),
-  payment_status_remarks: z.string().default(""),
-  registration_amount: z.coerce.number().min(0).default(0),
-  registration_fee_amount: z.coerce.number().min(0).default(0),
-  registration_addon_amount: z.coerce.number().min(0).default(0),
-  registration_deposit_amount: z.coerce.number().min(0).default(0),
-  registration_discount_amount: z.coerce.number().min(0).default(0),
-  total_amount: z.coerce.number().min(0).default(0),
+  attendant_name: z.string().prefault(""),
+  attendant_phone: z.string().trim().regex(/^\d{10}$/, "Attendant phone number must contain exactly 10 digits").or(z.literal("")).prefault(""),
+  attendant_relationship: z.string().prefault(""),
+  insurance_tpa: z.string().prefault(""),
+  advance: z.coerce.number().prefault(0),
+  deposit_amount: z.coerce.number().min(0).prefault(0),
+  charges: z.array(z.unknown()).optional().prefault([]),
+  paid_amount: z.coerce.number().min(0).prefault(0),
+  consultation_fee: z.coerce.number().min(0).prefault(0),
+  bed_daily_charge: z.coerce.number().min(0).prefault(0),
+  patient_documents: z.record(z.string(),z.object({name:z.string().max(255),type:z.string().max(100),data:z.string().max(4000000)})).optional().prefault({}),
+  payment_mode: z.string().prefault(""),
+  payment_reference: z.string().prefault(""),
+  discount: z.coerce.number().min(0).prefault(0),
+  discount_remarks: z.string().prefault(""),
+  admission_payment_status: z.enum(["Paid", "Unpaid"]).prefault("Unpaid"),
+  payment_status_remarks: z.string().prefault(""),
+  registration_amount: z.coerce.number().min(0).prefault(0),
+  registration_fee_amount: z.coerce.number().min(0).prefault(0),
+  registration_addon_amount: z.coerce.number().min(0).prefault(0),
+  registration_deposit_amount: z.coerce.number().min(0).prefault(0),
+  registration_discount_amount: z.coerce.number().min(0).prefault(0),
+  total_amount: z.coerce.number().min(0).prefault(0),
   has_insurance: z
     .union([z.boolean(), z.enum(["Yes", "No"])])
     .transform((v) => v === true || v === "Yes"),
-  insurance_company: z.string().default(""),
-  policy_number: z.string().default(""),
-  insurance_document: z.string().max(7000000).default(""),
+  insurance_company: z.string().prefault(""),
+  policy_number: z.string().prefault(""),
+  insurance_document: z.string().max(7000000).prefault(""),
   expected_discharge: z
     .union([z.string(), z.literal("")])
     .optional()
     .transform((v) => v || null),
-  status: z.string().default("Admitted"),
+  status: z.string().prefault("Admitted"),
 });
 router.get("/ipd", async (req: R, res) => {
   const branchIds = await accessibleBranchIds(req.portalUser!);
@@ -895,7 +895,7 @@ router.put("/ipd/:id/transfer", async (req: R, res) => {
         ward_id: z.preprocess(v=>v===""?null:v,z.string().uuid().nullable().optional()),
         room_id: z.preprocess(v=>v===""?null:v,z.string().uuid().nullable().optional()),
         bed_id: z.preprocess(v=>v===""?null:v,z.string().uuid().nullable().optional()),
-        notes: z.string().default(""),
+        notes: z.string().prefault(""),
       })
       .parse(req.body),
     t = req.portalUser!.tenantId,

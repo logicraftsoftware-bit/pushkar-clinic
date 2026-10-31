@@ -2,7 +2,7 @@ import { z } from 'zod';
 export const planInput = z.object({
   name: z.string().min(2).max(120),
   code: z.string().min(2).max(40).regex(/^[A-Za-z0-9_-]+$/),
-  description: z.string().max(1000).default(''),
+  description: z.string().max(1000).prefault(''),
   monthlyPrice: z.coerce.number().nonnegative(),
   yearlyPrice: z.coerce.number().nonnegative(),
   trialDays: z.coerce.number().int().min(0).max(365),
@@ -11,7 +11,7 @@ export const planInput = z.object({
   maxDoctors: z.coerce.number().int().positive(),
   storageLimitGb: z.coerce.number().int().positive(),
   aiUsageLimit: z.coerce.number().int().nonnegative(),
-  moduleIds: z.array(z.string().uuid()).default([]),
+  moduleIds: z.array(z.string().uuid()).prefault([]),
   status: z.enum(['active', 'inactive']),
 });
 export const hospitalInput = z.object({
@@ -28,7 +28,7 @@ export const hospitalInput = z.object({
   state: z.string().min(2).max(100),
   pinCode: z.string().min(3).max(20),
   country: z.string().min(2).max(100),
-  gstin: z.string().max(30).optional().default(''),
+  gstin: z.string().max(30).optional().prefault(''),
   branchName: z.string().min(2).max(160),
   planId: z.string().uuid(),
   subscriptionStartDate: z.string().date(),

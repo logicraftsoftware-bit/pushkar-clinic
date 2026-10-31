@@ -29,7 +29,7 @@ async function authorize(req:Req,kind:'reception'|'accountant'){
 router.get('/options',async(req:Req,res)=>{const settings=await operationalSettings(req.actor!.tenantId);res.json({payment_methods:settings.payment_methods,can_review:['accountant','hospital_admin'].includes(req.auth!.role),can_process:['receptionist','hospital_admin'].includes(req.auth!.role)});});
 router.get('/bill',async(req:Req,res)=>{const number=z.string().trim().min(1).max(100).parse(req.query.number);res.json(await findCancellationBills(pool,req.actor!,number));});
 router.get('/',async(req:Req,res)=>{
-  const query=z.string().trim().max(150).default('').parse(req.query.search),stage=z.enum(['requests','refunds']).default('requests').parse(req.query.stage),status=z.enum(['','Pending','Approved','Rejected','Partially Refunded','Completed']).default('').parse(req.query.status),page=z.coerce.number().int().min(1).default(1).parse(req.query.page);
+  const query=z.string().trim().max(150).prefault('').parse(req.query.search),stage=z.enum(['requests','refunds']).prefault('requests').parse(req.query.stage),status=z.enum(['','Pending','Approved','Rejected','Partially Refunded','Completed']).prefault('').parse(req.query.status),page=z.coerce.number().int().min(1).prefault(1).parse(req.query.page);
   const where=`r.tenant_id=$1 AND ($2::uuid[] IS NULL OR r.branch_id=ANY($2)) AND ($3='' OR concat_ws(' ',r.bill_number,r.request_number,r.patient_name) ILIKE '%'||$3||'%') AND ($4='' OR r.status=$4) ${stage==='refunds'?"AND r.status IN('Approved','Partially Refunded','Completed')":''}`;
   const args=[req.actor!.tenantId,req.actor!.branches,query,status];
   const [count,rows]=await Promise.all([pool.query(`SELECT count(*)::int total,coalesce(sum(approved_amount-refunded_amount) FILTER(WHERE status IN('Approved','Partially Refunded')),0) pending_refund FROM cancellation_requests r WHERE ${where}`,args),pool.query(`SELECT r.*,b.name branch_name,concat_ws(' ',u.first_name,u.last_name) requested_by_name,concat_ws(' ',v.first_name,v.last_name) reviewed_by_name FROM cancellation_requests r JOIN branches b ON b.id=r.branch_id LEFT JOIN users u ON u.id=r.created_by LEFT JOIN users v ON v.id=r.reviewed_by WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT 20 OFFSET $5`,[...args,(page-1)*20])]);
@@ -50,7 +50,7 @@ router.post('/:id/review',async(req:Req,res)=>{
   try{res.json(await reviewCancellation(client,req.actor!,id,body));}finally{client.release();}
 });
 router.post('/:id/refund',async(req:Req,res)=>{
-  await authorize(req,'reception');const id=z.string().uuid().parse(req.params.id),body=z.object({amount,method:z.string().trim().min(1).max(100),reference:z.string().trim().max(150).default(''),payment_key:z.string().uuid()}).parse(req.body);
+  await authorize(req,'reception');const id=z.string().uuid().parse(req.params.id),body=z.object({amount,method:z.string().trim().min(1).max(100),reference:z.string().trim().max(150).prefault(''),payment_key:z.string().uuid()}).parse(req.body);
   const methods=(await operationalSettings(req.actor!.tenantId)).payment_methods;
   if(!methods.includes(body.method))throw new CancellationError(400,'Select a valid refund payment method.');
   if(body.method!=='Cash'&&!body.reference)throw new CancellationError(400,'Enter the transaction reference for this payment method.');

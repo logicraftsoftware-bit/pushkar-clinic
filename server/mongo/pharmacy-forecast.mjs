@@ -5,7 +5,7 @@ import {scopeFor,allowedBranches,assertBranch,requirePermission} from './access.
 import {hospitalDay} from './finance-ledger.mjs';
 const router=Router();
 router.get('/pharmacy/forecast',requirePermission('pharmacy.view'),async(request,response)=>{
-  const options=z.object({lookback_days:z.coerce.number().int().min(7).max(365).default(30),horizon_days:z.coerce.number().int().min(7).max(180).default(30),branch_id:z.string().uuid().optional()}).parse(request.query);
+  const options=z.object({lookback_days:z.coerce.number().int().min(7).max(365).prefault(30),horizon_days:z.coerce.number().int().min(7).max(180).prefault(30),branch_id:z.string().uuid().optional()}).parse(request.query);
   if(options.branch_id)await assertBranch(response,options.branch_id);
   const tenant_id=response.locals.account.tenant_id,branchFilter=options.branch_id?{branch_id:options.branch_id}:{},today=hospitalDay(new Date()),end=new Date(today+'T00:00:00Z');end.setUTCDate(end.getUTCDate()+options.horizon_days);const horizon=end.toISOString().slice(0,10),start=new Date();start.setDate(start.getDate()-Math.max(14,options.lookback_days));const usageStart=Date.now()-options.lookback_days*86400000;
   const masters=await db.collection('hospital_pharmacy_masters').find({tenant_id,kind:'medicine'},{projection:{_id:0}}).sort({name:1}).toArray();

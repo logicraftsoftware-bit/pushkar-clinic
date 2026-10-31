@@ -1,6 +1,6 @@
 import {z} from 'zod';
 
-export const diagnosticTestType = z.enum(['Pathology', 'Radiology', 'Neurology']).default('Pathology');
+export const diagnosticTestType = z.enum(['Pathology', 'Radiology', 'Neurology']).prefault('Pathology');
 
 // Clinical routing retains the shared laboratory workflow for Neurology tests.
 export function diagnosticClinicalDomain(test: {domain?:string; data?:Record<string,unknown>}) {

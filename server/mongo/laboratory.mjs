@@ -42,13 +42,13 @@ router.get('/lab-tests',async(request,response)=>{
   response.json(rows.filter(row=>laboratoryTestAvailable(row.data,branch)).map(row=>({...row,data:{...row.data,amount:laboratoryPrice(row.data,branch)}})));
 });
 router.get('/lab-patients',async(request,response)=>{
-  const query=z.string().trim().max(150).default('').parse(request.query.search);
+  const query=z.string().trim().max(150).prefault('').parse(request.query.search);
   if(query.length<2)return response.json([]);
   const rows=await db.collection('patients').find({tenant_id:response.locals.account.tenant_id,deleted_at:null,$or:['first_name','last_name','medical_record_number','phone'].map(field=>({[field]:{$regex:escape(query),$options:'i'}}))},{projection:{_id:0,id:1,medical_record_number:1,first_name:1,last_name:1,phone:1,date_of_birth:1,sex:1,blood_group:1,email:1}}).limit(25).toArray();
   response.json(rows.map(row=>({...row,patient_name:`${row.first_name} ${row.last_name}`})));
 });
 router.post('/lab-patients',async(request,response)=>{
-  const body=z.object({first_name:z.string(),last_name:z.string(),phone:z.string().regex(/^\d{10}$/),date_of_birth:z.string().nullable().optional(),sex:z.enum(['male','female','other','unknown']).default('unknown'),blood_group:z.string().default(''),email:z.string().default(''),title:z.string().default(''),father_name:z.string().max(150).default(''),mother_name:z.string().max(150).default(''),state:z.string().max(100).default(''),district:z.string().max(150).default(''),city:z.string().max(150).default(''),age_years:z.number().int().min(0).max(150).default(0),age_months:z.number().int().min(0).max(11).default(0),age_days:z.number().int().min(0).max(30).default(0),address:z.string().max(1000).default(''),emergency_name:z.string().default(''),emergency_phone:z.string().default(''),allergies:z.string().max(2000).default('')}).parse(request.body);
+  const body=z.object({first_name:z.string(),last_name:z.string(),phone:z.string().regex(/^\d{10}$/),date_of_birth:z.string().nullable().optional(),sex:z.enum(['male','female','other','unknown']).prefault('unknown'),blood_group:z.string().prefault(''),email:z.string().prefault(''),title:z.string().prefault(''),father_name:z.string().max(150).prefault(''),mother_name:z.string().max(150).prefault(''),state:z.string().max(100).prefault(''),district:z.string().max(150).prefault(''),city:z.string().max(150).prefault(''),age_years:z.number().int().min(0).max(150).prefault(0),age_months:z.number().int().min(0).max(11).prefault(0),age_days:z.number().int().min(0).max(30).prefault(0),address:z.string().max(1000).prefault(''),emergency_name:z.string().prefault(''),emergency_phone:z.string().prefault(''),allergies:z.string().max(2000).prefault('')}).parse(request.body);
   request.body={first_name:body.first_name,last_name:body.last_name,phone:body.phone,date_of_birth:body.date_of_birth,sex:body.sex,blood_group:body.blood_group,email:body.email,allergies:body.allergies,branch_id:response.locals.account.branch_id,address:{line:body.address,title:body.title,state:body.state,city:body.city,district:body.district,father_name:body.father_name,mother_name:body.mother_name,age_years:body.age_years,age_months:body.age_months,age_days:body.age_days},emergency_contact:{name:body.emergency_name,phone:body.emergency_phone,relationship:body.emergency_name||body.emergency_phone?'Other':''}};
   return registerPatient(request,response,{requireTitle:false});
 });
@@ -67,7 +67,7 @@ router.get('/lab-registration-options',async(_request,response)=>{
     partners:await db.collection('referral_partners').find({tenant_id,status:'Active',$or:[{branch_id:response.locals.account.branch_id},{branch_id:null}]},{projection:{_id:0,id:1,name:1}}).toArray(),
     pharmacies:await db.collection('hospital_refer_pharmacies').find({tenant_id},{projection:{_id:0,id:1,name:1,address:1,discount_percentage:1}}).toArray()});
 });
-const orderInput=z.object({patient_id:uuid,appointment_id:uuid.nullable().optional(),test_ids:z.array(uuid).min(1).max(200),referred_by:uuid.nullable().default(null),referral_partner_id:uuid.nullable().default(null),collector_id:uuid.nullable().default(null),refer_pharmacy_id:uuid.nullable().default(null),center_id:uuid.nullable().default(null),source:z.string().max(100).default('Self'),urgent:z.boolean().default(false),payment_mode:z.string().max(100).default('Cash'),paid:money.default(0),discount:money.default(0)});
+const orderInput=z.object({patient_id:uuid,appointment_id:uuid.nullable().optional(),test_ids:z.array(uuid).min(1).max(200),referred_by:uuid.nullable().prefault(null),referral_partner_id:uuid.nullable().prefault(null),collector_id:uuid.nullable().prefault(null),refer_pharmacy_id:uuid.nullable().prefault(null),center_id:uuid.nullable().prefault(null),source:z.string().max(100).prefault('Self'),urgent:z.boolean().prefault(false),payment_mode:z.string().max(100).prefault('Cash'),paid:money.prefault(0),discount:money.prefault(0)});
 router.post('/lab-own-orders',async(request,response)=>{
   const input=orderInput.parse(request.body),tenant_id=response.locals.account.tenant_id,orderId=randomUUID(),invoiceId=randomUUID();
   const result=await transaction(async session=>{
@@ -100,7 +100,7 @@ router.post('/lab-own-orders',async(request,response)=>{
   });response.status(201).json(result);
 });
 router.get('/lab-orders',async(request,response)=>{
-  const stage=z.string().max(100).default('').parse(request.query.stage),extra={workspace:'laboratory'};
+  const stage=z.string().max(100).prefault('').parse(request.query.stage),extra={workspace:'laboratory'};
   const stages={'Lab Orders':['orders'],'Lab POS':['pos']};
   if(stages[stage])extra.kind={$in:stages[stage]};
   if(stage==='Sample Collection'){
@@ -110,14 +110,14 @@ router.get('/lab-orders',async(request,response)=>{
   if(stage==='Results'){extra['data.collected_at']={$type:'string'};extra.status={$nin:['Cancelled','Rejected']};}
   if(stage==='Verification')extra['data.result_status']={$in:['Completed','Partially Completed']};
   if(stage==='Reports'){extra['data.result_status']={$in:['Completed','Partially Completed']};extra['data.doctor_approval']={$type:'object'};}
-  const type=z.enum(['','orders','pos','sample collection','results','verification','reports']).default('').parse(request.query.order_type);
+  const type=z.enum(['','orders','pos','sample collection','results','verification','reports']).prefault('').parse(request.query.order_type);
   if(type)extra.kind=type;
   if(request.query.from||request.query.to)extra.occurred_at={...(request.query.from?{$gte:new Date(z.string().date().parse(request.query.from)+'T00:00:00+05:30')}:{}),...(request.query.to?{$lte:new Date(z.string().date().parse(request.query.to)+'T23:59:59.999+05:30')}:{})};
   if(request.query.center_id)extra.branch_id=uuid.parse(request.query.center_id);
-  const filter=await scopeFor(response,extra),search=z.string().max(150).default('').parse(request.query.search);
+  const filter=await scopeFor(response,extra),search=z.string().max(150).prefault('').parse(request.query.search);
   if(search)filter.$and.push({$or:['title','data.customer_name','data.medical_record_number','data.bill_number'].map(field=>({[field]:{$regex:escape(search),$options:'i'}}))});
-  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
-  const billing=request.query.billing==='1',status=z.string().max(100).default('').parse(request.query.status);
+  const page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).prefault(25).parse(request.query.page_size);
+  const billing=request.query.billing==='1',status=z.string().max(100).prefault('').parse(request.query.status);
   const join=[{$lookup:{from:'finance_records',let:{bill:'$data.bill_id',tenant:'$tenant_id'},pipeline:[{$match:{$expr:{$and:[{$eq:['$id','$$bill']},{$eq:['$tenant_id','$$tenant']},{$eq:['$kind','invoices']}]}}}],as:'invoice'}},{$set:{invoice:{$arrayElemAt:['$invoice',0]}}},{$set:{payment_status:{$cond:[{$in:['$invoice.status',['Cancelled','Refunded']]},'$invoice.status',{$cond:[{$ne:[{$ifNull:['$invoice.id',null]},null]},{$cond:[{$lte:['$invoice.due',0]},'Paid',{$cond:[{$gt:['$invoice.paid',0]},'Partially Paid','Unpaid']}]},'Not billed']}]},sample_status:{$switch:{branches:[{case:{$eq:['$status','Cancelled']},then:'Cancelled'},{case:{$or:[{$eq:['$status','Rejected']},{$eq:['$data.processing_status','Rejected']}]},then:'Rejected'},{case:{$ne:[{$ifNull:['$data.collected_at',null]},null]},then:{$cond:[{$or:[{$eq:['$data.result_status','In Progress']},{$eq:['$data.processing_status','Accepted']}]},'Processing','Sample Collected']}},{case:{$eq:['$status','Barcode Generated']},then:'Barcode Generated'},{case:{$or:[{$eq:['$kind','sample collection']},{$ne:[{$ifNull:['$data.sample_requested_at',null]},null]}]},then:'Awaiting Sample'}],default:'$status'}}}}];
   const pipeline=[{$match:filter},...join,...(billing?[{$match:{'invoice.id':{$exists:true}}}]:[]),...(status?[{$match:{[billing?'payment_status':'sample_status']:status}}]:[])];
   const [count]=await db.collection('role_work_items').aggregate([...pipeline,{$count:'total'}]).toArray();

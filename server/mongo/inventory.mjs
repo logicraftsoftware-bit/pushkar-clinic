@@ -9,7 +9,7 @@ const editable=new Set(['items','categories','suppliers','purchase-orders','asse
 const nullableId=z.union([uuid,z.literal(''),z.null()]).optional().transform(value=>value||null);
 const quantity=z.coerce.number().finite().nonnegative().max(99999999).refine(value=>Math.abs(value*1000-Math.round(value*1000))<0.00001,'Use at most three decimal places for quantities.');
 const money=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
-const input=z.object({branch_id:nullableId,supplier_id:nullableId,category_id:nullableId,item_id:nullableId,record_date:z.union([z.string().date(),z.literal('')]).optional(),status:z.string().max(80).default('Active'),quantity:quantity.default(0),amount:money.default(0),data:z.record(z.string(),z.unknown()).default({}),request_id:uuid.optional(),updated_at:z.string().datetime().optional()});
+const input=z.object({branch_id:nullableId,supplier_id:nullableId,category_id:nullableId,item_id:nullableId,record_date:z.union([z.string().date(),z.literal('')]).optional(),status:z.string().max(80).prefault('Active'),quantity:quantity.prefault(0),amount:money.prefault(0),data:z.record(z.string(),z.unknown()).prefault({}),request_id:uuid.optional(),updated_at:z.string().datetime().optional()});
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export async function inventoryScope(response,extra={},session) {

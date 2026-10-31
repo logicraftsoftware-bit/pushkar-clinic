@@ -70,7 +70,7 @@ router.delete('/hospitals/:id',async(request,response)=>{
   });response.status(204).end();
 });
 router.post('/modules',async(request,response)=>{
-  const body=z.object({code:z.string().regex(/^[A-Za-z0-9_-]{2,40}$/),name:z.string().min(2).max(100),description:z.string().max(500).default('')}).parse(request.body);
+  const body=z.object({code:z.string().regex(/^[A-Za-z0-9_-]{2,40}$/),name:z.string().min(2).max(100),description:z.string().max(500).prefault('')}).parse(request.body);
   const row={...body,code:body.code.toLowerCase(),id:randomUUID(),is_active:true,created_at:new Date()};await db.collection('platform_modules').insertOne({...row});response.status(201).json(row);
 });
 router.patch('/modules/:id',async(request,response)=>{

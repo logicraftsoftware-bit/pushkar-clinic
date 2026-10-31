@@ -30,6 +30,10 @@ jobs:
           NODE_ENV: production
       - name: Install compatibility test tooling after the production build
         run: npm ci --include=dev --no-audit --no-fund
+      - name: Audit application and server dependency lockfiles
+        run: |
+          npm audit --package-lock-only --audit-level=moderate
+          npm --prefix server audit --package-lock-only --audit-level=moderate
       - id: legacy_tests
         run: npm test 2>&1 | tee /tmp/clinic-tests.log
       - name: Expose validation failure details in check annotations

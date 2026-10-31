@@ -8,7 +8,7 @@ import {labPharmacyBilling} from "./lab-billing.js";
 import {labOrderEditable} from "./lab-result-completion.js";
 
 export async function editLabOrder(req: Request & {portalUser?: {tenantId:string;branchId:string;sub:string;role:string;portal?:string}}, res: Response) {
-  const body=z.object({test_ids:z.array(z.string().uuid()).min(1),discount:z.number().finite().min(0),updated_at:z.string(),diagnosis:z.string().trim().max(2000).default(""),urgent:z.boolean().default(false),source:z.string().trim().max(100).optional(),referred_by:z.string().uuid().nullable().optional(),referral_partner_id:z.string().uuid().nullable().optional(),collector_id:z.string().uuid().nullable().optional(),refer_pharmacy_id:z.string().uuid().nullable().optional(),pharmacy_discount_percentage:z.number().finite().min(0).max(100).optional()}).parse(req.body);
+  const body=z.object({test_ids:z.array(z.string().uuid()).min(1),discount:z.number().finite().min(0),updated_at:z.string(),diagnosis:z.string().trim().max(2000).prefault(""),urgent:z.boolean().prefault(false),source:z.string().trim().max(100).optional(),referred_by:z.string().uuid().nullable().optional(),referral_partner_id:z.string().uuid().nullable().optional(),collector_id:z.string().uuid().nullable().optional(),refer_pharmacy_id:z.string().uuid().nullable().optional(),pharmacy_discount_percentage:z.number().finite().min(0).max(100).optional()}).parse(req.body);
   const a=req.portalUser!,client=await pool.connect();
   try {
     await client.query("BEGIN");

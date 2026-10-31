@@ -21,7 +21,7 @@ function authenticate(req: AuthedRequest, res: Response, next: NextFunction) {
 
 const bodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
-  history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(2000) })).max(8).default([]),
+  history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(2000) })).max(8).prefault([]),
 });
 
 async function identity(auth: Auth) {

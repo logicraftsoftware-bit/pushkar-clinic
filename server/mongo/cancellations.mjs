@@ -55,7 +55,7 @@ router.get('/bill',async(request,response)=>{
   response.json(result);
 });
 router.get('/',async(request,response)=>{
-  const search=z.string().trim().max(150).default('').parse(request.query.search),stage=z.enum(['requests','refunds']).default('requests').parse(request.query.stage),status=z.enum(['','Pending','Approved','Rejected','Partially Refunded','Completed']).default('').parse(request.query.status),page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page);
+  const search=z.string().trim().max(150).prefault('').parse(request.query.search),stage=z.enum(['requests','refunds']).prefault('requests').parse(request.query.stage),status=z.enum(['','Pending','Approved','Rejected','Partially Refunded','Completed']).prefault('').parse(request.query.status),page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(request.query.page);
   const extra={$and:[...(status?[{status}]:[]),...(stage==='refunds'?[{status:{$in:['Approved','Partially Refunded','Completed']}}]:[]),...(search?[{$or:['bill_number','request_number','patient_name'].map(field=>({[field]:{$regex:escapeSearch(search),$options:'i'}}))}]:[])]};
   if(!extra.$and.length)delete extra.$and;
   const filter=await scopeFor(response,extra),[rows,total,balances]=await Promise.all([db.collection('cancellation_requests').find(filter,{projection:{_id:0}}).sort({created_at:-1,id:-1}).skip((page-1)*20).limit(20).toArray(),db.collection('cancellation_requests').countDocuments(filter),db.collection('cancellation_requests').find({$and:[filter,{status:{$in:['Approved','Partially Refunded']}}]},{projection:{approved_amount:1,refunded_amount:1}}).toArray()]);
@@ -101,7 +101,7 @@ router.post('/:id/review',async(request,response)=>{
   });response.json(result);
 });
 router.post('/:id/refund',async(request,response)=>{
-  const identity=uuid.parse(request.params.id),body=z.object({amount,method:z.string().trim().min(1).max(100),reference:z.string().trim().max(150).default(''),payment_key:uuid}).parse(request.body),tenant_id=response.locals.account.tenant_id;
+  const identity=uuid.parse(request.params.id),body=z.object({amount,method:z.string().trim().min(1).max(100),reference:z.string().trim().max(150).prefault(''),payment_key:uuid}).parse(request.body),tenant_id=response.locals.account.tenant_id;
   const result=await transaction(async session=>{
     await authorize(response,false,session);await serialize(response,session);const row=await requestFor(response,identity,session);delete row._id;
     const prior=await db.collection('finance_records').findOne({tenant_id,kind:'refunds','data.refund_payment_key':body.payment_key},{session,projection:{_id:0}});

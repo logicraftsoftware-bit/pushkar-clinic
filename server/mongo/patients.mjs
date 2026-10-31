@@ -32,12 +32,12 @@ async function validateReferral(response,data,session){
 }
 router.use((request,response,next)=>requirePermission(`patient.${request.method==='GET'?'view':request.method==='DELETE'?'delete':request.method==='PUT'?'update':'create'}`)(request,response,next));
 router.get('/',async(request,response)=>{
-  const search=z.string().max(150).default('').parse(request.query.search);
+  const search=z.string().max(150).prefault('').parse(request.query.search);
   const filter=await scopeFor(response,{deleted_at:null});
   if(search.trim())filter.$and.push(...search.trim().split(/\s+/).map(term=>({$or:['medical_record_number','first_name','last_name','phone','email'].map(key=>({[key]:{$regex:term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),$options:'i'}}))})));
   const paged=request.query.page!==undefined;
-  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page);
-  const pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
+  const page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(request.query.page);
+  const pageSize=z.coerce.number().int().min(1).max(100).prefault(25).parse(request.query.page_size);
   const cursor=db.collection('patients').find(filter,{projection:{_id:0,normalized_name:0}}).sort({created_at:-1,id:-1});
   const rows=await (paged?cursor.skip((page-1)*pageSize).limit(pageSize):cursor).toArray();
   const branches=await db.collection('branches').find({tenant_id:response.locals.account.tenant_id},{projection:{id:1,name:1}}).toArray();

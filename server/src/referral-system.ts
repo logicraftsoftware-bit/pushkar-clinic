@@ -100,12 +100,12 @@ router.post("/partners", async (req: R, res) => {
         name: z.string().min(2),
         phone: z.string().min(5),
         password: z.string().min(8),
-        email: z.string().default(""),
-        partner_type: z.string().default("Referral Partner"),
+        email: z.string().prefault(""),
+        partner_type: z.string().prefault("Referral Partner"),
         branch_id: z.string().uuid().nullable().optional(),
-        bank_details: z.record(z.string(), z.unknown()).default({}),
-        kyc: z.record(z.string(), z.unknown()).default({}),
-        minimum_withdrawal: z.coerce.number().min(0).default(500),
+        bank_details: z.record(z.string(), z.unknown()).prefault({}),
+        kyc: z.record(z.string(), z.unknown()).prefault({}),
+        minimum_withdrawal: z.coerce.number().min(0).prefault(500),
       })
       .parse(req.body),
     n = await pool.query(
@@ -148,7 +148,7 @@ router.patch("/partners/:id", async (req: R, res) => {
       .object({
         name: z.string().min(2),
         phone: z.string().min(5),
-        email: z.string().default(""),
+        email: z.string().prefault(""),
         partner_type: z.string().min(2),
         status: z.enum(["Active", "Inactive", "Suspended"]),
         minimum_withdrawal: z.coerce.number().min(0),
@@ -268,7 +268,7 @@ router.post("/commissions/:id/action", async (req: R, res) => {
   const b = z
       .object({
         action: z.enum(["approve", "hold", "release"]),
-        reason: z.string().default(""),
+        reason: z.string().prefault(""),
       })
       .parse(req.body),
     c = await pool.connect();
@@ -379,7 +379,7 @@ router.post("/withdrawals", async (req: R, res) => {
       .object({
         amount: z.coerce.number().positive(),
         method: z.enum(["Bank Transfer", "UPI", "Cash"]),
-        notes: z.string().default(""),
+        notes: z.string().prefault(""),
       })
       .parse(req.body),
     balance = await pool.query(
@@ -411,8 +411,8 @@ router.post("/withdrawals/:id/action", async (req: R, res) => {
   const b = z
       .object({
         action: z.enum(["approve", "reject", "pay"]),
-        payment_reference: z.string().default(""),
-        notes: z.string().default(""),
+        payment_reference: z.string().prefault(""),
+        notes: z.string().prefault(""),
       })
       .parse(req.body),
     c = await pool.connect();

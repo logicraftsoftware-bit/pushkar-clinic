@@ -8,15 +8,15 @@ const personal = z.object({
 }).passthrough();
 const account = z.object({
   mobile: phone.optional(),
-  account_status: z.enum(['Active', 'Inactive']).default('Active'),
+  account_status: z.enum(['Active', 'Inactive']).prefault('Active'),
 }).passthrough();
 
 export const staffSaveBody = z.object({
-  id: z.string().uuid().optional(), first_name: z.string().trim().min(1), middle_name: z.string().optional().default(''),
-  last_name: z.string().trim().min(1), profile_photo: z.string().optional().default(''), staff_type: z.string().min(1),
+  id: z.string().uuid().optional(), first_name: z.string().trim().min(1), middle_name: z.string().optional().prefault(''),
+  last_name: z.string().trim().min(1), profile_photo: z.string().optional().prefault(''), staff_type: z.string().min(1),
   branch_id: z.string().uuid().nullable().optional(), branch_ids: z.array(z.string().uuid()).min(1), department_id: z.string().uuid().nullable().optional(),
-  designation: z.string().optional().default(''), employment_type: z.string().optional().default(''),
-  joining_date: z.string().nullable().optional(), status: z.enum(['Active', 'Inactive', 'On Leave']).default('Active'),
+  designation: z.string().optional().prefault(''), employment_type: z.string().optional().prefault(''),
+  joining_date: z.string().nullable().optional(), status: z.enum(['Active', 'Inactive', 'On Leave']).prefault('Active'),
   personal, employment: z.record(z.string(), z.unknown()), account,
   professional: z.record(z.string(), z.unknown()),
 }).superRefine((body, context) => {

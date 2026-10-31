@@ -15,10 +15,10 @@ router.get('/print-template/:document',requirePermission('appointment.view'),asy
 const date=z.string().date(),time=z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::00)?$/).transform(value=>value.slice(0,5));
 const amount=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
 const appointmentInput=z.object({branch_id:uuid,department_id:uuid,patient_id:uuid,doctor_id:uuid,appointment_date:date,appointment_time:time,
-  slot_interval:z.coerce.number().refine(value=>value===5).optional(),appointment_type:z.string().max(100),visit_type:z.string().max(100),reason:z.string().max(4000).default(''),
-  consultation_fee:amount.default(0),payment_status:z.string().optional(),source:z.string().max(100).default('Reception'),notes:z.string().max(10000).default(''),
-  symptoms:z.array(z.string().max(200)).max(100).default([]),charges:z.array(z.object({label:z.string().max(200).optional(),name:z.string().max(200).optional(),amount,doctor_fee:z.enum(['registration_fee','maintenance_fee']).optional()}).passthrough()).max(100).default([]),
-  doctor_fee_selection:z.preprocess(value=>{if(typeof value==='string'){try{return JSON.parse(value);}catch{return value;}}return value;},z.object({registration_fee:z.boolean(),maintenance_fee:z.boolean()}).optional()),discount:amount.default(0),payment_mode:z.string().max(100).default(''),paid_amount:amount.default(0)});
+  slot_interval:z.coerce.number().refine(value=>value===5).optional(),appointment_type:z.string().max(100),visit_type:z.string().max(100),reason:z.string().max(4000).prefault(''),
+  consultation_fee:amount.prefault(0),payment_status:z.string().optional(),source:z.string().max(100).prefault('Reception'),notes:z.string().max(10000).prefault(''),
+  symptoms:z.array(z.string().max(200)).max(100).prefault([]),charges:z.array(z.object({label:z.string().max(200).optional(),name:z.string().max(200).optional(),amount,doctor_fee:z.enum(['registration_fee','maintenance_fee']).optional()}).passthrough()).max(100).prefault([]),
+  doctor_fee_selection:z.preprocess(value=>{if(typeof value==='string'){try{return JSON.parse(value);}catch{return value;}}return value;},z.object({registration_fee:z.boolean(),maintenance_fee:z.boolean()}).optional()),discount:amount.prefault(0),payment_mode:z.string().max(100).prefault(''),paid_amount:amount.prefault(0)});
 function failure(message,status=400){return Object.assign(new Error(message),{status});}
 async function methods(tenant,session){
   return (await operationalSettings(tenant,session)).payment_methods;
@@ -56,7 +56,7 @@ export async function receipt(response,row,amountCents,key,session){
 router.get('/lookups',async(request,response)=>{
   const granted=await permissionsFor(response.locals.account);
   if(!granted.includes('*')&&!granted.some(code=>['appointment.view','ipd.view','hospital.manage'].includes(code)))throw failure('Clinical access is required.',403);
-  const mode=z.enum(['all','none','recent']).default('all').parse(request.query.patients),tenant=response.locals.account.tenant_id;
+  const mode=z.enum(['all','none','recent']).prefault('all').parse(request.query.patients),tenant=response.locals.account.tenant_id;
   const query=await scopeFor(response,{}),read=async name=>db.collection(name).find(query,{projection:{_id:0}}).toArray();
   const branches=await db.collection('branches').find({tenant_id:tenant,is_active:true}).toArray();
   // Branches are filtered separately because their identity is stored in id.
@@ -82,13 +82,13 @@ router.get('/appointment-slots',requirePermission('appointment.view'),async(requ
 router.get('/appointments',requirePermission('appointment.view'),async(request,response)=>{
   const extra={};
   for(const field of ['branch_id','doctor_id','patient_id'])if(request.query[field])extra[field]=uuid.parse(request.query[field]);
-  const doctorIds=z.string().max(4000).default('').parse(request.query.doctor_ids).split(',').filter(Boolean).map(value=>uuid.parse(value));
+  const doctorIds=z.string().max(4000).prefault('').parse(request.query.doctor_ids).split(',').filter(Boolean).map(value=>uuid.parse(value));
   if(doctorIds.length>100)throw failure('Select at most 100 doctors.');
   if(doctorIds.length)extra.doctor_id={$in:doctorIds};
-  const queue=z.enum(['0','1']).default('0').parse(request.query.queue)==='1';
+  const queue=z.enum(['0','1']).prefault('0').parse(request.query.queue)==='1';
   if(queue)extra.status={$ne:'Cancelled'};
   const filter=await scopeFor(response,extra),paged=request.query.page!==undefined;
-  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
+  const page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).prefault(25).parse(request.query.page_size);
   const selectedDate=request.query.date?date.parse(request.query.date):null;
   const dateFilter=selectedDate?{appointment_date:selectedDate}:request.query.from||request.query.to?{appointment_date:{...(request.query.from?{$gte:date.parse(request.query.from)}:{}),...(request.query.to?{$lte:date.parse(request.query.to)}:{})}}:{};
   const pipeline=[{$match:filter}];
@@ -97,7 +97,7 @@ router.get('/appointments',requirePermission('appointment.view'),async(request,r
     pipeline.push({$unwind:{path:'$_'+alias,preserveNullAndEmptyArrays:true}});
   }
   pipeline.push({$set:{patient_name:{$concat:[{$ifNull:['$_patient.first_name','']},' ',{$ifNull:['$_patient.last_name','']}]},doctor_name:{$concat:[{$ifNull:['$_doctor.first_name','']},' ',{$ifNull:['$_doctor.last_name','']}]},department_name:'$_department.name',branch_name:'$_branch.name',medical_record_number:'$_patient.medical_record_number',patient_phone:'$_patient.phone',patient_address:'$_patient.address',patient_date_of_birth:'$_patient.date_of_birth',gender:'$_patient.sex',allergies:'$_patient.allergies',finding:'$_patient.existing_conditions',registration_fee_amount:'$_patient.registration_fee',registration_addon_amount:'$_patient.maintenance_fee',registration_discount_amount:'$_patient.discount',registration_amount:'$_patient.total_amount',registration_charges:'$_patient.registration_addons',_finished:{$cond:[{$in:['$status',['Completed','No Show']]},1,0]}}});
-  const search=z.string().max(150).default('').parse(request.query.search).trim();
+  const search=z.string().max(150).prefault('').parse(request.query.search).trim();
   if(search)for(const term of search.split(/\s+/)){
     const expression={};expression.$regex=escapeSearch(term);expression.$options='i';
     pipeline.push({$match:{$or:['appointment_number','token_number','status','appointment_date','patient_name','medical_record_number','patient_phone','doctor_name','department_name'].map(field=>({[field]:expression}))}});
@@ -182,7 +182,7 @@ router.put('/appointments/:id',requirePermission('appointment.update'),async(req
   });response.json(saved);
 });
 router.patch('/appointments/:id/check-in',requirePermission('appointment.update'),async(request,response)=>{
-  const input=z.object({payment:z.object({amount,method:z.string().max(100),reference:z.string().max(150).default('')}).optional()}).parse(request.body),recordId=uuid.parse(request.params.id);
+  const input=z.object({payment:z.object({amount,method:z.string().max(100),reference:z.string().max(150).prefault('')}).optional()}).parse(request.body),recordId=uuid.parse(request.params.id);
   const result=await transaction(async session=>{
     const filter=await scopeFor(response,{id:recordId},session),row=await db.collection('clinical_appointments').findOne(filter,{session});
     if(!row)throw failure('Appointment not found',404);

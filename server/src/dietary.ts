@@ -235,8 +235,8 @@ router.post("/diets", async (req: R, res) => {
       .object({
         admission_id: z.string().uuid(),
         diet_type: z.string().min(2),
-        instructions: z.string().default(""),
-        reason: z.string().default(""),
+        instructions: z.string().prefault(""),
+        reason: z.string().prefault(""),
       })
       .parse(req.body),
     a = req.user!;
@@ -281,10 +281,10 @@ router.post("/menu", async (req: R, res) => {
         attendant_rate: z.coerce.number().min(0),
         guest_rate: z.coerce.number().min(0),
         staff_rate: z.coerce.number().min(0),
-        tax: z.coerce.number().min(0).default(0),
-        package_eligible: z.boolean().default(false),
-        complimentary_eligible: z.boolean().default(false),
-        allergens: z.array(z.string()).default([]),
+        tax: z.coerce.number().min(0).prefault(0),
+        package_eligible: z.boolean().prefault(false),
+        complimentary_eligible: z.boolean().prefault(false),
+        allergens: z.array(z.string()).prefault([]),
       })
       .parse(req.body),
     a = req.user!;
@@ -317,7 +317,7 @@ router.post("/orders", async (req: R, res) => {
         order_type: z.string(),
         quantity: z.coerce.number().positive(),
         billing_class: z.string(),
-        remarks: z.string().default(""),
+        remarks: z.string().prefault(""),
       })
       .parse(req.body),
     a = req.user!;
@@ -448,8 +448,8 @@ router.patch("/orders/:id/status", async (req: R, res) => {
           "Delivered",
           "Cancelled",
         ]),
-        remarks: z.string().default(""),
-        received_by: z.string().trim().default(""),
+        remarks: z.string().prefault(""),
+        received_by: z.string().trim().prefault(""),
       })
       .parse(req.body),
     a = req.user!,
@@ -611,8 +611,8 @@ router.post("/schedules", async (req: R, res) => {
         .int()
         .min(0)
         .max(1440)
-        .default(120),
-      active: z.boolean().default(true),
+        .prefault(120),
+      active: z.boolean().prefault(true),
     })
     .parse(req.body);
   const q = await pool.query(
@@ -719,7 +719,7 @@ router.post("/generate", async (req: R, res) => {
       meal_date: z
         .string()
         .date()
-        .default(() => new Date().toISOString().slice(0, 10)),
+        .prefault(() => new Date().toISOString().slice(0, 10)),
     })
     .parse(req.body);
   const candidates = await pool.query(

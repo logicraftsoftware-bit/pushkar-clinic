@@ -6,7 +6,7 @@ export const checkInBody = z.object({
     amount: z.number().finite().min(0).max(99999999.99)
       .refine(value => Math.abs(value * 100 - Math.round(value * 100)) < 0.00001, "Use at most two decimal places."),
     method: z.string().trim().max(100),
-    reference: z.string().trim().max(150).optional().default(""),
+    reference: z.string().trim().max(150).optional().prefault(""),
   }).optional(),
 });
 

@@ -5,7 +5,7 @@ import {scopeFor,requirePermission} from './access.mjs';
 import {escapeSearch} from './search.mjs';
 const router=Router();
 router.get('/lab/test-status-report',requirePermission('lab.order.view'),async(request,response)=>{
-  const filters=z.object({from:z.string().date(),to:z.string().date(),test_id:z.string().uuid().or(z.literal('')).default(''),status:z.enum(['all','pending','conducted']).default('all'),search:z.string().trim().max(150).default(''),test_search:z.string().trim().max(150).default(''),page:z.coerce.number().int().min(1).max(100000).default(1)}).parse(request.query);
+  const filters=z.object({from:z.string().date(),to:z.string().date(),test_id:z.string().uuid().or(z.literal('')).prefault(''),status:z.enum(['all','pending','conducted']).prefault('all'),search:z.string().trim().max(150).prefault(''),test_search:z.string().trim().max(150).prefault(''),page:z.coerce.number().int().min(1).max(100000).prefault(1)}).parse(request.query);
   if(filters.from>filters.to)return response.status(400).json({error:'From Date must be on or before To Date.'});
   const match=await scopeFor(response,{workspace:'laboratory',kind:{$in:['orders','pos','sample collection','results','verification','reports']},status:{$nin:['Cancelled','Rejected']},occurred_at:{$gte:new Date(filters.from+'T00:00:00+05:30'),$lte:new Date(filters.to+'T23:59:59.999+05:30')}});
   const lookup=(from,local,as)=>({$lookup:{from,let:{identity:local,tenant:'$tenant_id'},pipeline:[{$match:{$expr:{$and:[{$eq:['$id','$$identity']},{$eq:['$tenant_id','$$tenant']}]}}}],as}});

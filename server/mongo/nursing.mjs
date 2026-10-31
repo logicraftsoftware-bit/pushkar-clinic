@@ -36,7 +36,7 @@ router.get('/nursing-station',requirePermission('ipd.view'),async(_request,respo
   response.json({ward:admin?{id:null,name:'All wards'}:{id:wardId,name:ward?.name??''},patients,prescriptions,nursing,medicines,diagnostics,diagnostic_masters:masters.filter(row=>laboratoryTestAvailable(row.data??{},account.branch_id)).map(row=>({...row,domain:row.data?.test_type==='Radiology'?'radiology':'pathology'}))});
 });
 router.post('/nursing-station/diagnostic-orders',requirePermission('ipd.update'),async(request,response)=>{
-  const body=z.object({...context,domain:z.enum(['pathology','radiology']),test_ids:z.array(uuid).min(1).max(100),priority:z.enum(['Routine','Urgent','STAT']).default('Routine'),instruction:z.string().max(1000).default(''),clinical_note:z.string().max(2000).default('')}).parse(request.body);
+  const body=z.object({...context,domain:z.enum(['pathology','radiology']),test_ids:z.array(uuid).min(1).max(100),priority:z.enum(['Routine','Urgent','STAT']).prefault('Routine'),instruction:z.string().max(1000).prefault(''),clinical_note:z.string().max(2000).prefault('')}).parse(request.body);
   const result=await transaction(async session=>{
     const admission=await nursingAdmission(response,body.admission_id,body.patient_id,session);await lock(response,admission,session);
     const tenant_id=admission.tenant_id,ids=[...new Set(body.test_ids)],masters=await db.collection('hospital_diagnostic_masters').find({tenant_id,id:{$in:ids},domain:'pathology',kind:'test'},{session}).toArray();if(masters.length!==ids.length)throw failure('Selected tests are unavailable.');
@@ -46,13 +46,13 @@ router.post('/nursing-station/diagnostic-orders',requirePermission('ipd.update')
 });
 router.post('/nursing-station/medications',requirePermission('ipd.update'),async(request,response)=>{
   if(hasClinicalTimestamp(request.body))throw failure('Clinical entry times are recorded by the server.');
-  const body=z.object({...context,name:text,dose:text,route:z.string().max(100).default('Oral'),schedule:z.enum(['Once','Every 4 hours','Every 6 hours','Every 8 hours','Every 12 hours','Daily']),first_due_at:z.string().datetime({offset:true}),instructions:z.string().max(4000).default(''),start_date:z.union([z.string().date(),z.literal('')]).optional(),end_date:z.union([z.string().date(),z.literal('')]).optional(),prn:z.boolean().default(false),indication:z.string().max(2000).default(''),double_check:z.boolean().default(false)}).parse(request.body);
+  const body=z.object({...context,name:text,dose:text,route:z.string().max(100).prefault('Oral'),schedule:z.enum(['Once','Every 4 hours','Every 6 hours','Every 8 hours','Every 12 hours','Daily']),first_due_at:z.string().datetime({offset:true}),instructions:z.string().max(4000).prefault(''),start_date:z.union([z.string().date(),z.literal('')]).optional(),end_date:z.union([z.string().date(),z.literal('')]).optional(),prn:z.boolean().prefault(false),indication:z.string().max(2000).prefault(''),double_check:z.boolean().prefault(false)}).parse(request.body);
   const timing=medicationScheduleError(body);if(timing)throw failure(timing);
   const result=await transaction(async session=>{const admission=await nursingAdmission(response,body.admission_id,body.patient_id,session);await lock(response,admission,session);const patient=await db.collection('patients').findOne({tenant_id:admission.tenant_id,id:body.patient_id},{session});const conflicts=allergyConflicts(patient?.allergies,[{name:body.name}]);if(conflicts.length)throw failure(conflicts.join(' '),422);return item(response,admission,'medication-plan',`Previous medicine - ${body.name}`,body,session,{status:'Active',occurred_at:new Date(body.first_due_at)});});response.status(201).json(result);
 });
 router.post('/nursing-station/medications/:id/administer',requirePermission('ipd.update'),async(request,response)=>{
   if(hasClinicalTimestamp(request.body))throw failure('Administration time is recorded by the server.');
-  const identity=uuid.parse(request.params.id),body=z.object({outcome:z.enum(['Given','Missed','Refused','Held']),notes:z.string().max(4000).default(''),scheduled_at:z.string().datetime({offset:true})}).parse(request.body);
+  const identity=uuid.parse(request.params.id),body=z.object({outcome:z.enum(['Given','Missed','Refused','Held']),notes:z.string().max(4000).prefault(''),scheduled_at:z.string().datetime({offset:true})}).parse(request.body);
   const result=await transaction(async session=>{
     const plan=await db.collection('role_work_items').findOne(await scopeFor(response,{id:identity,workspace:'nurse',kind:'medication-plan'},session),{session});if(!plan)throw failure('Medication plan not found.',404);
     const admission=await nursingAdmission(response,plan.data.admission_id,plan.patient_id,session);await lock(response,admission,session);
@@ -65,11 +65,11 @@ router.post('/nursing-station/medications/:id/administer',requirePermission('ipd
   });response.status(201).json(result);
 });
 const forms={
-  notes:z.object({...context,text,input_mode:z.enum(['written','voice']).default('written')}),
-  pharmacy:z.object({...context,action:z.enum(['request','return']),medicine:text,quantity:z.number().finite().positive().max(100000),reason:z.string().max(4000).default('')}),
+  notes:z.object({...context,text,input_mode:z.enum(['written','voice']).prefault('written')}),
+  pharmacy:z.object({...context,action:z.enum(['request','return']),medicine:text,quantity:z.number().finite().positive().max(100000),reason:z.string().max(4000).prefault('')}),
   clinical:z.object({...context,type:z.enum(['vitals','intake-output','assessment']),data:z.record(z.string(),z.unknown())}),
-  'care-plans':z.object({...context,problem:text,goal:text,intervention:text,due_at:z.string().datetime({offset:true}),priority:z.enum(['Low','Normal','High','Critical']).default('Normal')}),
-  handover:z.object({...context,shift:z.enum(['Morning','Evening','Night']),situation:text,background:z.string().max(4000).default(''),assessment:z.string().max(4000).default(''),recommendation:text}),
+  'care-plans':z.object({...context,problem:text,goal:text,intervention:text,due_at:z.string().datetime({offset:true}),priority:z.enum(['Low','Normal','High','Critical']).prefault('Normal')}),
+  handover:z.object({...context,shift:z.enum(['Morning','Evening','Night']),situation:text,background:z.string().max(4000).prefault(''),assessment:z.string().max(4000).prefault(''),recommendation:text}),
 };
 for(const [path,schema] of Object.entries(forms))router.post(`/nursing-station/${path}`,requirePermission('ipd.update'),async(request,response)=>{
   const body=schema.parse(request.body);if(hasClinicalTimestamp(request.body)||body.data&&hasClinicalTimestamp(body.data))throw failure('Clinical entry timestamps are recorded by the server.');

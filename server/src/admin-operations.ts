@@ -116,14 +116,14 @@ router.get("/lookups", async (req: R, res) => {
 const doc = z.object({
   name: z.string().min(1),
   document_type: z.string().min(1),
-  related_type: z.string().default(""),
-  related_id: z.string().default(""),
-  branch_id: z.string().default(""),
-  file_data: z.string().default(""),
-  issue_date: z.string().default(""),
-  expiry_date: z.string().default(""),
-  description: z.string().default(""),
-  access_level: z.string().default("Hospital"),
+  related_type: z.string().prefault(""),
+  related_id: z.string().prefault(""),
+  branch_id: z.string().prefault(""),
+  file_data: z.string().prefault(""),
+  issue_date: z.string().prefault(""),
+  expiry_date: z.string().prefault(""),
+  description: z.string().prefault(""),
+  access_level: z.string().prefault("Hospital"),
 });
 router.get("/documents", async (req: R, res) => {
   const r = await pool.query(

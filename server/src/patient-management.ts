@@ -103,7 +103,7 @@ const schema = z
         "Photo must be JPEG, PNG or WebP",
       )
       .optional()
-      .default(""),
+      .prefault(""),
     date_of_birth: z
       .string()
       .nullable()
@@ -126,12 +126,12 @@ const schema = z
         },
         "Date of birth cannot be more than 120 years ago",
       ),
-    sex: z.enum(["male", "female", "other", "unknown"]).default("unknown"),
+    sex: z.enum(["male", "female", "other", "unknown"]).prefault("unknown"),
     blood_group: z
       .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown", ""])
       .optional()
-      .default(""),
-    phone: optionalPhone.default(""),
+      .prefault(""),
+    phone: optionalPhone.prefault(""),
     email: z
       .string()
       .trim()
@@ -142,14 +142,14 @@ const schema = z
           /^[^\s@]+@[A-Za-z0-9][A-Za-z0-9-]{1,62}(?:\.[A-Za-z0-9][A-Za-z0-9-]{1,62})+$/.test(value),
         "Enter a complete email address",
       )
-      .default(""),
+      .prefault(""),
     address: z
       .object({
         ...patientAgeFields,
         title: z.enum(["Mr.","Mrs.","Ms.","Miss","Master","Baby","Dr.",""]).optional(),
-        line: meaningfulText(500).default(""),
-        city: meaningfulText(100).default(""),
-        state: z.string().trim().max(100).default(""),
+        line: meaningfulText(500).prefault(""),
+        city: meaningfulText(100).prefault(""),
+        state: z.string().trim().max(100).prefault(""),
         pin: z
           .string()
           .trim()
@@ -157,13 +157,13 @@ const schema = z
             (value) => !value || /^\d{6}$/.test(value),
             "PIN code must contain exactly 6 digits",
           )
-          .default(""),
+          .prefault(""),
       })
-      .default({ line: "", city: "", state: "", pin: "" }),
+      .prefault({ line: "", city: "", state: "", pin: "" }),
     emergency_contact: z
       .object({
-        name: z.union([nameField, z.literal("")]).default(""),
-        phone: optionalPhone.default(""),
+        name: z.union([nameField, z.literal("")]).prefault(""),
+        phone: optionalPhone.prefault(""),
         relationship: z
           .enum([
             "Parent",
@@ -175,7 +175,7 @@ const schema = z
             "Other",
             "",
           ])
-          .default(""),
+          .prefault(""),
       })
       .superRefine((value, ctx) => {
         if (
@@ -188,12 +188,12 @@ const schema = z
               "Complete the emergency contact name, number and relationship",
           });
       })
-      .default({ name: "", phone: "", relationship: "" }),
-    allergies: meaningfulText(2000).default(""),
-    existing_conditions: meaningfulText(2000).default(""),
-    current_medication: meaningfulText(2000).default(""),
-    registration_fee: z.coerce.number().min(0).default(0),
-    maintenance_fee: z.coerce.number().min(0).default(0),
+      .prefault({ name: "", phone: "", relationship: "" }),
+    allergies: meaningfulText(2000).prefault(""),
+    existing_conditions: meaningfulText(2000).prefault(""),
+    current_medication: meaningfulText(2000).prefault(""),
+    registration_fee: z.coerce.number().min(0).prefault(0),
+    maintenance_fee: z.coerce.number().min(0).prefault(0),
     registration_addons: z
       .array(
         z.object({
@@ -202,15 +202,15 @@ const schema = z
           price: z.coerce.number().min(0),
         }),
       )
-      .default([]),
-    payment_mode: z.string().default(""),
-    payment_reference: z.string().default(""),
-    discount: z.coerce.number().min(0).default(0),
-    discount_remarks: z.string().default(""),
-    registration_payment_status: z.enum(["Paid", "Unpaid"]).default("Unpaid"),
-    payment_status_remarks: z.string().default(""),
-    total_amount: z.coerce.number().min(0).default(0),
-    status: z.string().default("Active"),
+      .prefault([]),
+    payment_mode: z.string().prefault(""),
+    payment_reference: z.string().prefault(""),
+    discount: z.coerce.number().min(0).prefault(0),
+    discount_remarks: z.string().prefault(""),
+    registration_payment_status: z.enum(["Paid", "Unpaid"]).prefault("Unpaid"),
+    payment_status_remarks: z.string().prefault(""),
+    total_amount: z.coerce.number().min(0).prefault(0),
+    status: z.string().prefault("Active"),
     referral_partner_id: z
       .union([z.string().uuid(), z.literal(""), z.null()])
       .optional()
@@ -220,9 +220,9 @@ const schema = z
         z.boolean(),
         z.enum(["true", "false"]).transform((value) => value === "true"),
       ])
-      .default(false),
-    duplicate_override: z.boolean().default(false),
-    duplicate_override_reason: z.string().trim().max(500).default(""),
+      .prefault(false),
+    duplicate_override: z.boolean().prefault(false),
+    duplicate_override_reason: z.string().trim().max(500).prefault(""),
   })
   .superRefine((value, ctx) => {
     if (value.referral_partner_id && !value.referral_consent)

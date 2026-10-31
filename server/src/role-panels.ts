@@ -349,7 +349,7 @@ router.get("/nursing-station", async (req: Authed, res) => {
 
 router.post("/nursing-station/diagnostic-orders", async (req: Authed, res) => {
   if (!nurseOnly(req, res)) return;
-  const body=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),domain:z.enum(["pathology","radiology"]),test_ids:z.array(z.string().uuid()).min(1),priority:z.enum(["Routine","Urgent","STAT"]).default("Routine"),instruction:z.string().trim().max(1000).default(""),clinical_note:z.string().trim().max(2000).default("")}).parse(req.body),a=req.portalUser!;
+  const body=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),domain:z.enum(["pathology","radiology"]),test_ids:z.array(z.string().uuid()).min(1),priority:z.enum(["Routine","Urgent","STAT"]).prefault("Routine"),instruction:z.string().trim().max(1000).prefault(""),clinical_note:z.string().trim().max(2000).prefault("")}).parse(req.body),a=req.portalUser!;
   if(!await nursePatientAccess(a,body.patient_id,body.admission_id))return void res.status(403).json({error:"Patient is not in your assigned ward"});
   const ids=[...new Set(body.test_ids)],found=await pool.query(`SELECT id,name,data FROM hospital_diagnostic_masters WHERE tenant_id=$1 AND domain=$2 AND kind='test' AND id=ANY($3::uuid[]) ORDER BY name`,[a.tenantId,'pathology',ids]);
   if(found.rowCount!==ids.length)return void res.status(400).json({error:"One or more selected tests are unavailable"});
@@ -363,7 +363,7 @@ router.post("/nursing-station/diagnostic-orders", async (req: Authed, res) => {
 router.post("/nursing-station/medications", async (req: Authed, res) => {
   if (!nurseOnly(req, res)) return;
   if(hasClinicalTimestamp(req.body))return void res.status(400).json({error:'Clinical entry times are recorded by the server and cannot be overridden.'});
-  const b = z.object({ patient_id:z.string().uuid(), admission_id:z.string().uuid(), name:z.string().min(1), dose:z.string().min(1), route:z.string().default("Oral"), schedule:z.string().min(1), first_due_at:z.string().min(1), instructions:z.string().default(""), start_date:z.string().optional(), end_date:z.string().optional(), prn:z.boolean().default(false), indication:z.string().default(""), double_check:z.boolean().default(false) }).parse(req.body);
+  const b = z.object({ patient_id:z.string().uuid(), admission_id:z.string().uuid(), name:z.string().min(1), dose:z.string().min(1), route:z.string().prefault("Oral"), schedule:z.string().min(1), first_due_at:z.string().min(1), instructions:z.string().prefault(""), start_date:z.string().optional(), end_date:z.string().optional(), prn:z.boolean().prefault(false), indication:z.string().prefault(""), double_check:z.boolean().prefault(false) }).parse(req.body);
   const a=req.portalUser!;
   const allowedPatient=await nursePatientAccess(a,b.patient_id,b.admission_id);
   if(!allowedPatient)return void res.status(403).json({error:"Patient is not in your assigned ward"});
@@ -376,7 +376,7 @@ router.post("/nursing-station/medications", async (req: Authed, res) => {
 router.post("/nursing-station/medications/:id/administer", async (req: Authed, res) => {
   if (!nurseOnly(req, res)) return;
   if(hasClinicalTimestamp(req.body))return void res.status(400).json({error:'Administration time is recorded by the server and cannot be overridden.'});
-  const body=z.object({outcome:z.enum(["Given","Missed","Refused","Held"]),notes:z.string().default("")}).parse(req.body),a=req.portalUser!;
+  const body=z.object({outcome:z.enum(["Given","Missed","Refused","Held"]),notes:z.string().prefault("")}).parse(req.body),a=req.portalUser!;
   const plan=await pool.query(`SELECT n.* FROM role_work_items n JOIN ipd_admissions x ON x.id=nullif(n.data->>'admission_id','')::uuid WHERE n.id=$1 AND n.tenant_id=$2 AND n.workspace='nurse' AND n.kind='medication-plan' AND ($4='hospital_admin' OR EXISTS(SELECT 1 FROM staff_members s WHERE s.user_id=$3 AND s.tenant_id=x.tenant_id AND x.ward_id=nullif(s.professional->>'ward_assignment','')::uuid))`,[req.params.id,a.tenantId,a.sub,a.role]);
   if(!plan.rowCount)return void res.status(404).json({error:"Medication plan not found"});
   const row=plan.rows[0], data={plan_id:row.id,admission_id:row.data.admission_id,medicine:row.data.name,dose:row.data.dose,route:row.data.route,scheduled_at:row.occurred_at,outcome:body.outcome,notes:body.notes,administered_at:new Date().toISOString()};
@@ -387,7 +387,7 @@ router.post("/nursing-station/medications/:id/administer", async (req: Authed, r
 
 router.post("/nursing-station/notes", async (req: Authed, res) => {
   if (!nurseOnly(req, res)) return;
-  const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),text:z.string().min(1),input_mode:z.enum(["written","voice"]).default("written")}).parse(req.body),a=req.portalUser!;
+  const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),text:z.string().min(1),input_mode:z.enum(["written","voice"]).prefault("written")}).parse(req.body),a=req.portalUser!;
   if(!await nursePatientAccess(a,b.patient_id,b.admission_id))return void res.status(403).json({error:"Patient is not in your assigned ward"});
   const result=await pool.query(`INSERT INTO role_work_items(tenant_id,branch_id,patient_id,assigned_user_id,created_by,workspace,kind,title,status,data) VALUES($1,$2,$3,$4,$4,'nurse','nursing-note','Nursing instruction','Recorded',$5) RETURNING *`,[a.tenantId,a.branchId,b.patient_id,a.sub,b]);
   res.status(201).json(result.rows[0]);
@@ -395,7 +395,7 @@ router.post("/nursing-station/notes", async (req: Authed, res) => {
 
 router.post("/nursing-station/pharmacy", async (req: Authed, res) => {
   if (!nurseOnly(req, res)) return;
-  const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),action:z.enum(["request","return"]),medicine:z.string().min(1),quantity:z.number().positive(),reason:z.string().default("")}).parse(req.body),a=req.portalUser!;
+  const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),action:z.enum(["request","return"]),medicine:z.string().min(1),quantity:z.number().positive(),reason:z.string().prefault("")}).parse(req.body),a=req.portalUser!;
   if(!await nursePatientAccess(a,b.patient_id,b.admission_id))return void res.status(403).json({error:"Patient is not in your assigned ward"});
   const kind=b.action==='request'?'pharmacy-request':'pharmacy-return', title=`Nurse ${b.action} · ${b.medicine}`;
   const nurseItem=await pool.query(`INSERT INTO role_work_items(tenant_id,branch_id,patient_id,assigned_user_id,created_by,workspace,kind,title,status,priority,data) VALUES($1,$2,$3,$4,$4,'nurse',$5,$6,'Pending','High',$7) RETURNING *`,[a.tenantId,a.branchId,b.patient_id,a.sub,kind,title,b]);
@@ -419,18 +419,18 @@ router.post("/nursing-station/clinical", async (req: Authed, res) => {
 });
 
 router.post("/nursing-station/care-plans", async (req: Authed, res) => {
-  if (!nurseOnly(req, res)) return;const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),problem:z.string().min(1),goal:z.string().min(1),intervention:z.string().min(1),due_at:z.string().min(1),priority:z.enum(['Low','Normal','High','Critical']).default('Normal')}).parse(req.body),a=req.portalUser!;
+  if (!nurseOnly(req, res)) return;const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),problem:z.string().min(1),goal:z.string().min(1),intervention:z.string().min(1),due_at:z.string().min(1),priority:z.enum(['Low','Normal','High','Critical']).prefault('Normal')}).parse(req.body),a=req.portalUser!;
   if(!await nursePatientAccess(a,b.patient_id,b.admission_id))return void res.status(403).json({error:"Patient is not in your assigned ward"});
   const result=await pool.query(`INSERT INTO role_work_items(tenant_id,branch_id,patient_id,assigned_user_id,created_by,workspace,kind,title,status,priority,data,occurred_at) VALUES($1,$2,$3,$4,$4,'nurse','care-plan',$5,'Pending',$6,$7,$8) RETURNING *`,[a.tenantId,a.branchId,b.patient_id,a.sub,`Care plan · ${b.problem}`,b.priority,b,b.due_at]);res.status(201).json(result.rows[0]);
 });
 
 router.patch("/nursing-station/tasks/:id", async (req: Authed, res) => {
-  if (!nurseOnly(req, res)) return;const b=z.object({status:z.enum(['Completed','Acknowledged','Discontinued']),note:z.string().default('')}).parse(req.body),a=req.portalUser!;
+  if (!nurseOnly(req, res)) return;const b=z.object({status:z.enum(['Completed','Acknowledged','Discontinued']),note:z.string().prefault('')}).parse(req.body),a=req.portalUser!;
   const result=await pool.query(`UPDATE role_work_items n SET status=$1,data=n.data||jsonb_build_object('action_note',$2::text,'action_by',$3::text,'action_at',now()),updated_at=now() FROM ipd_admissions x WHERE n.id=$4 AND n.tenant_id=$5 AND x.id=nullif(n.data->>'admission_id','')::uuid AND ($6='hospital_admin' OR EXISTS(SELECT 1 FROM staff_members s WHERE s.user_id=$3 AND s.tenant_id=n.tenant_id AND x.ward_id=nullif(s.professional->>'ward_assignment','')::uuid)) RETURNING n.*`,[b.status,b.note,a.sub,req.params.id,a.tenantId,a.role]);if(!result.rowCount)return void res.status(404).json({error:'Record not found in your ward'});res.json(result.rows[0]);
 });
 
 router.post("/nursing-station/handover", async (req: Authed, res) => {
-  if (!nurseOnly(req, res)) return;const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),shift:z.enum(['Morning','Evening','Night']),situation:z.string().min(1),background:z.string().default(''),assessment:z.string().default(''),recommendation:z.string().min(1)}).parse(req.body),a=req.portalUser!;
+  if (!nurseOnly(req, res)) return;const b=z.object({patient_id:z.string().uuid(),admission_id:z.string().uuid(),shift:z.enum(['Morning','Evening','Night']),situation:z.string().min(1),background:z.string().prefault(''),assessment:z.string().prefault(''),recommendation:z.string().min(1)}).parse(req.body),a=req.portalUser!;
   if(!await nursePatientAccess(a,b.patient_id,b.admission_id))return void res.status(403).json({error:"Patient is not in your assigned ward"});
   const result=await pool.query(`INSERT INTO role_work_items(tenant_id,branch_id,patient_id,assigned_user_id,created_by,workspace,kind,title,status,priority,data) VALUES($1,$2,$3,$4,$4,'nurse','shift-handover',$5,'Pending','High',$6) RETURNING *`,[a.tenantId,a.branchId,b.patient_id,a.sub,`${b.shift} shift handover`,b]);res.status(201).json(result.rows[0]);
 });
@@ -453,9 +453,9 @@ router.post("/work-items", async (req: Authed, res) => {
       kind: z.string().min(1),
       title: z.string().min(1),
       patient_id: z.string().uuid().nullable().optional(),
-      status: z.string().default("Pending"),
-      priority: z.string().default("Normal"),
-      data: z.record(z.string(), z.unknown()).default({}),
+      status: z.string().prefault("Pending"),
+      priority: z.string().prefault("Normal"),
+      data: z.record(z.string(), z.unknown()).prefault({}),
     })
     .parse(req.body);
   const a = req.portalUser!,
@@ -498,27 +498,27 @@ router.get("/lab-tests", async (req: Authed, res) => {
 
 router.get("/lab-patients",async(req:Authed,res)=>{const a=req.portalUser!,activeWorkspace=workspace(a);if(!labCommercialAccess(a))return void res.status(403).json({error:"Laboratory access required"});const search=String(req.query.search||"").trim();if(search.length<2)return void res.json([]);const result=await pool.query(`SELECT id,medical_record_number,first_name,last_name,concat_ws(' ',first_name,last_name) patient_name,phone,date_of_birth,sex,blood_group,email FROM patients WHERE tenant_id=$1 AND deleted_at IS NULL AND (medical_record_number::text ILIKE $2 OR phone ILIKE $2 OR concat_ws(' ',first_name,last_name) ILIKE $2) ORDER BY created_at DESC LIMIT 25`,[a.tenantId,`%${search}%`]);res.json(result.rows)});
 
-router.post("/lab-patients",async(req:Authed,res)=>{const a=req.portalUser!,activeWorkspace=workspace(a);if(!labCommercialAccess(a))return void res.status(403).json({error:"Laboratory access required"});const name=z.string().trim().min(1).max(80).regex(/^[\p{L}][\p{L} '\-]*$/u,"Use letters, spaces, hyphens or apostrophes only"),phone=z.string().trim().max(16).refine(value=>parsePhoneNumberFromString(value,"IN")?.isValid()===true,"Enter a valid phone number");const body=z.object({first_name:name,last_name:name,phone,date_of_birth:z.string().nullable().optional().refine(value=>!value||(/^\d{4}-\d{2}-\d{2}$/.test(value)&&new Date(`${value}T00:00:00Z`).getTime()<=Date.now()),"Date of birth cannot be in the future"),sex:z.enum(["male","female","other","unknown"]).default("unknown"),blood_group:z.enum(["A+","A-","B+","B-","AB+","AB-","O+","O-",""]).default(""),email:z.string().trim().email().or(z.literal("")).default(""),title:z.string().trim().max(20).default(""),father_name:z.string().trim().max(150).default(""),mother_name:z.string().trim().max(150).default(""),state:z.string().trim().max(100).default(""),district:z.string().trim().max(100).default(""),city:z.string().trim().max(150).default(""),age_years:z.coerce.number().int().min(0).max(150).default(0),age_months:z.coerce.number().int().min(0).max(11).default(0),age_days:z.coerce.number().int().min(0).max(30).default(0),address:z.string().trim().max(1000).default(""),emergency_name:z.union([name,z.literal("")]).default(""),emergency_phone:z.string().trim().max(16).refine(value=>!value||parsePhoneNumberFromString(value,"IN")?.isValid()===true,"Enter a valid emergency phone number").default(""),allergies:z.string().trim().max(2000).default("")}).parse(req.body);const duplicate=await pool.query(`SELECT id,medical_record_number FROM patients WHERE tenant_id=$1 AND phone=$2 AND deleted_at IS NULL AND regexp_replace(lower(trim(concat_ws(' ',first_name,last_name))),'\\s+',' ','g')=$3 LIMIT 1`,[a.tenantId,body.phone,`${body.first_name} ${body.last_name}`.toLowerCase().replace(/\s+/g,' ').trim()]);if(duplicate.rows[0])return void res.status(409).json({error:`A patient with the same name and phone number already exists (${duplicate.rows[0].medical_record_number}). Use Existing Patient search.`});const count=await pool.query(`SELECT count(*)::int+1 n FROM patients WHERE tenant_id=$1`,[a.tenantId]),prefix=await configuredPrefix(a.tenantId,"uhid_prefix","UHID"),uhid=`${prefix}-${String(count.rows[0].n).padStart(6,"0")}`;const result=await pool.query(`INSERT INTO patients(tenant_id,branch_id,medical_record_number,first_name,last_name,date_of_birth,sex,blood_group,phone,email,address,emergency_contact,allergies,existing_conditions,current_medication,registration_fee,maintenance_fee,registration_addons,payment_mode,payment_reference,discount,discount_remarks,registration_payment_status,payment_status_remarks,total_amount,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'','',0,0,'[]','','',0,'','Unpaid','',0,'Active') RETURNING id,medical_record_number,first_name,last_name,concat_ws(' ',first_name,last_name) patient_name,phone,date_of_birth,sex,blood_group,email`,[a.tenantId,a.branchId,uhid,body.first_name,body.last_name,body.date_of_birth||null,body.sex,body.blood_group||null,body.phone,body.email||null,{line:body.address,title:body.title,father_name:body.father_name,mother_name:body.mother_name,state:body.state,district:body.district,city:body.city,...ageAddress({age_years:body.age_years,age_months:body.age_months,age_days:body.age_days})},{name:body.emergency_name,phone:body.emergency_phone},body.allergies]);res.status(201).json(result.rows[0])});
+router.post("/lab-patients",async(req:Authed,res)=>{const a=req.portalUser!,activeWorkspace=workspace(a);if(!labCommercialAccess(a))return void res.status(403).json({error:"Laboratory access required"});const name=z.string().trim().min(1).max(80).regex(/^[\p{L}][\p{L} '\-]*$/u,"Use letters, spaces, hyphens or apostrophes only"),phone=z.string().trim().max(16).refine(value=>parsePhoneNumberFromString(value,"IN")?.isValid()===true,"Enter a valid phone number");const body=z.object({first_name:name,last_name:name,phone,date_of_birth:z.string().nullable().optional().refine(value=>!value||(/^\d{4}-\d{2}-\d{2}$/.test(value)&&new Date(`${value}T00:00:00Z`).getTime()<=Date.now()),"Date of birth cannot be in the future"),sex:z.enum(["male","female","other","unknown"]).prefault("unknown"),blood_group:z.enum(["A+","A-","B+","B-","AB+","AB-","O+","O-",""]).prefault(""),email:z.string().trim().email().or(z.literal("")).prefault(""),title:z.string().trim().max(20).prefault(""),father_name:z.string().trim().max(150).prefault(""),mother_name:z.string().trim().max(150).prefault(""),state:z.string().trim().max(100).prefault(""),district:z.string().trim().max(100).prefault(""),city:z.string().trim().max(150).prefault(""),age_years:z.coerce.number().int().min(0).max(150).prefault(0),age_months:z.coerce.number().int().min(0).max(11).prefault(0),age_days:z.coerce.number().int().min(0).max(30).prefault(0),address:z.string().trim().max(1000).prefault(""),emergency_name:z.union([name,z.literal("")]).prefault(""),emergency_phone:z.string().trim().max(16).refine(value=>!value||parsePhoneNumberFromString(value,"IN")?.isValid()===true,"Enter a valid emergency phone number").prefault(""),allergies:z.string().trim().max(2000).prefault("")}).parse(req.body);const duplicate=await pool.query(`SELECT id,medical_record_number FROM patients WHERE tenant_id=$1 AND phone=$2 AND deleted_at IS NULL AND regexp_replace(lower(trim(concat_ws(' ',first_name,last_name))),'\\s+',' ','g')=$3 LIMIT 1`,[a.tenantId,body.phone,`${body.first_name} ${body.last_name}`.toLowerCase().replace(/\s+/g,' ').trim()]);if(duplicate.rows[0])return void res.status(409).json({error:`A patient with the same name and phone number already exists (${duplicate.rows[0].medical_record_number}). Use Existing Patient search.`});const count=await pool.query(`SELECT count(*)::int+1 n FROM patients WHERE tenant_id=$1`,[a.tenantId]),prefix=await configuredPrefix(a.tenantId,"uhid_prefix","UHID"),uhid=`${prefix}-${String(count.rows[0].n).padStart(6,"0")}`;const result=await pool.query(`INSERT INTO patients(tenant_id,branch_id,medical_record_number,first_name,last_name,date_of_birth,sex,blood_group,phone,email,address,emergency_contact,allergies,existing_conditions,current_medication,registration_fee,maintenance_fee,registration_addons,payment_mode,payment_reference,discount,discount_remarks,registration_payment_status,payment_status_remarks,total_amount,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'','',0,0,'[]','','',0,'','Unpaid','',0,'Active') RETURNING id,medical_record_number,first_name,last_name,concat_ws(' ',first_name,last_name) patient_name,phone,date_of_birth,sex,blood_group,email`,[a.tenantId,a.branchId,uhid,body.first_name,body.last_name,body.date_of_birth||null,body.sex,body.blood_group||null,body.phone,body.email||null,{line:body.address,title:body.title,father_name:body.father_name,mother_name:body.mother_name,state:body.state,district:body.district,city:body.city,...ageAddress({age_years:body.age_years,age_months:body.age_months,age_days:body.age_days})},{name:body.emergency_name,phone:body.emergency_phone},body.allergies]);res.status(201).json(result.rows[0])});
 
 router.get("/lab-orders", async (req: Authed, res) => {
   const a=req.portalUser!;
   if (!labCommercialAccess(a) && !(await hasPermission(a.sub,a.tenantId,"lab.order.view"))) return void res.status(403).json({error:"Laboratory access required"});
-  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(req.query.page);
-  const stage=z.enum(["Orders","Sample Collection","Lab Billing","Results","Reports","Verification"]).default("Orders").parse(req.query.stage);
-  const search=z.string().trim().max(150).default("").parse(req.query.search);
-  const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).default('');
+  const page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(req.query.page);
+  const stage=z.enum(["Orders","Sample Collection","Lab Billing","Results","Reports","Verification"]).prefault("Orders").parse(req.query.stage);
+  const search=z.string().trim().max(150).prefault("").parse(req.query.search);
+  const day=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).prefault('');
   const from=day.parse(req.query.from),to=day.parse(req.query.to);
   if(from&&to&&from>to)return void res.status(400).json({error:'From Date must be on or before To Date'});
-  const billing=z.enum(['0','1']).default('0').parse(req.query.billing)==='1';
-  const status=z.enum([...labOrderStatuses,...labBillingStatuses,'']).default('').parse(req.query.status);
-  const orderType=z.enum([...labOrderTypes,'']).default('').parse(req.query.order_type);
-  const detailFilters=z.object({bill_id:z.string().trim().max(150).default(''),uhid:z.string().trim().max(150).default(''),name:z.string().trim().max(150).default(''),barcode:z.string().trim().max(150).default(''),department:z.string().trim().max(150).default(''),test_id:z.string().trim().max(150).default(''),result_status:z.enum(['','Pending','In Progress','Partially Completed','Completed']).default('')}).parse(req.query);
+  const billing=z.enum(['0','1']).prefault('0').parse(req.query.billing)==='1';
+  const status=z.enum([...labOrderStatuses,...labBillingStatuses,'']).prefault('').parse(req.query.status);
+  const orderType=z.enum([...labOrderTypes,'']).prefault('').parse(req.query.order_type);
+  const detailFilters=z.object({bill_id:z.string().trim().max(150).prefault(''),uhid:z.string().trim().max(150).prefault(''),name:z.string().trim().max(150).prefault(''),barcode:z.string().trim().max(150).prefault(''),department:z.string().trim().max(150).prefault(''),test_id:z.string().trim().max(150).prefault(''),result_status:z.enum(['','Pending','In Progress','Partially Completed','Completed']).prefault('')}).parse(req.query);
 const hasDetails=Object.values(detailFilters).some(Boolean);
-const pageSize=z.coerce.number().int().min(1).max(100).default(50).parse(req.query.page_size);
+const pageSize=z.coerce.number().int().min(1).max(100).prefault(50).parse(req.query.page_size);
   const stages:Record<string,string>={"Sample Collection":`AND ${labSampleQueueSql}`,"Lab Billing":"AND lower(w.kind)='pos'","Results":"AND w.data->>'collected_at' IS NOT NULL","Reports":"AND w.data->>'result_status' IN ('Completed','Partially Completed') AND w.data->'doctor_approval' IS NOT NULL AND w.data->'doctor_approval'<>'null'::jsonb","Verification":"AND w.data->>'result_status' IN ('Completed','Partially Completed')"};
-  const billedOnly=z.enum(["0","1"]).default("0").parse(req.query.billed_only);
-  const summaryOnly=z.enum(['0','1']).default('0').parse(req.query.summary_only)==='1';
-  const includeSummary=summaryOnly||z.enum(['0','1']).default('1').parse(req.query.include_summary)==='1';
+  const billedOnly=z.enum(["0","1"]).prefault("0").parse(req.query.billed_only);
+  const summaryOnly=z.enum(['0','1']).prefault('0').parse(req.query.summary_only)==='1';
+  const includeSummary=summaryOnly||z.enum(['0','1']).prefault('1').parse(req.query.include_summary)==='1';
   const extra=labOrderFilterSql({from,to,status,orderType},billing);
   const detailSql="AND ($9::jsonb IS NOT NULL)\nAND (coalesce($9->>'bill_id','')='' OR strpos(lower(concat_ws(' ',f.record_number,w.data->>'bill_number',w.data->>'legacy_opd_id')),lower($9->>'bill_id'))>0)\nAND (coalesce($9->>'uhid','')='' OR strpos(lower(coalesce(p.medical_record_number,w.data->>'medical_record_number','')),lower($9->>'uhid'))>0)\nAND (coalesce($9->>'name','')='' OR strpos(lower(concat_ws(' ',p.first_name,p.last_name,w.data->>'customer_name')),lower($9->>'name'))>0)\nAND (coalesce($9->>'barcode','')='' OR EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(w.data->'barcodes','[]'::jsonb)) bc WHERE strpos(lower(bc->>'value'),lower($9->>'barcode'))>0) OR EXISTS (SELECT 1 FROM jsonb_array_elements(coalesce(w.data->'sample_records','[]'::jsonb)) sr WHERE strpos(lower(concat_ws(' ',sr->>'barcode',sr->>'barcode_id',sr->>'barcode_no',sr->>'bar_code')),lower($9->>'barcode'))>0))\nAND (coalesce($9->>'result_status','')='' OR coalesce(w.data->>'result_status','Pending')=$9->>'result_status')\nAND ((coalesce($9->>'test_id','')='' AND coalesce($9->>'department','')='') OR EXISTS (\nSELECT 1 FROM jsonb_array_elements(coalesce(w.data->'tests','[]'::jsonb)) t\nLEFT JOIN hospital_diagnostic_masters m ON m.id::text=t->>'test_id' AND m.tenant_id=w.tenant_id\nWHERE (coalesce($9->>'test_id','')='' OR t->>'test_id'=$9->>'test_id')\nAND (coalesce($9->>'department','')='' OR coalesce((SELECT c.name FROM hospital_diagnostic_masters c WHERE c.id::text=m.data->>'category_id' AND c.tenant_id=w.tenant_id),m.data->>'department',m.data->>'department_name',t->>'department','')=$9->>'department')))";
   const filters=`w.tenant_id=$1 AND w.workspace='laboratory' AND lower(w.kind) IN ('orders','pos','sample collection','results','verification','reports') ${stages[stage]||""} ${billing||billedOnly==="1"?"AND f.id IS NOT NULL":""} AND ($4::uuid IS NULL OR w.branch_id=$4) AND ${labSearchSql(true)} ${extra.sql} ${hasDetails?detailSql:"AND $9::jsonb IS NOT NULL"}`;
@@ -584,17 +584,17 @@ router.post("/lab-own-orders", async (req: Authed, res) => {
     patient_id: z.string().uuid(),
     appointment_id:z.string().uuid().nullable().optional(),
     test_ids: z.array(z.string().uuid()).min(1),
-    referred_by: z.string().uuid().nullable().default(null),
-    referral_partner_id: z.string().uuid().nullable().default(null),
-    collector_id: z.string().uuid().nullable().default(null),
-    refer_pharmacy_id: z.string().uuid().nullable().default(null),
+    referred_by: z.string().uuid().nullable().prefault(null),
+    referral_partner_id: z.string().uuid().nullable().prefault(null),
+    collector_id: z.string().uuid().nullable().prefault(null),
+    refer_pharmacy_id: z.string().uuid().nullable().prefault(null),
     pharmacy_discount_percentage: z.number().finite().min(0).max(100).optional(),
-    center_id: z.string().uuid().nullable().default(null),
-    source: z.string().trim().max(100).default("Self"),
-    urgent: z.boolean().default(false),
-    payment_mode: z.enum(["Cash", "Card", "UPI", "Bank Transfer", "Insurance"]).default("Cash"),
-    paid: z.number().finite().min(0).default(0),
-    discount: z.number().finite().min(0).default(0),
+    center_id: z.string().uuid().nullable().prefault(null),
+    source: z.string().trim().max(100).prefault("Self"),
+    urgent: z.boolean().prefault(false),
+    payment_mode: z.enum(["Cash", "Card", "UPI", "Bank Transfer", "Insurance"]).prefault("Cash"),
+    paid: z.number().finite().min(0).prefault(0),
+    discount: z.number().finite().min(0).prefault(0),
   }).parse(req.body);
   const a = req.portalUser!, activeWorkspace = workspace(a);
   if (!labCommercialAccess(a))
@@ -933,7 +933,7 @@ async function laboratoryResultRecord(id: string, tenantId: string) {
 
 router.post("/work-items/:id/lab-report-share",async(req:Authed,res)=>{
   const a=req.portalUser!;if(!labCommercialAccess(a))return void res.status(403).json({error:"Laboratory access required"});
-  const body=z.object({pdf:z.string().max(16_000_000),filename:z.string().max(120).default("Lab-Report.pdf"),updated_at:z.string()}).parse(req.body);
+  const body=z.object({pdf:z.string().max(16_000_000),filename:z.string().max(120).prefault("Lab-Report.pdf"),updated_at:z.string()}).parse(req.body);
   let bytes:Buffer;try{bytes=decodeReportPdf(body.pdf);}catch(error){return void res.status(400).json({error:error instanceof Error?error.message:"Invalid report PDF"});}
   await ensureReportShares();const client=await pool.connect();
   try{await client.query("BEGIN");const found=await client.query(`SELECT w.*,f.total,f.paid,f.due,f.status bill_status,md5(jsonb_build_object('results',w.data->'lab_results','approval',w.data->'doctor_approval','technician',w.data->'technician_approval')::text) revision FROM role_work_items w LEFT JOIN finance_records f ON f.id=nullif(w.data->>'bill_id','')::uuid AND f.tenant_id=w.tenant_id WHERE w.id=$1 AND w.tenant_id=$2 AND w.workspace='laboratory' AND ($3::uuid IS NULL OR w.branch_id=$3) FOR UPDATE OF w`,[req.params.id,a.tenantId,a.role==="receptionist"?a.branchId:null]);
@@ -991,7 +991,7 @@ async function createLabNarrative(tests: Array<Record<string, any>>, patientCont
 }
 
 router.patch("/work-items/:id/lab-results", async (req: Authed, res) => {
-  const body = z.object({ updated_at:z.string().datetime().optional(), results: z.array(z.object({ test_id: z.string().uuid().nullable(), parameters: z.array(z.object({ parameter_id: z.string().uuid().nullable().optional(), value: z.string().trim().max(20000), remarks: z.string().trim().max(1000).default("") })) })) }).parse(req.body);
+  const body = z.object({ updated_at:z.string().datetime().optional(), results: z.array(z.object({ test_id: z.string().uuid().nullable(), parameters: z.array(z.object({ parameter_id: z.string().uuid().nullable().optional(), value: z.string().trim().max(20000), remarks: z.string().trim().max(1000).prefault("") })) })) }).parse(req.body);
   const a = req.portalUser!, activeWorkspace = workspace(a);
   if (!["laboratory", "all"].includes(activeWorkspace)) return void res.status(403).json({ error: "Laboratory access required" });
   const record = await laboratoryResultRecord(String(req.params.id), a.tenantId);

@@ -60,11 +60,11 @@ router.put('/plans/:id', async (request,response) => {
   response.json(row);
 });
 router.get('/hospitals', async (request,response) => {
-  const search=z.string().max(150).default('').parse(request.query.search);
+  const search=z.string().max(150).prefault('').parse(request.query.search);
   const filter={deleted_at:null};
   if(search){const pattern=escapeSearch(search);filter.$or=[{name:{$regex:pattern,$options:'i'}},{code:{$regex:pattern,$options:'i'}}];}
   if(request.query.status)filter.status=z.enum(['active','trial','suspended','inactive']).parse(request.query.status);
-  const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),limit=z.coerce.number().int().min(1).max(100).default(10).parse(request.query.limit);
+  const page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(request.query.page),limit=z.coerce.number().int().min(1).max(100).prefault(10).parse(request.query.limit);
   const rows=await db.collection('hospitals').find(filter,{projection:{_id:0}}).sort({created_at:-1}).skip((page-1)*limit).limit(limit).toArray();
   for(const row of rows){
     row.branch_count=await db.collection('branches').countDocuments({tenant_id:row.id});

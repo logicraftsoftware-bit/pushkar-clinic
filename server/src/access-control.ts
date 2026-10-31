@@ -314,9 +314,9 @@ router.post("/roles", async (req: Req, res) => {
       id: z.string().uuid().optional(),
       name: z.string().trim().min(2).transform(roleLabel),
       code: z.string().trim().min(2).transform(value => value.toUpperCase().replace(/\s+/g, '_')),
-      description: z.string().default(""),
-      role_level: z.coerce.number().default(50),
-      status: z.string().default("Active"),
+      description: z.string().prefault(""),
+      role_level: z.coerce.number().prefault(50),
+      status: z.string().prefault("Active"),
       permissions: z.array(z.string()),
     })
     .parse(req.body);

@@ -38,7 +38,7 @@ async function filters(req:Request){
   return{auth,sql:`tenant_id=$1 AND ($2::uuid[] IS NULL OR branch_id=ANY($2) OR branch_id IS NULL) AND ($4::text[] IS NULL OR module=ANY($4) OR actor_id=$3)`,args:[auth.tenantId,branches,auth.sub,modules] as unknown[]};
 }
 router.get('/',async(req,res)=>{
-  const scope=await filters(req),search=z.string().trim().max(150).default('').parse(req.query.search),module=z.string().max(100).default('').parse(req.query.module),record=z.string().max(250).default('').parse(req.query.record),page=z.coerce.number().int().min(1).max(100000).default(1).parse(req.query.page);
+  const scope=await filters(req),search=z.string().trim().max(150).prefault('').parse(req.query.search),module=z.string().max(100).prefault('').parse(req.query.module),record=z.string().max(250).prefault('').parse(req.query.record),page=z.coerce.number().int().min(1).max(100000).prefault(1).parse(req.query.page);
   const args=[...scope.args,search,module,record],n=scope.args.length;
   const where=`${scope.sql} AND ($${n+1}='' OR concat_ws(' ',actor_name,record_id,record_label,ip_address,action) ILIKE '%'||$${n+1}||'%') AND ($${n+2}='' OR module=$${n+2}) AND ($${n+3}='' OR record_id=$${n+3})`;
   const [rows,count,modules]=await Promise.all([

@@ -92,18 +92,18 @@ router.get("/lookups", async (req: R, res) => {
 const claim = z.object({
   patient_id: z.string().uuid(),
   insurance_company: z.string().min(1),
-  tpa: z.string().default(""),
-  policy_number: z.string().default(""),
-  policy_validity: z.string().optional().default(""),
-  reference_type: z.string().default(""),
-  reference_number: z.string().default(""),
-  claimed_amount: z.coerce.number().default(0),
-  approved_amount: z.coerce.number().default(0),
-  settled_amount: z.coerce.number().default(0),
-  submission_date: z.string().optional().default(""),
-  status: z.string().default("Draft"),
-  documents: z.string().default(""),
-  remarks: z.string().default(""),
+  tpa: z.string().prefault(""),
+  policy_number: z.string().prefault(""),
+  policy_validity: z.string().optional().prefault(""),
+  reference_type: z.string().prefault(""),
+  reference_number: z.string().prefault(""),
+  claimed_amount: z.coerce.number().prefault(0),
+  approved_amount: z.coerce.number().prefault(0),
+  settled_amount: z.coerce.number().prefault(0),
+  submission_date: z.string().optional().prefault(""),
+  status: z.string().prefault("Draft"),
+  documents: z.string().prefault(""),
+  remarks: z.string().prefault(""),
 });
 router.get("/insurance", async (req: R, res) => {
   const r = await pool.query(
@@ -169,12 +169,12 @@ router.put("/insurance/:id", async (req: R, res) => {
   res.json(r.rows[0]);
 });
 const hr = z.object({
-  employee_id: z.string().optional().default(""),
-  branch_id: z.string().optional().default(""),
-  record_date: z.string().optional().default(""),
-  status: z.string().default("Active"),
-  amount: z.coerce.number().default(0),
-  data: z.record(z.string(), z.unknown()).default({}),
+  employee_id: z.string().optional().prefault(""),
+  branch_id: z.string().optional().prefault(""),
+  record_date: z.string().optional().prefault(""),
+  status: z.string().prefault("Active"),
+  amount: z.coerce.number().prefault(0),
+  data: z.record(z.string(), z.unknown()).prefault({}),
 });
 router.get("/hr/:kind", async (req: R, res) => {
   const r = await pool.query(

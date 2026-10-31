@@ -152,7 +152,7 @@ router.put('/ipd/:id',requirePermission('ipd.update'),async(request,response)=>{
 });
 router.put('/ipd/:id/transfer',requirePermission('ipd.update'),async(request,response)=>{
   const admissionId=uuid.parse(request.params.id),optional=z.union([uuid,z.literal(''),z.null()]).optional().transform(value=>value||null);
-  const input=z.object({transfer_type:z.string().min(1).max(100),department_id:optional,consultant_doctor_id:optional,ward_id:optional,room_id:optional,bed_id:optional,notes:z.string().max(2000).default('')}).parse(request.body);
+  const input=z.object({transfer_type:z.string().min(1).max(100),department_id:optional,consultant_doctor_id:optional,ward_id:optional,room_id:optional,bed_id:optional,notes:z.string().max(2000).prefault('')}).parse(request.body);
   const saved=await transaction(async session=>{
     const filter=await scopeFor(response,{id:admissionId,active:true},session),row=await db.collection('ipd_admissions').findOne(filter,{session});
     if(!row)throw failure('Active admission not found',404);
@@ -173,7 +173,7 @@ router.put('/ipd/:id/transfer',requirePermission('ipd.update'),async(request,res
   });response.json(saved);
 });
 router.put('/ipd/:id/status',requirePermission('ipd.update'),async(request,response)=>{
-  const identity=uuid.parse(request.params.id),body=z.object({status:z.enum(['Admitted','Under Treatment','Discharge Requested','Discharged','Cancelled']),reason:z.string().trim().max(2000).default('')}).parse(request.body);
+  const identity=uuid.parse(request.params.id),body=z.object({status:z.enum(['Admitted','Under Treatment','Discharge Requested','Discharged','Cancelled']),reason:z.string().trim().max(2000).prefault('')}).parse(request.body);
   if(['Discharged','Discharge Requested'].includes(body.status))throw failure('Use the doctor recommendation, nursing clearance and Reception Discharge workflow.',409);
   await transaction(async session=>{
     const filter=await scopeFor(response,{id:identity},session),row=await db.collection('ipd_admissions').findOne(filter,{session});if(!row)throw failure('Admission not found.',404);

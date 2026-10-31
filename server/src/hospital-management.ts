@@ -215,7 +215,7 @@ async function validateRoomLocation(body: Record<string,unknown>, tenantId:strin
 
 const bedMasterKind = z.enum(['type','group','floor'])
 const bedMasterBody = z.object({
-  name:z.string().trim().min(1), description:z.string().optional().default(''), color:z.string().optional().nullable(),
+  name:z.string().trim().min(1), description:z.string().optional().prefault(''), color:z.string().optional().nullable(),
   floor_id:z.string().uuid().optional().nullable(),
 })
 async function validateBedFloor(tenantId:string, floorId:string|null|undefined) {
@@ -274,8 +274,8 @@ router.put('/profile', async (request: AuthedRequest, response) => {
 const chargeKind = z.enum(['charge','category','type','tax','unit'])
 const chargeMasterBody = z.object({
   name:z.string().trim().min(1), parent_id:z.string().uuid().nullable().optional(),
-  percentage:z.coerce.number().min(0).max(100).nullable().optional(), modules:z.array(z.string()).optional().default([]),
-  data:z.record(z.string(),z.unknown()).optional().default({}),
+  percentage:z.coerce.number().min(0).max(100).nullable().optional(), modules:z.array(z.string()).optional().prefault([]),
+  data:z.record(z.string(),z.unknown()).optional().prefault({}),
 })
 async function validateChargeReferences(tenantId:string, body:z.infer<typeof chargeMasterBody>) {
   const ids=[body.parent_id,...['charge_type_id','category_id','unit_type_id','tax_category_id'].map(key=>body.data[key])]
@@ -353,7 +353,7 @@ router.delete('/operation-masters/:kind/:id',async(request:AuthedRequest,respons
   if(!result.rows[0]){response.status(404).json({error:'Record not found'});return}response.status(204).end()
 })
 const pharmacyKind=z.enum(['category','supplier','dosage','interval','duration','unit','company','group','medicine'])
-const pharmacyBody=z.object({name:z.string().trim().min(1),data:z.record(z.string(),z.unknown()).optional().default({})})
+const pharmacyBody=z.object({name:z.string().trim().min(1),data:z.record(z.string(),z.unknown()).optional().prefault({})})
 async function validatePharmacyReferences(tenantId:string,body:z.infer<typeof pharmacyBody>){
   const refs=[['category_id','category'],['dosage_id','dosage'],['interval_id','interval'],['duration_id','duration'],['unit_id','unit'],['company_id','company'],['group_id','group']] as const
   for(const [key,kind] of refs){const id=body.data[key];if(!id)continue;const valid=await pool.query(`SELECT 1 FROM hospital_pharmacy_masters WHERE id=$1 AND tenant_id=$2 AND kind=$3`,[id,tenantId,kind]);if(!valid.rowCount)throw new Error(`Invalid medicine ${kind}`)}
@@ -383,7 +383,7 @@ router.get('/diagnostic-branches',async(request:AuthedRequest,response)=>{
   response.json(result.rows);
 });
 const diagnosticDomain=z.enum(['pathology','blood','symptoms']),diagnosticKind=z.enum(['test','category','unit','parameter','product','type','head','specimen','container','method','approver'])
-const diagnosticBody=z.object({name:z.string().trim().min(1),data:z.record(z.string(),z.unknown()).optional().default({})})
+const diagnosticBody=z.object({name:z.string().trim().min(1),data:z.record(z.string(),z.unknown()).optional().prefault({})})
 async function validateDiagnosticReferences(tenantId:string,domain:string,body:z.infer<typeof diagnosticBody>){if(domain==='pathology'){const ids=validateLabPrices(body.data);if(ids.length){const branches=await pool.query('SELECT count(*)::int count FROM branches WHERE tenant_id=$1 AND id=ANY($2::uuid[])',[tenantId,ids]);if(branches.rows[0].count!==ids.length)throw new Error('Invalid laboratory price branch')}}for(const [key,kind] of [['unit_id','unit'],['type_id','type'],['category_id','category']] as const){const id=body.data[key];if(!id)continue;const valid=await pool.query(`SELECT 1 FROM hospital_diagnostic_masters WHERE id=$1 AND tenant_id=$2 AND domain=$3 AND kind=$4`,[id,tenantId,domain,kind]);if(!valid.rowCount)throw new Error(`Invalid ${kind} selection`)}for(const [key,kind] of [['billing_category_id','category'],['charge_id','charge']] as const){const id=body.data[key];if(!id)continue;const valid=await pool.query(`SELECT 1 FROM hospital_charge_masters WHERE id=$1 AND tenant_id=$2 AND kind=$3`,[id,tenantId,kind]);if(!valid.rowCount)throw new Error(`Invalid pathology ${kind} selection`)}const containerIds=Array.isArray(body.data.container_ids)?body.data.container_ids:[];if(containerIds.length){const ids=z.array(z.string().uuid()).parse(containerIds);const valid=await pool.query(`SELECT count(*)::int count FROM hospital_diagnostic_masters WHERE tenant_id=$1 AND domain=$2 AND kind='container' AND id=ANY($3::uuid[])`,[tenantId,domain,ids]);if(valid.rows[0].count!==new Set(ids).size)throw new Error('Invalid Vaccu selection')}const parameterIds=Array.isArray(body.data.parameter_ids)?body.data.parameter_ids:[];if(parameterIds.length){const valid=await pool.query(`SELECT count(*)::int count FROM hospital_diagnostic_masters WHERE tenant_id=$1 AND domain=$2 AND kind='parameter' AND id=ANY($3::uuid[])`,[tenantId,domain,parameterIds]);if(valid.rows[0].count!==new Set(parameterIds).size)throw new Error('Invalid pathology parameter selection')}}
 router.get('/diagnostic-masters/:domain/:kind',async(request:AuthedRequest,response)=>{const domain=diagnosticDomain.parse(request.params.domain),kind=diagnosticKind.parse(request.params.kind);const result=await pool.query(`SELECT m.*,b.name created_branch_name FROM hospital_diagnostic_masters m LEFT JOIN branches b ON b.tenant_id=m.tenant_id AND b.id::text=m.data->>'created_branch_id' WHERE m.tenant_id=$1 AND m.domain=$2 AND m.kind=$3 ORDER BY m.created_at DESC`,[request.portalUser!.tenantId,domain,kind]);response.json(result.rows)})
 router.post('/diagnostic-masters/:domain/:kind',async(request:AuthedRequest,response)=>{const domain=diagnosticDomain.parse(request.params.domain),kind=diagnosticKind.parse(request.params.kind),body=diagnosticBody.parse(request.body),tenantId=request.portalUser!.tenantId;delete body.data.created_branch_id;if(domain==='pathology'&&kind==='test')body.data.test_type=diagnosticTestType.parse(body.data.test_type);if(domain==='pathology'&&kind==='test')body.data.created_branch_id=request.portalUser!.branchId||null;await validateDiagnosticReferences(tenantId,domain,body);const result=await pool.query(`INSERT INTO hospital_diagnostic_masters(tenant_id,domain,kind,name,data) VALUES($1,$2,$3,$4,$5) RETURNING *`,[tenantId,domain,kind,body.name,body.data]);response.status(201).json(result.rows[0])})

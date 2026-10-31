@@ -9,7 +9,7 @@ import {hospitalDay} from './finance-ledger.mjs';
 const router=Router();export const pharmacyMasters=Router();
 const uuid=z.string().uuid(),name=z.string().trim().min(1).max(200),money=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01),quantity=z.coerce.number().finite().nonnegative().max(99999999).refine(value=>Math.abs(value*1000-Math.round(value*1000))<0.00001),percent=z.coerce.number().min(0).max(100).multipleOf(0.01);
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
-const masterKind=z.enum(['category','supplier','dosage','interval','duration','unit','company','group','medicine']),masterInput=z.object({name,data:z.record(z.string(),z.unknown()).default({})});
+const masterKind=z.enum(['category','supplier','dosage','interval','duration','unit','company','group','medicine']),masterInput=z.object({name,data:z.record(z.string(),z.unknown()).prefault({})});
 async function serialize(tenant,session){await db.collection('workflow_locks').updateOne({_id:`${tenant}:inventory`},{$inc:{version:1}},{session,upsert:true});}
 async function saveMaster(response,kind,body,identity){
   const tenant_id=response.locals.account.tenant_id;
@@ -37,14 +37,14 @@ async function removeMaster(response,kind,identity){
 }
 pharmacyMasters.delete('/pharmacy-masters/:kind/:id',requirePermission('pharmacy.inventory.manage'),async(request,response)=>{await removeMaster(response,masterKind.parse(request.params.kind),uuid.parse(request.params.id));response.status(204).end();});
 router.use('/pharmacy',(request,response,next)=>requirePermission(request.method==='GET'?'inventory.view':'inventory.manage')(request,response,next));
-const supplier=z.object({name,contact_person:z.string().max(200).default(''),phone:z.string().max(30).default(''),email:z.union([z.string().email(),z.literal('')]).default(''),drug_license_number:z.string().max(200).default(''),gstin:z.string().max(100).default(''),address:z.string().max(2000).default(''),status:z.enum(['Active','Inactive']).default('Active'),notes:z.string().max(4000).default('')});
+const supplier=z.object({name,contact_person:z.string().max(200).prefault(''),phone:z.string().max(30).prefault(''),email:z.union([z.string().email(),z.literal('')]).prefault(''),drug_license_number:z.string().max(200).prefault(''),gstin:z.string().max(100).prefault(''),address:z.string().max(2000).prefault(''),status:z.enum(['Active','Inactive']).prefault('Active'),notes:z.string().max(4000).prefault('')});
 function supplierMaster(body){const {name,...data}=body;return {name,data:{...data,contact_person_name:data.contact_person,supplier_contact:data.phone,contact_person_phone:data.phone}};}
 router.get('/pharmacy/suppliers',async(_request,response)=>response.json(await db.collection('hospital_pharmacy_masters').find({tenant_id:response.locals.account.tenant_id,kind:'supplier'},{projection:{_id:0}}).sort({name:1}).toArray()));
 router.post('/pharmacy/suppliers',async(request,response)=>response.status(201).json(await saveMaster(response,'supplier',supplierMaster(supplier.parse(request.body)))));
 router.put('/pharmacy/suppliers/:id',async(request,response)=>response.json(await saveMaster(response,'supplier',supplierMaster(supplier.parse(request.body)),uuid.parse(request.params.id))));
 router.delete('/pharmacy/suppliers/:id',async(request,response)=>{await removeMaster(response,'supplier',uuid.parse(request.params.id));response.status(204).end();});
 router.post('/pharmacy/medicines',async(request,response)=>{
-  const body=z.object({name,hsn_code:z.string().max(100).default(''),tax:percent.default(0),packing_type:z.string().max(100).default('Box'),units_per_strip:quantity.refine(value=>value>0).optional(),volume_ml:quantity.optional()}).parse(request.body),{name:medicineName,...data}=body;
+  const body=z.object({name,hsn_code:z.string().max(100).prefault(''),tax:percent.prefault(0),packing_type:z.string().max(100).prefault('Box'),units_per_strip:quantity.refine(value=>value>0).optional(),volume_ml:quantity.optional()}).parse(request.body),{name:medicineName,...data}=body;
   response.status(201).json({...await saveMaster(response,'medicine',{name:medicineName,data}),price:0});
 });
 router.get('/pharmacy/lookups',async(_request,response)=>{
@@ -52,7 +52,7 @@ router.get('/pharmacy/lookups',async(_request,response)=>{
   response.json({medicines:rows.filter(row=>row.kind==='medicine'),suppliers:rows.filter(row=>row.kind==='supplier'),branches:await db.collection('branches').find({tenant_id,is_active:true,...(ids===null?{}:{id:{$in:ids}})},{projection:{_id:0,id:1,name:1}}).toArray()});
 });
 function expiry(value){if(/^\d{4}-\d{2}$/.test(value)){const [year,month]=value.split('-').map(Number);if(month<1||month>12)throw failure('Invalid expiry month.');return `${value}-${String(new Date(Date.UTC(year,month,0)).getUTCDate()).padStart(2,'0')}`;}return z.string().date().parse(value);}
-const purchaseInput=z.object({supplier_id:uuid,branch_id:z.union([uuid,z.literal('')]).optional(),invoice_number:name,purchase_date:z.string().date(),payment_status:z.enum(['Paid','Unpaid','Partially Paid']).default('Unpaid'),notes:z.string().max(4000).default(''),request_id:uuid.optional(),items:z.array(z.object({medicine_id:uuid,batch_number:name,manufacturing_date:z.union([z.string().date(),z.literal('')]).default(''),expiry_date:z.string().transform(expiry),quantity:quantity.refine(value=>value>0),free_quantity:quantity.default(0),purchase_rate:money,mrp:money,gst_percent:percent.default(0),discount_percent:percent.default(0)})).min(1).max(200)});
+const purchaseInput=z.object({supplier_id:uuid,branch_id:z.union([uuid,z.literal('')]).optional(),invoice_number:name,purchase_date:z.string().date(),payment_status:z.enum(['Paid','Unpaid','Partially Paid']).prefault('Unpaid'),notes:z.string().max(4000).prefault(''),request_id:uuid.optional(),items:z.array(z.object({medicine_id:uuid,batch_number:name,manufacturing_date:z.union([z.string().date(),z.literal('')]).prefault(''),expiry_date:z.string().transform(expiry),quantity:quantity.refine(value=>value>0),free_quantity:quantity.prefault(0),purchase_rate:money,mrp:money,gst_percent:percent.prefault(0),discount_percent:percent.prefault(0)})).min(1).max(200)});
 async function enrich(response,row){
   const tenant_id=row.tenant_id,supplier=row.data?.supplier_id?await db.collection('hospital_pharmacy_masters').findOne({tenant_id,id:row.data.supplier_id,kind:'supplier'}):null,branch=await db.collection('branches').findOne({tenant_id,id:row.branch_id});
   row.supplier_name=supplier?.name??'';row.branch_name=branch?.name??'';

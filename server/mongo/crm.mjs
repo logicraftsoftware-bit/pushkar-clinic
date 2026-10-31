@@ -23,7 +23,7 @@ crmAdmin.get('/crm-clinics',enabled,async(_request,response)=>{
   for(const clinic of parsed.data){const connection=connections.find(row=>row.clinic_external_id===clinic.id),hospital=connection?await db.collection('hospitals').findOne({id:connection.tenant_id},{projection:{name:1}}):null;rows.push({...clinic,connectedTenantId:connection?.tenant_id??null,connectedHospitalName:hospital?.name??null});}response.json(rows);
 });
 crmAdmin.post('/crm-connections',enabled,async(request,response)=>{
-  const body=z.object({tenantId:z.string().uuid(),clinicExternalId:z.string().trim().min(1).max(200),clinicName:z.string().trim().max(200).default('')}).parse(request.body),key='cfc_'+randomBytes(32).toString('base64url');
+  const body=z.object({tenantId:z.string().uuid(),clinicExternalId:z.string().trim().min(1).max(200),clinicName:z.string().trim().max(200).prefault('')}).parse(request.body),key='cfc_'+randomBytes(32).toString('base64url');
   const row=await transaction(async session=>{
     const hospital=await db.collection('hospitals').findOne({id:body.tenantId,deleted_at:null},{session});if(!hospital)throw failure('Clinic not found.',404);
     const old=await db.collection('call_centre_crm_connections').findOne({tenant_id:body.tenantId},{session});

@@ -72,7 +72,7 @@ receptionDischarge.post('/discharge-requests/:id/complete',requirePermission('ip
   });response.status(204).end();
 });
 nursingTasks.patch('/nursing-station/tasks/:id',requirePermission('ipd.update'),async(request,response)=>{
-  const identity=uuid.parse(request.params.id),body=z.object({status:z.enum(['Completed','Acknowledged','Discontinued']),note:z.string().max(4000).default('')}).parse(request.body);
+  const identity=uuid.parse(request.params.id),body=z.object({status:z.enum(['Completed','Acknowledged','Discontinued']),note:z.string().max(4000).prefault('')}).parse(request.body);
   const row=await transaction(async session=>{
     const item=await db.collection('role_work_items').findOne(await scopeFor(response,{id:identity,workspace:'nurse'},session),{session});if(!item)throw failure('Nursing task not found.',404);
     const admission=await nursingAdmission(response,item.data.admission_id,item.patient_id,session);

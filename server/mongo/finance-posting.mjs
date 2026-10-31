@@ -9,7 +9,7 @@ import {syncAdmissionInvoice,financialNumber,hospitalDay} from './finance-ledger
 const router=Router(),uuid=z.string().uuid(),kind=z.enum(['invoices','payments','expenses','refunds']);
 const nullable=z.union([uuid,z.literal(''),z.null()]).optional().transform(value=>value||null);
 const money=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
-const input=z.object({branch_id:nullable,patient_id:nullable,invoice_id:nullable,amount:money.default(0),total:money.default(0),paid:money.default(0),record_date:z.union([z.string().date(),z.literal('')]).optional(),data:z.record(z.string(),z.unknown()).default({}),request_id:uuid.optional(),updated_at:z.string().datetime().optional()});
+const input=z.object({branch_id:nullable,patient_id:nullable,invoice_id:nullable,amount:money.prefault(0),total:money.prefault(0),paid:money.prefault(0),record_date:z.union([z.string().date(),z.literal('')]).optional(),data:z.record(z.string(),z.unknown()).prefault({}),request_id:uuid.optional(),updated_at:z.string().datetime().optional()});
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 async function permission(response,code,session) {
   const granted=await permissionsFor(response.locals.account,session);

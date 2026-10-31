@@ -22,8 +22,8 @@ router.get('/diagnostic-masters/:domain/:kind',async(request,response)=>{
 });
 async function save(request,response){
   const domain=domainInput.parse(request.params.domain),kind=kindInput.parse(request.params.kind),recordId=request.params.id?z.string().uuid().parse(request.params.id):randomUUID();
-  const body=z.object({name:z.string().trim().min(1).max(200),data:z.record(z.string(),z.unknown()).default({})}).parse(request.body),tenant_id=response.locals.account.tenant_id;
-  if(domain==='pathology'&&kind==='test')body.data.test_type=z.enum(['Pathology','Radiology','Neurology']).default('Pathology').parse(body.data.test_type);
+  const body=z.object({name:z.string().trim().min(1).max(200),data:z.record(z.string(),z.unknown()).prefault({})}).parse(request.body),tenant_id=response.locals.account.tenant_id;
+  if(domain==='pathology'&&kind==='test')body.data.test_type=z.enum(['Pathology','Radiology','Neurology']).prefault('Pathology').parse(body.data.test_type);
   delete body.data.created_branch_id;
   const result=await transaction(async session=>{
     const existing=request.params.id?await db.collection('hospital_diagnostic_masters').findOne({tenant_id,id:recordId,domain,kind},{session}):null;
@@ -36,7 +36,7 @@ async function save(request,response){
     for(const [field,type] of [['unit_id','unit'],['type_id','type'],['category_id','category']])if(body.data[field]&&!await db.collection('hospital_diagnostic_masters').findOne({tenant_id,id:z.string().uuid().parse(body.data[field]),domain,kind:type},{session}))throw Object.assign(new Error(`Invalid ${type} selection`),{status:400});
     for(const [field,type] of [['billing_category_id','category'],['charge_id','charge']])if(body.data[field]&&!await db.collection('hospital_charge_masters').findOne({tenant_id,id:z.string().uuid().parse(body.data[field]),kind:type},{session}))throw Object.assign(new Error(`Invalid billing ${type} selection`),{status:400});
     for(const [field,type] of [['parameter_ids','parameter'],['container_ids','container']]){
-      const ids=z.array(z.string().uuid()).max(1000).default([]).parse(body.data[field]);
+      const ids=z.array(z.string().uuid()).max(1000).prefault([]).parse(body.data[field]);
       if(ids.length!==new Set(ids).size)throw Object.assign(new Error(`Duplicate ${type} selections`),{status:400});
       if(ids.length&&await db.collection('hospital_diagnostic_masters').countDocuments({tenant_id,id:{$in:ids},domain,kind:type},{session})!==ids.length)throw Object.assign(new Error(`Invalid ${type} selections`),{status:400});
     }

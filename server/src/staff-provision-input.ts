@@ -9,8 +9,8 @@ export const provisionRoles={
 const account=z.object({
   name:z.string().trim().min(1).max(100),
   email:z.string().trim().email().transform(value=>value.toLowerCase()),
-  role:z.enum(['Receptionist','Lab Technician','Accountant','Pharmacist']).default('Receptionist'),
-  replace_role:z.boolean().default(false),
+  role:z.enum(['Receptionist','Lab Technician','Accountant','Pharmacist']).prefault('Receptionist'),
+  replace_role:z.boolean().prefault(false),
   branch:z.string().trim().min(1).optional(),
   branches:z.array(z.string().trim().min(1)).min(1).optional(),
 }).transform(value=>({...value,branches:[...new Set((value.branches??(value.branch?[value.branch]:[])).map(branch=>branch.toLowerCase()))]}))

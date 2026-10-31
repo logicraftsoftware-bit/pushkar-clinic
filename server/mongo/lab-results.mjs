@@ -32,7 +32,7 @@ router.get('/work-items/:id/lab-results',async(request,response)=>{
   }
   response.json(record);
 });
-const resultsInput=z.object({updated_at:z.string().datetime(),definition_revision:z.string().regex(/^[a-f0-9]{64}$/).optional(),results:z.array(z.object({test_id:uuid,parameters:z.array(z.object({parameter_id:uuid.nullable().optional(),value:z.string().trim().max(20000),remarks:z.string().trim().max(1000).default('')})).max(1000)})).min(1).max(200)});
+const resultsInput=z.object({updated_at:z.string().datetime(),definition_revision:z.string().regex(/^[a-f0-9]{64}$/).optional(),results:z.array(z.object({test_id:uuid,parameters:z.array(z.object({parameter_id:uuid.nullable().optional(),value:z.string().trim().max(20000),remarks:z.string().trim().max(1000).prefault('')})).max(1000)})).min(1).max(200)});
 router.patch('/work-items/:id/lab-results',requirePermission('lab.result.create'),async(request,response)=>{
   const body=resultsInput.parse(request.body),id=uuid.parse(request.params.id);
   const saved=await transaction(async session=>{
@@ -65,7 +65,7 @@ router.get('/lab/pathologists',requirePermission('lab.result.verify'),async(_req
   response.json({rows:profiles.map(row=>({id:row.id,name:[row.first_name,row.middle_name,row.last_name].filter(Boolean).join(' '),has_signature:Boolean(row.professional?.digital_signature)})),self_pathologist_id:own?.id??null});
 });
 router.patch('/lab/orders/:id/process',requirePermission('lab.result.create'),async(request,response)=>{
-  const body=z.object({action:z.enum(['receive','accept','reject']),note:z.string().trim().max(2000).default('')}).parse(request.body),id=uuid.parse(request.params.id);
+  const body=z.object({action:z.enum(['receive','accept','reject']),note:z.string().trim().max(2000).prefault('')}).parse(request.body),id=uuid.parse(request.params.id);
   if(body.action==='reject'&&!body.note)throw failure('Enter the sample rejection reason.',400);
   const state={receive:'Received',accept:'Accepted',reject:'Rejected'}[body.action];
   await transaction(async session=>{
@@ -76,7 +76,7 @@ router.patch('/lab/orders/:id/process',requirePermission('lab.result.create'),as
     await writeAudit(response,'lab_sample_processed',id,session,{action:body.action,note:body.note});
   });response.json({status:state});
 });
-const approvalInput=z.object({stage:z.enum(['doctor','technician','return','disapprove']),updated_at:z.string().datetime().optional(),test_ids:z.array(uuid).max(300).default([]),pathologist_ids:z.array(uuid).max(6).default([]),test_pathologists:z.record(uuid,uuid).optional(),note:z.string().trim().max(2000).default('')});
+const approvalInput=z.object({stage:z.enum(['doctor','technician','return','disapprove']),updated_at:z.string().datetime().optional(),test_ids:z.array(uuid).max(300).prefault([]),pathologist_ids:z.array(uuid).max(6).prefault([]),test_pathologists:z.record(uuid,uuid).optional(),note:z.string().trim().max(2000).prefault('')});
 router.patch('/lab/orders/:id/approve',async(request,response)=>{
   const body=approvalInput.parse(request.body),id=uuid.parse(request.params.id),granted=await permissionsFor(response.locals.account),permission=body.stage==='return'?'lab.result.create':'lab.result.verify';
   if(!granted.includes('*')&&!granted.includes(permission))throw failure(`Permission required: ${permission}`,403);
