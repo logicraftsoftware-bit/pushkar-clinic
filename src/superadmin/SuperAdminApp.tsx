@@ -311,15 +311,17 @@ function Empty({ text }: { text: string }) {
   );
 }
 
-function LegacyDashboardPage() {
+function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [error, setError] = useState("");
   const load = useCallback(
-    () => adminApi<Dashboard>("/dashboard").then(setData),
+    () => adminApi<Dashboard>("/dashboard").then((result) => { setData(result); setError(""); }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to load dashboard")),
     [],
   );
   useEffect(() => {
     load();
   }, [load]);
+  if (error) return <div role="alert"><p>{error}</p><button className="sa-secondary" onClick={load}>Retry</button></div>;
   if (!data) return <Loading />;
   const metrics = [
     [
@@ -446,103 +448,6 @@ function LegacyDashboardPage() {
               </div>
             ))}
           </div>
-        </Card>
-      </div>
-    </>
-  );
-}
-
-function DashboardPage() {
-  const [refreshing, setRefreshing] = useState(false);
-  const growth = [
-    ["Aug",49,7],["Sep",65,9],["Oct",80,13],["Nov",89,16],["Dec",99,24],["Jan",106,20],
-    ["Feb",108,18],["Mar",110,17],["Apr",116,21],["May",122,24],["Jun",127,26],["Jul",134,27],
-  ].map(([month,total,newHospitals]) => ({ month, total, newHospitals }));
-  const revenue = [
-    ["Aug",3.1,.8],["Sep",5.5,1.2],["Oct",6,1.1],["Nov",6.1,1.3],["Dec",5.9,1.4],["Jan",6.8,1.8],
-    ["Feb",5.2,1.5],["Mar",6.8,1.9],["Apr",6.4,2.1],["May",5.9,2],["Jun",7.7,2.3],["Jul",7.9,2.6],
-  ].map(([month,mrr,newRevenue]) => ({ month, mrr, newRevenue }));
-  const plans = [
-    { name:"Enterprise", value:38, color:"#5146e5" }, { name:"Premium", value:32, color:"#5b7df0" },
-    { name:"Standard", value:27, color:"#35c7a1" }, { name:"Starter", value:11, color:"#f7bf4d" },
-  ];
-  const metrics = [
-    ["Total Hospitals","124","↑ 8.6%","vs last month",Hospital,"blue"],
-    ["Active Subscriptions","108","↑ 4.2%","vs last month",CreditCard,"green"],
-    ["Trial Hospitals","9","↓ 2","ending this week",UserRound,"orange"],
-    ["Monthly Recurring Revenue","₹8.40L","↑ 12.4%","vs last month",CircleDollarSign,"violet"],
-    ["Platform Users","4,850","↑ 7.1%","vs last month",Users,"blue"],
-    ["Renewals / Expiry","12","View upcoming →","next 30 days",CalendarDays,"pink"],
-  ] as const;
-  const modules = [["OPD & Appointments",92],["Billing & Finance",88],["Pharmacy",76],["Laboratory",71],["IPD & Bed Management",64],["Radiology",52],["Patient Portal",47],["AI Features",31]] as const;
-  const usage = [
-    { Icon:Users, label:"Patients Managed", value:"48,450", tone:"blue" },
-    { Icon:CalendarDays, label:"Appointments (This Month)", value:"22,840", tone:"violet" },
-    { Icon:Code2, label:"API Requests", value:"1.8M", tone:"green" },
-    { Icon:Cloud, label:"Storage Used", value:"420 GB", tone:"blue" },
-  ];
-  const activity = [
-    ["NovaCare Hospital was registered","29 Jul 2026, 06:57 PM","green"],
-    ["Enterprise subscription activated for NovaCare Hospital","29 Jul 2026, 06:31 PM","blue"],
-    ["CityCare Hospital upgraded to Premium plan","29 Jul 2026, 06:12 PM","violet"],
-    ["Payment received from HealthPlus Hospital","29 Jul 2026, 04:48 PM","green"],
-    ["Sunrise Hospital storage usage crossed 75%","29 Jul 2026, 02:21 PM","red"],
-  ];
-  const refresh = () => {
-    setRefreshing(true);
-    window.setTimeout(() => setRefreshing(false), 800);
-  };
-  return (
-    <>
-      <PageHead title="Welcome back, Super Admin" text="Here's what's happening with your platform today."
-        action={<button className="sa-secondary" onClick={refresh}><RefreshCw className={refreshing ? "spin" : ""} size={16}/> Refresh</button>} />
-      <div className="sa-metrics sa-metrics-six">
-        {metrics.map(([label,value,change,help,Icon,tone]) => <Card key={label} className="sa-metric">
-          <div className={`metric-icon ${tone}`}><Icon/></div><span>{label}</span><strong>{value}</strong>
-          <small><b className={change.includes("↓") ? "down" : ""}>{change}</b> {help}</small>
-        </Card>)}
-      </div>
-      <div className="sa-dashboard-grid sa-primary-charts">
-        <Card><div className="sa-cardhead"><div><h2>Hospital Growth</h2><p>Registrations over time</p></div><select className="dash-select"><option>12 Months</option></select></div>
-          <div className="sa-chart"><ResponsiveContainer><AreaChart data={growth}>
-            <defs><linearGradient id="growth2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#635bff" stopOpacity=".2"/><stop offset="1" stopColor="#635bff" stopOpacity="0"/></linearGradient></defs>
-            <CartesianGrid vertical={false} stroke="#e8edf5" strokeDasharray="4 4"/><XAxis dataKey="month" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip/><Legend verticalAlign="top" height={34}/>
-            <Area name="Total Hospitals" dataKey="total" type="monotone" stroke="#635bff" strokeWidth={2.5} fill="url(#growth2)"/><Area name="New Hospitals" dataKey="newHospitals" type="monotone" stroke="#36c9a2" strokeWidth={2} fill="transparent"/>
-          </AreaChart></ResponsiveContainer></div>
-        </Card>
-        <Card><div className="sa-cardhead"><div><h2>Subscription Revenue</h2><p>MRR over time</p></div><select className="dash-select"><option>12 Months</option></select></div>
-          <div className="sa-chart"><ResponsiveContainer><BarChart data={revenue}>
-            <CartesianGrid vertical={false} stroke="#e8edf5" strokeDasharray="4 4"/><XAxis dataKey="month" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}L`}/><Tooltip/><Legend verticalAlign="top" height={34}/>
-            <Bar name="MRR (₹)" dataKey="mrr" fill="#526dff" radius={[3,3,0,0]}/><Bar name="New Revenue (₹)" dataKey="newRevenue" fill="#73ddc1" radius={[3,3,0,0]}/><Line dataKey="mrr" stroke="#665cff" strokeWidth={2}/>
-          </BarChart></ResponsiveContainer></div>
-        </Card>
-      </div>
-      <div className="sa-insight-grid">
-        <Card className="dash-panel plan-panel"><div className="sa-cardhead"><div><h2>Plan Distribution</h2><p>By active subscriptions</p></div></div>
-          <div className="plan-content"><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={plans} dataKey="value" cx="50%" cy="50%" innerRadius={43} outerRadius={60} paddingAngle={1} stroke="#fff" strokeWidth={1}>{plans.map(p=><Cell key={p.name} fill={p.color}/>)}</Pie></PieChart></ResponsiveContainer><div><strong>108</strong><span>Total</span></div></div>
-          <div className="plan-legend">{plans.map(p=><div key={p.name}><i style={{background:p.color}}/><span>{p.name}</span><b>{Math.round(p.value/108*100)}% ({p.value})</b></div>)}</div></div>
-        </Card>
-        <Card className="dash-panel"><div className="sa-cardhead"><div><h2>Subscription Status</h2><p>All subscriptions</p></div></div>
-          <div className="status-list">{[["Active",108,"green"],["Trial",9,"blue"],["Past Due",4,"orange"],["Expired",2,"gray"],["Suspended",1,"red"]].map(([a,b,c])=><div key={String(a)}><i className={String(c)}/><span>{a}</span><strong>{b}</strong></div>)}</div>
-        </Card>
-        <Card className="dash-panel renewal-panel"><div className="sa-cardhead"><div><h2>Upcoming Renewals</h2><p>Next 30 days</p></div></div>
-          <table className="mini-table"><thead><tr><th>Hospital</th><th>Plan</th><th>Renewal Date</th><th>Amount</th></tr></thead><tbody>{[
-            ["NovaCare Hospital","Enterprise","03 Aug 2026","₹49,999"],["CityCare Hospital","Premium","07 Aug 2026","₹29,999"],["HealthPlus Hospital","Standard","12 Aug 2026","₹19,999"],["Sunrise Hospital","Enterprise","18 Aug 2026","₹49,999"],["LifeCare Hospital","Standard","25 Aug 2026","₹19,999"],
-          ].map(r=><tr key={r[0]}>{r.map(x=><td key={x}>{x}</td>)}</tr>)}</tbody></table><button className="text-link">View all renewals →</button>
-        </Card>
-        <Card className="dash-panel"><div className="sa-cardhead"><div><h2>Needs Attention</h2></div></div>
-          <div className="attention-list">{[["4 subscriptions expiring in 7 days","orange"],["2 hospitals above 90% storage","orange"],["1 failed payment","red"],["3 integration errors","red"],["2 tenants approaching user limit","blue"]].map(([t,c])=><div key={t}><AlertTriangle className={c}/><span>{t}</span></div>)}</div><button className="text-link">View all alerts →</button>
-        </Card>
-      </div>
-      <div className="sa-bottom-grid">
-        <Card className="dash-panel"><div className="sa-cardhead"><div><h2>Platform Usage</h2><p>Key usage metrics across all tenants</p></div></div>
-          <div className="usage-grid">{usage.map(({Icon,label,value,tone})=><div key={label}><span className={`usage-icon ${tone}`}><Icon/></span><p>{label}<strong>{value}</strong></p></div>)}</div>
-        </Card>
-        <Card className="dash-panel"><div className="sa-cardhead"><div><h2>Most Used Modules</h2><p>By hospitals</p></div></div>
-          <div className="module-bars">{modules.map(([m,v],i)=><div key={m}><span>{m}</span><div><i style={{width:`${v}%`,background:i<2?"#5865f2":i<4?"#43b9ce":i<6?"#f5a552":"#ef6473"}}/></div><b>{v}%</b></div>)}</div>
-        </Card>
-        <Card className="dash-panel"><div className="sa-cardhead"><div><h2>Recent Platform Activity</h2><p>Latest system and tenant events</p></div></div>
-          <div className="compact-events">{activity.map(([t,d,c])=><div key={t}><i className={c}/><span><strong>{t}</strong><small>{d}</small></span></div>)}</div><button className="text-link">View all activity →</button>
         </Card>
       </div>
     </>
@@ -1526,9 +1431,9 @@ export default function SuperAdminApp() {
         </nav>
         <div className="sa-sidefoot">
           <div>
-            <span>DA</span>
+            <span>SA</span>
             <div>
-              <strong>Dwaipayan Admin</strong>
+              <strong>Super administrator</strong>
               <small>Super administrator</small>
             </div>
           </div>
@@ -1580,7 +1485,7 @@ export default function SuperAdminApp() {
               <Bell />
               <i />
             </button>
-            <span className="admin-avatar">DA</span>
+            <span className="admin-avatar">SA</span>
           </div>
         </header>
         <main>{content}</main>
