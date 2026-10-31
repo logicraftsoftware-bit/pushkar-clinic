@@ -50,6 +50,7 @@ import { hasActiveRole } from './access.mjs';
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy',config.TRUST_PROXY_HOPS);
 app.use(helmet());
 app.use(cors({ origin: config.FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '20mb' }));
@@ -117,7 +118,7 @@ function authenticate(audience) {
 
 app.get('/api/v1/health', async (_request, response) => {
   await db.command({ ping: 1 });
-  response.json({ status: 'ok', service: 'pushkar-clinic-api', database: 'mongodb', migration_complete: false });
+  response.json({ status: 'ok', service: 'pushkar-clinic-api', database: 'mongodb', runtime: 'native-mongodb' });
 });
 app.get('/api/v1/branding', async (_request, response) => {
   const settings = await db.collection('platform_settings').find({ is_public: true, key: { $in: ['platform_name','platform_logo'] } }).toArray();
@@ -205,8 +206,8 @@ app.use('/api/v1/referrals',authenticate(['careframe-portal','careframe-broker']
 app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labOrderEdit,labResults,labReports,labQuality,labStatusReport,nursing,nursingTasks,registrationLinks,workspaces);
 app.use('/api/v1/self-registration',selfRegistration);
 app.use('/api/v1/lab-report-shares',publicReports);
-// Never route unconverted workflows into PostgreSQL or return fake empty success.
-app.use('/api', (_request, response) => response.status(501).json({ code: 'MONGODB_WORKFLOW_PENDING', error: 'This workflow is not yet converted to MongoDB. This build is not ready for clinic use.' }));
+// Unknown API routes never fall through to the React page or a legacy database.
+app.use('/api', (_request, response) => response.status(404).json({code:'NOT_FOUND',error:'API route not found.'}));
 app.use((error, _request, response, _next) => {
   if (error instanceof z.ZodError) return response.status(400).json({ error: 'Check the submitted values.', fields: error.issues.map(issue => issue.path.join('.')) });
   if (error?.code === 11000) return response.status(409).json({ error: 'A record with these details already exists.' });

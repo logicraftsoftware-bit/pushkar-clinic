@@ -172,5 +172,31 @@ router.put('/ipd/:id/transfer',requirePermission('ipd.update'),async(request,res
     return recalculate(updated,session);
   });response.json(saved);
 });
-router.put('/ipd/:id/status',requirePermission('ipd.update'),(_request,response)=>response.status(501).json({code:'MONGODB_WORKFLOW_PENDING',error:'IPD discharge and cancellation clearance are not converted yet. Direct status changes are disabled.'}));
+router.put('/ipd/:id/status',requirePermission('ipd.update'),async(request,response)=>{
+  const identity=uuid.parse(request.params.id),body=z.object({status:z.enum(['Admitted','Under Treatment','Discharge Requested','Discharged','Cancelled']),reason:z.string().trim().max(2000).default('')}).parse(request.body);
+  if(['Discharged','Discharge Requested'].includes(body.status))throw failure('Use the doctor recommendation, nursing clearance and Reception Discharge workflow.',409);
+  await transaction(async session=>{
+    const filter=await scopeFor(response,{id:identity},session),row=await db.collection('ipd_admissions').findOne(filter,{session});if(!row)throw failure('Admission not found.',404);
+    if(row.status===body.status)return;
+    if(!row.active||!['Admitted','Under Treatment'].includes(row.status))throw failure('This admission cannot be changed through a direct status action.',409);
+    const now=new Date();
+    if(body.status==='Cancelled'){
+      if(row.status!=='Admitted')throw failure('An admission under treatment must complete clinical discharge clearance.',409);
+      if(cents(row.paid_amount??0)+cents(row.deposit_amount??0)>0)throw failure('This admission has payments. Complete clinical discharge and reconcile any refund through accounting.',409);
+      for(const [collection,extra] of [['doctor_clinical_records',{}],['role_work_items',{'data.admission_id':identity}],['ot_cases',{}],['dietary_orders',{}]]){
+        const linked={tenant_id:row.tenant_id,...(collection==='role_work_items'?{}:{admission_id:identity}),...extra};
+        if(await db.collection(collection).findOne(linked,{session,projection:{_id:1}}))throw failure('This admission has clinical or departmental history. Complete discharge clearance instead of cancelling it.',409);
+      }
+      await db.collection('ipd_bed_stays').updateMany({tenant_id:row.tenant_id,admission_id:identity,ended_at:null},{$set:{ended_at:now}},{session});
+      // Preserve accrued charges in the ledger; cancellation is not a write-off or refund.
+      await syncAdmissionInvoice(row,session);
+      if(row.bed_id)await db.collection('beds').updateOne({tenant_id:row.tenant_id,id:row.bed_id,status:'Occupied'},{$set:{status:'Cleaning',updated_at:now}},{session});
+      await db.collection('ipd_admissions').updateOne(filter,{$set:{status:'Cancelled',active:false,cancelled_at:now,cancelled_by:response.locals.account.id,cancellation_reason:body.reason,updated_at:now},$inc:{clinical_version:1}},{session});
+    }else{
+      if(body.status!=='Under Treatment'||row.status!=='Admitted')throw failure('Admission status cannot move backward.',409);
+      await db.collection('ipd_admissions').updateOne(filter,{$set:{status:body.status,updated_at:now},$inc:{clinical_version:1}},{session});
+    }
+    await writeAudit(response,body.status==='Cancelled'?'ipd_cancelled':'ipd_status_updated',identity,session,{previous_status:row.status,status:body.status,reason:body.reason});
+  });response.status(204).end();
+});
 export default router;

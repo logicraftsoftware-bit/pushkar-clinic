@@ -40,13 +40,24 @@ router.get('/overview',async(_request,response)=>{
   const patients=await rows('patients',can('patient.view')||patientPortal,{...patientFilter,deleted_at:null},{created_at:-1});
   const appointments=await rows('clinical_appointments',can('appointment.view')||patientPortal,clinicalFilter,{appointment_date:-1,appointment_time:-1});
   const admissions=await rows('ipd_admissions',can('ipd.view')||patientPortal,clinicalFilter,{admitted_at:-1});
-  const finances=await rows('finance_records',can('billing.view')||patientPortal,clinicalFilter,{created_at:-1});
+  const finances=await rows('finance_records',can('billing.view')||patientPortal,{...clinicalFilter,...(patientPortal?{kind:{$in:['invoices','pharmacy-bill','payments','refunds']}}:{})},{created_at:-1});
   const inventory=await rows('inventory_records',can('inventory.view')&&!patientPortal,{}, {updated_at:-1});
   // Patient-facing clinical publication is handled by its dedicated record endpoints.
   // Do not include raw laboratory drafts or nursing handovers in this shared response.
   const workspaces=workspace==='all'?['reception','nurse','laboratory','pharmacy','accounting','hr','inventory']:workspace==='branch'?['reception','inventory']:['reception','laboratory','pharmacy','accounting','hr','inventory'].includes(workspace)?[workspace]:[];
   const permittedWorkspaces=workspaces.filter(value=>({reception:can('patient.view'),nurse:can('ipd.view'),laboratory:can('lab.order.view'),pharmacy:can('pharmacy.view'),accounting:can('billing.view'),hr:can('hr.view'),inventory:can('inventory.view')})[value]);
   const workItems=await rows('role_work_items',!patientPortal&&permittedWorkspaces.length>0,{...clinicalFilter,workspace:{$in:permittedWorkspaces}}, {occurred_at:-1},150);
+  if(patientPortal&&patientId){
+    const published=await rows('doctor_clinical_records',true,{patient_id:patientId,$or:[{record_type:'consultation','data.encounter_status':'Completed'},{record_type:'discharge_summary','data.document_status':'Finalized'}]},{created_at:-1});
+    for(const record of published)workItems.push({...record,kind:record.record_type,title:record.record_type==='consultation'?'Completed Consultation':'Discharge Summary',status:'Published',occurred_at:record.created_at});
+    const reports=await rows('role_work_items',true,{patient_id:patientId,workspace:'laboratory','data.doctor_approval':{$type:'object'},status:{$nin:['Cancelled','Rejected']}},{occurred_at:-1});
+    for(const report of reports){
+      const bill=await db.collection('finance_records').findOne({tenant_id:account.tenant_id,id:report.data.bill_id,kind:'invoices',status:'Paid',due:0});
+      if(!bill||Number(bill.paid)<Number(bill.total))continue;
+      const approved=new Set(report.data.doctor_approval?.test_ids??[]);if(!approved.size)continue;
+      workItems.push({id:report.id,workspace:'laboratory',kind:'reports',title:report.title,status:'Published',patient_id:patientId,occurred_at:report.occurred_at,data:{tests:(report.data.tests??[]).filter(test=>approved.has(test.test_id)),lab_results:(report.data.lab_results??[]).filter(test=>approved.has(test.test_id)),result_status:report.data.result_status,doctor_approval:report.data.doctor_approval,bill_number:report.data.bill_number}});
+    }
+  }
   const patientById=new Map(patients.map(row=>[row.id,row]));
   for(const row of [...appointments,...admissions,...finances,...workItems]){
     const patient=patientById.get(row.patient_id);

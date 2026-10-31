@@ -212,7 +212,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await db.collection('beds').findOne({id:secondBed.id})).status,'Occupied');
     const detail=await request(`/clinical/ipd/${admission.id}/details`,'GET',null,staffLogin.data.token);
     assert.equal(detail.status,200,JSON.stringify(detail.data));assert.equal(detail.data.bed_stays.length,2);assert.equal(detail.data.transfers.length,1);
-    assert.equal((await request(`/clinical/ipd/${admission.id}/status`,'PUT',{status:'Discharged'},staffLogin.data.token)).status,501);
+    assert.equal((await request(`/clinical/ipd/${admission.id}/status`,'PUT',{status:'Discharged'},staffLogin.data.token)).status,409);
   });
   await t.test('OT scheduling serializes conflicts and completed charges and consumption post once',async()=>{
     const category=await request('/hospital-management/operation-masters/category','POST',{name:'Synthetic Surgery'},staffLogin.data.token);assert.equal(category.status,201,JSON.stringify(category.data));
@@ -690,6 +690,26 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
       assert.equal((await request('/ai-assistant/finance-report','POST',{prompt:'Attempt wrong role'},staffLogin.data.token)).status,403);
     }finally{globalThis.fetch=originalFetch;}
   });
+  await t.test('pristine IPD cancellation releases the bed and retains accrued ledger charges',async()=>{
+    const registered=await db.collection('patients').findOne({tenant_id:hospital.data.id,phone:'9999999975'});assert.ok(registered);
+    const bed=await request('/hospital-management/beds','POST',{bed_number:'CANCEL-TEST-BED',branch_id:branch.id,ward_id:secondBed.ward_id,room_id:secondBed.room_id,daily_charge:50},staffLogin.data.token);assert.equal(bed.status,201,JSON.stringify(bed.data));
+    const admitted=await request('/clinical/ipd','POST',{branch_id:branch.id,patient_id:registered.id,admitted_at:new Date(Date.now()-1000).toISOString(),admission_type:'Planned',department_id:department.id,consultant_doctor_id:doctor.user_id,bed_id:bed.data.id,has_insurance:false,deposit_amount:0,payment_mode:'Cash',charges:[],discount:0},staffLogin.data.token);assert.equal(admitted.status,201,JSON.stringify(admitted.data));
+    const path=`/clinical/ipd/${admitted.data.id}/status`;
+    for(let attempt=0;attempt<2;attempt++)assert.equal((await request(path,'PUT',{status:'Cancelled',reason:'Synthetic cancellation before care'},staffLogin.data.token)).status,204);
+    assert.equal((await db.collection('beds').findOne({id:bed.data.id})).status,'Cleaning');assert.equal((await db.collection('ipd_admissions').findOne({id:admitted.data.id})).active,false);
+    const invoice=await db.collection('finance_records').findOne({tenant_id:hospital.data.id,kind:'invoices','data.admission_id':admitted.data.id});assert.equal(invoice.total,50);assert.equal(invoice.due,50);assert.equal(await db.collection('audit_events').countDocuments({record_id:admitted.data.id,action:'ipd_cancelled'}),1);
+    assert.equal((await request(path,'PUT',{status:'Admitted'},staffLogin.data.token)).status,409);
+  });
+  await t.test('patient portals require an explicit UHID link and show only finalized own records',async()=>{
+    const userId='00000000-0000-4000-8000-000000000025';await db.collection('users').insertOne({id:userId,tenant_id:hospital.data.id,branch_id:branch.id,first_name:'Synthetic',last_name:'Patient Login',email:'patient-login@example.invalid',role:'patient',role_codes:['PATIENT'],portal_code:'PATIENT',is_active:true,password_hash:await hashPassword(password),session_version:0});
+    const login=await request('/auth/login','POST',{identifier:'patient-login@example.invalid',password,portal:'patient'});assert.equal(login.status,200,JSON.stringify(login.data));
+    const unlinked=await request('/workspaces/overview','GET',null,login.data.token);assert.equal(unlinked.status,200,JSON.stringify(unlinked.data));assert.equal(unlinked.data.patientLinked,false);assert.equal(unlinked.data.patients.length,0);assert.equal(unlinked.data.appointments.length,0);
+    const patientRole=await db.collection('rbac_roles').findOne({tenant_id:hospital.data.id,code:'PATIENT'});
+    const linked=await request(`/access-control/users/${userId}`,'PUT',{role_id:patientRole.id,patient_uhid:patient.medical_record_number},staffLogin.data.token);assert.equal(linked.status,204,JSON.stringify(linked.data));assert.equal((await request('/workspaces/overview','GET',null,login.data.token)).status,401);
+    const renewed=await request('/auth/login','POST',{identifier:'patient-login@example.invalid',password,portal:'patient'});assert.equal(renewed.status,200,JSON.stringify(renewed.data));
+    const own=await request('/workspaces/overview','GET',null,renewed.data.token);assert.equal(own.status,200,JSON.stringify(own.data));assert.equal(own.data.patientLinked,true);assert.equal(own.data.patients.length,1);assert.equal(own.data.patients[0].id,patient.id);assert.ok(own.data.workItems.some(row=>row.kind==='consultation'));assert.ok(own.data.workItems.every(row=>row.patient_id===patient.id&&row.status==='Published'));assert.ok(own.data.appointments.every(row=>row.patient_id===patient.id));assert.ok(own.data.finances.every(row=>row.patient_id===patient.id));
+    assert.equal((await request('/patients','GET',null,renewed.data.token)).status,403);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
@@ -710,7 +730,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/admin/hospitals/${hospital.data.id}/status`,'PATCH',{status:'suspended'},token)).status,200);
     assert.equal((await request('/auth/login','POST',{identifier:input.adminEmail,password:'New-synthetic-password-123',portal:'hospital_admin'})).status,401);
   });
-  await t.test('unconverted workflows never return synthetic success',async()=>{
-    const result=await request('/pharmacy/not-converted');assert.equal(result.status,501);assert.equal(result.data.code,'MONGODB_WORKFLOW_PENDING');
+  await t.test('unknown API routes return JSON errors rather than a page or synthetic success',async()=>{
+    const result=await request('/pharmacy/not-converted');assert.equal(result.status,404);assert.equal(result.data.code,'NOT_FOUND');
   });
 });

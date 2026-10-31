@@ -1,56 +1,51 @@
-# Pushkar Clinic deployment status
+# Hostinger Cloud deployment
 
-This checkout is a React/Vite frontend and an Express/TypeScript API inherited from another clinic. **It is not ready for MongoDB production deployment.** No database, account, service, or dependency has been installed locally.
-
-The native MongoDB conversion has started in `server/mongo/`. See [MONGODB-MIGRATION.md](MONGODB-MIGRATION.md) for implemented routes, remaining workflows, private connection settings and verification limits. The Hostinger entry point has deliberately not been switched to this incomplete backend.
-
-## Hostinger Cloud Hosting
-
-Use hPanel's **Node.js web app** deployment, not a static-only website upload. Hostinger supports managed Node.js apps on eligible Business and Cloud plans:
-https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/
-
-After the database conversion and validation are complete, use these application settings:
+Use the managed **Node.js web app** on Cloud Startup for `erp.pushkarpharmaceutical.com`. No VPS, Docker, PM2 or local installation is needed.
 
 | Setting | Value |
 | --- | --- |
-| Repository | `https://github.com/logicraftsoftware-bit/pushkar-clinic.git` |
-| Project root | Repository root |
+| Repository / branch | `logicraftsoftware-bit/pushkar-clinic` / `main` |
+| Root | Repository root |
+| Framework | Express / Other |
 | Node.js | 22 |
-| Install command | `npm ci --include=dev` |
-| Build command | `npm run build:hostinger` |
-| Start command | `npm start` |
-| Entry point, if requested | `hosting.mjs` |
-| Health endpoint | `/api/v1/health` |
+| Install | `npm ci --include=dev` |
+| Build | `npm run build:hostinger` |
+| Start | `npm start` |
+| Entry if requested | `hosting.mjs` |
+| Health check | `/api/v1/health` |
 
-The entry point serves `dist/` and delegates `/api/*` to the backend on one port. React routes such as `/superadmin` load the SPA. Hostinger's `PORT` environment variable takes precedence over `API_PORT`. Leave `VITE_API_URL` unset to use the same origin. Keep both root and server build artifacts in the deployment. The server build needs dev dependencies for TypeScript.
+The server serves React and the MongoDB API on one port. Hostinger supplies `PORT`. Set `TRUST_PROXY_HOPS=1` for the hosting reverse proxy so login limits use the forwarded client IP; adjust only if Hostinger specifies a different proxy chain. Keep `VITE_API_URL` unset. Use Hostinger's [Node.js guide](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/) and [private environment settings](https://www.hostinger.com/support/how-to-add-environment-variables-during-node-js-application-deployment/).
 
-Do not enable live deployment yet. These settings prepare the packaging; they do not make the current PostgreSQL backend work with MongoDB.
+## Atlas and first owner
 
-## Database conversion required
+Set `MONGODB_URI`, `MONGODB_DB=pushkar_clinic`, `FRONTEND_ORIGIN=https://erp.pushkarpharmaceutical.com`, a new random `JWT_SECRET` of at least 32 characters, and `NODE_ENV=production`. The URI template is in [.env.example](.env.example). Enter values without surrounding quotes.
 
-There is no MongoDB driver, model layer, or MongoDB account in this source. `DATABASE_URL` is used by the PostgreSQL driver. Replacing it with an Atlas URI will fail; configuration now rejects this clearly.
+Use a new Atlas application user with `readWrite` restricted to `pushkar_clinic`; URL-encode reserved characters in its password. Add Hostinger's outbound IP addresses to Atlas Network Access. Ask Hostinger for them if the dashboard does not show them. `DATABASE_URL` is not the native database variable. Never put secrets in `VITE_*` variables or GitHub.
 
-The requested MongoDB conversion must replace more than 1,000 SQL call sites, SQL migrations, PostgreSQL `crypt()` password verification, joins, tenant transaction context, triggers/audit logging, enums, and LISTEN/NOTIFY access events. This includes authentication, patients, appointments, billing, laboratory, pharmacy, inventory, HR, reporting, and admin APIs. MongoDB tenant filtering, unique indexes, transactional money/inventory updates, and live account revocation need equivalent behavior and tests.
+For the first deployment, privately set `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD` (at least 12 characters), and `BOOTSTRAP_ADMIN_NAME`. Startup creates one owner only on an empty database. It never resets an existing owner. Sign in at `/superadmin`, then remove the bootstrap variables from hPanel and apply changes. Create this client's plan, clinic and clinic administrator in the app.
 
-Use a separate MongoDB Atlas project/database and application user for this client. Enter its eventual connection URI only in Hostinger's private environment settings, never in source or any `VITE_*` variable. No MongoDB account was created or changed in this task. Do not reuse another client's database or copy patient records.
+Startup initializes indexes and system module definitions, not old patients, users, bills or workflow events. No existing-client records or credentials are needed. Server-terminal `mongodb:check` and stdin-based `mongodb:bootstrap` scripts remain available as alternatives.
 
-## Configuration after conversion
+## CRM
 
-- `NODE_ENV=production`
-- `FRONTEND_ORIGIN=https://YOUR-CLINIC-DOMAIN`
-- `JWT_SECRET`: a new, random secret of at least 32 characters, unique to this clinic
-- Database URI: configure the variable implemented by the completed MongoDB adapter; it does not exist yet
-- `CRM_INTEGRATION_ENABLED=false` until this client's integration is configured
-- Optional Groq API key/models only if this client needs AI functionality; omit unused optional keys
+Set `CRM_INTEGRATION_ENABLED=true` and `CRM_API_BASE_URL` to **this client's** HTTPS CRM API base. Its clinic directory is `<base>/patient/clinics`. Connect the clinic in Super Admin and save the once-displayed integration key privately in the CRM. Rotation invalidates the old key.
 
-The existing `.env.example` describes the **legacy PostgreSQL backend**, not the requested MongoDB deployment. Do not upload that file unchanged as production credentials.
+Send JSON to `POST /api/v1/crm-sync/bootstrap` using `x-api-key` or Bearer authentication. Arrays are `branches`, `departments`, `doctors`, `patients`, `appointments`; fields are in `server/mongo/crm-schema.mjs`. Dependencies must be mapped first or included earlier in the same payload. Doctors and appointments require mapped branches and departments; schedules use `HH:MM`, and appointment timestamps include an offset.
 
-## Client-data cleanup
+Sync is restricted to one clinic, ignores identical/older records and rolls back failed payloads. External medical record numbers are stored separately from immutable local UHIDs. Paid, checked-in or completed encounters cannot be overwritten. Availability and slot locks apply. Do not connect to another client's CRM data source.
 
-Old catalogs, embedded doctor rosters, referral partner records, user-account seeds, sample hospital data, patient-specific discharge repairs, old work summaries and previous-client deployment workflows were removed. Startup no longer imports the old catalogs. Reusable UI, API workflows and schema definitions remain. No user or patient records are bundled. Tests that depended on the removed spreadsheets were removed or replaced with synthetic fixtures.
+## AI
 
-New users, patients, doctors, partners, prices and hospital details must be entered for this clinic after MongoDB conversion. Do not run the legacy PostgreSQL migrations against MongoDB.
+Set `GROQ_API_KEY` privately. `GROQ_MODEL` controls chat, SOAP and financial summaries; `GROQ_VISION_MODEL` controls handwriting. Example IDs are in `.env.example`; availability depends on your provider account. See Groq's [chat API](https://console.groq.com/docs/api-reference) and [vision documentation](https://console.groq.com/docs/vision).
 
-## Verification
+SOAP and handwriting return editable drafts; clinical saving still requires normal validation. SOAP needs an assigned encounter. Chat uses role-scoped aggregates without individual patient identifiers. Accountant reports use authorized branch records. Without a key, generation returns a configuration error; verified financial reporting remains available without generated prose.
 
-No local application or database was started and no dependencies were installed. A GitHub CI workflow builds both packages and runs the existing tests on GitHub runners. Review its results before deployment. Full functional testing on the new MongoDB database remains required; this preparation does not claim that the application is production-ready.
+The requested transcript or handwriting image is sent to Groq when an AI action is used. The patient database is not automatically uploaded.
+
+## Domain and live checks
+
+Select `erp.pushkarpharmaceutical.com` for this Node.js app. Complete ownership verification and the **erp-specific DNS records** Hostinger supplies. Keep the main website and mail records unchanged. Wait for HTTPS before signing in.
+
+After deployment, check `/api/v1/health` reports MongoDB. Create the new clinic accounts and masters, then check synthetic registration, booking, lab results, billing and receipts before using real records. Check CRM with a new-client test payload and AI with synthetic text/images after adding provider settings.
+
+CI uses disposable MongoDB and mocked providers. Live Atlas, domain and provider checks remain deployment steps; no real account or patient data is used in source verification. Legacy PostgreSQL source is retained for compatibility tests and is not the native runtime's data store.

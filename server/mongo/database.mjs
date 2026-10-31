@@ -28,6 +28,7 @@ export function initializeMongo() {
       ['hospitals', { code: 1 }, { unique: true }],
       ['users', { email: 1 }, { unique: true }],
       ['users', { tenant_id: 1, branch_id: 1 }, {}],
+      ['users',{tenant_id:1,patient_id:1},{unique:true,partialFilterExpression:{role:'patient',patient_id:{$type:'string'}}}],
       ['branches', { tenant_id: 1, code: 1 }, { unique: true }],
       ['patients', { tenant_id: 1, medical_record_number: 1 }, { unique: true }],
       ['patients', { tenant_id: 1, branch_id: 1, created_at: -1 }, {}],

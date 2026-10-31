@@ -1,52 +1,34 @@
-# MongoDB conversion progress
+# Native MongoDB runtime
 
-This is an in-progress native MongoDB conversion, not a completed production release. The existing PostgreSQL workflows remain in `server/src/`. They must not be pointed at an Atlas URI. No existing-client records or users are imported.
+The deployment entry is `hosting.mjs`, which imports `hosting-mongo.mjs`: React static assets and the native API in `server/mongo/` run on one managed Hostinger port. The runtime does not load `server/dist/app.js`, PostgreSQL pools or a SQL emulation layer. Legacy TypeScript source remains for compatibility tests.
 
-## Implemented
+## Workflow coverage
 
-`server/mongo/` contains a separate MongoDB backend with connection pooling, index initialization, a transaction helper, tenant-scoped repositories, scrypt password hashing, private first-administrator bootstrap, persistent login limits, revocable sessions, and native login/password-change/logout endpoints. Session validation checks current user activity, expiration, hospital status and session version. No SQL compatibility shim is used.
+- Authentication: scrypt passwords, first-owner bootstrap, persistent login limits, revocable sessions, current role/account checks and live access events.
+- Administration: plans, modules, clinic provisioning, branches, roles, staff accounts, schedules, settings, profile, master setup, documents, activity history and print templates.
+- Reception and clinical care: patients/UHIDs, duplicate checks, booking, capacity/availability, check-in, queues, IPD beds/deposits/transfers, doctor consultations, prescriptions, ward nursing, MAR, care plans, handovers and discharge clearance.
+- Laboratory: catalogues, branch prices, new patients, clinician-request billing, edits, payment receipts, sample collection, barcodes, processing, result validation, reference snapshots, approval locks, reports, canonical PDF shares, retry-safe printing, QC and accreditation.
+- Operations: invoices/payments/expenses/refunds, cancellation approvals, credit notes, insurance, HR/payroll/attendance, inventory purchases/transfers, pharmacy catalogues/purchases/batches/adjustments, prescription-to-POS billing, forecasts, OT, dietary and referral wallets/withdrawals.
+- Portals: scoped staff overviews, protected task notes, broker login and explicitly UHID-linked patient accounts. Patient views exclude draft clinical notes, unapproved laboratory results and other patients' data.
+- CRM: connection/key management, directory lookup, tenant-bound mappings, atomic synchronization and slot-safe appointment requests. Local clinical/financial records and UHIDs cannot be overwritten by arbitrary external data.
+- AI: Groq chat, SOAP drafts, handwriting and accountant financial summaries. Inputs and responses are bounded; clinical drafts are not saved automatically; totals come from authorized native records.
 
-The native backend includes authentication, plan/clinic provisioning, patient registration/editing/search/deletion, branch-scoped custom roles and account administration, live access refresh, clinic setup, staff accounts, doctor schedules and appointment queues/booking/editing/check-in. IPD admission/editing, deposits, bed transfers, billing snapshots, doctor discharge recommendations, nursing clearance and reception discharge are implemented. Doctor consultations preserve completed records and synchronize diagnostic/prescription orders. Nursing supports ward assignments, charts, medication schedules and duplicate-safe administration outcomes, notes, care plans, handover and departmental requests.
+## Preserved boundaries
 
-Laboratory catalogues, branch-priced billing, collection, barcodes, measured results, reference snapshots, technician/doctor approval, canonical server-generated PDF sharing and retry-safe print confirmation are implemented. General invoices, receipts, expenses, tracked insurance claims, HR/payroll/attendance, inventory purchases/transfers, cancellation approvals, credit notes and approved refunds are implemented. Super Admin administration and operational settings are included. Pharmacy catalogues, suppliers, purchases, batches, audited stock adjustments, prescription-to-draft billing and POS bill generation are implemented. Generating a pharmacy bill does not claim to dispense stock or collect money. The hospital dashboard reads native financial and clinical records with branch/date filters; other role dashboard parity remains outstanding. These statements describe backend implementation and test coverage, not a complete frontend acceptance review. Unconverted routes explicitly fail. The full ERP is not ready to deploy.
+Generating a pharmacy bill records an invoice; it does not itself dispense stock or collect payment. Purchases and stock adjustments are separate audited operations. No new automatic dispensing/return behavior was added merely by changing databases.
 
-## Cloud verification status
+Direct IPD discharge is prohibited: doctor recommendation, nursing clearance and financial clearance must complete first. Direct cancellation is limited to admissions without treatment history or payments and preserves accrued ledger charges. Paid/treated cases use discharge and accounting reconciliation. Patient accounts require an explicit UHID link instead of ambiguous email/phone matching.
 
-Both jobs passed for `e1a79ef`: [cloud validation](https://github.com/logicraftsoftware-bit/pushkar-clinic/actions/runs/41167780524). This verified the frontend/backend build and legacy tests, plus native MongoDB authentication, laboratory PDFs, custom roles, appointment editing, inventory movements, finance posting, HR/insurance tracking, cancellation/refunds, doctor consultations, ward nursing, discharge clearance, pharmacy stock and pharmacy bill generation, and the hospital dashboard. Tests exercise transactions, concurrent retries, stale edits, tenant/branch restrictions, approval locks and rollback. Documentation changes after that revision do not change the tested application source.
+Device Integration task notes retain the original metadata workflow. A physical analyzer or PACS connection requires its actual device/provider contract; this migration does not simulate machine results or claim a hardware connection exists.
 
-GitHub authentication and pushing work. No production Atlas connection, real account or existing-client data was used. No application dependencies or database server were installed locally.
+## Verification
 
-## Still required before production
+[CI run 41179634972](https://github.com/logicraftsoftware-bit/pushkar-clinic/actions/runs/41179634972) passed the full build/compatibility job, 57 native test outcomes, mocked CRM/AI integration and native managed-hosting smoke checks at revision `001bee3`. Final entry-point and identity checks are also run on subsequent pushes; consult the latest GitHub Actions result for the deployed revision.
 
-- Pharmacy dispensing/returns; complete pharmacy frontend acceptance checks and document how bill generation relates to stock and collections.
-- Remaining laboratory status-report and device workflows; full frontend laboratory acceptance checks. Order edits, clinician-request billing, sample/billing filters, QC controls/runs and accreditation now have native routes.
-- External integrations and any remaining compatibility gaps found by the frontend route audit.
-- Remaining role reports and full dashboard acceptance checks. Shared staff overview, documents, task notes, charge/operation/bed masters and print-template settings now have native routes.
-- Full frontend route compatibility, stale-edit handling and tenant/branch acceptance checks across the implemented modules; complete any workflow-specific gaps found by that audit.
-- Optional clinical AI requires an explicitly configured provider. Its native routes currently return a configuration error and do not fabricate clinical text.
-- Full route compatibility and tenant-isolation tests against a disposable MongoDB database.
-- Hostinger startup switch only after those checks pass.
+The dependency-free Node suite checks money, permissions, password verification, clinical invariants and provider error handling. Cloud integration tests use a disposable MongoDB replica set and synthetic records. They exercise concurrency, replay protection, stale edits, approval locks, tenant/branch isolation and transaction rollback. Provider requests in those tests are blocked unless explicitly mocked. Hosting checks cover API health, React routes, first-owner login and graceful shutdown through the real entry file.
 
-## Atlas connection (when testing is requested)
+These checks are not a complete manual browser acceptance review. Live Atlas connectivity, DNS/HTTPS and real CRM/Groq/Razorpay account behavior require private deployment configuration and a synthetic acceptance check on the hosted app. No real patient data, Atlas writes or real provider credentials were used for source verification. No application dependencies, local database or local app service were installed.
 
-Use the Atlas cluster already created for this project. Enter secrets only in the hosting server's private environment configuration:
+## Connection and first login
 
-```dotenv
-MONGODB_URI=mongodb+srv://USERNAME:URL_ENCODED_PASSWORD@pushkar-clinic.z23i30y.mongodb.net/pushkar_clinic
-MONGODB_DB=pushkar_clinic
-FRONTEND_ORIGIN=https://erp.pushkarpharmaceutical.com
-JWT_SECRET=REPLACE_WITH_A_NEW_RANDOM_SECRET_OF_AT_LEAST_32_CHARACTERS
-NODE_ENV=production
-```
-
-Use a database user restricted to `pushkar_clinic` and allow the hosting server's outbound IP in Atlas Network Access. The automatic Atlas Admin user shown during onboarding is not the intended permanent application identity. Never commit these credentials or place them in a `VITE_*` variable. No real URI is required for source conversion.
-
-After server dependencies are installed by the hosting build, `npm --prefix server run mongodb:check` pings Atlas without initializing records or indexes. This does not start a local database. Do not run it against production until the private hosting configuration is available.
-
-`npm --prefix server run mongodb:bootstrap` accepts a single JSON object on stdin with `username`, `password` and `displayName`. Use a password of at least 12 characters. Supply it through a private server-side input mechanism; never place it in command arguments, repository files, CI logs or chat. Bootstrap creates one administrator only and refuses to reset an existing account. It initializes indexes and writes to Atlas, so connection checking alone should be used first.
-
-The development command `npm --prefix server run start:mongo` starts only the incomplete MongoDB API; it is not a command to deploy the full ERP. The existing root Hostinger start command continues using the legacy backend until the workflow conversion is complete.
-
-## Verification boundaries
-
-Policy tests run with Node's built-in test runner and require no database or dependency installation: `node --test server/mongo/tests/*.test.mjs`. GitHub CI runs those tests, the frontend/backend build, legacy tests and native integration tests against a disposable MongoDB replica set on an Ubuntu runner. Syntax checks alone do not establish workflow compatibility, and passing the implemented integration suite does not make unconverted routes production ready. Live Atlas connection testing requires private hosting configuration; no live credentials or database writes were used during this implementation.
+Follow [HOSTINGER.md](HOSTINGER.md) and [.env.example](.env.example). Use the new `pushkar_clinic` Atlas database and new application credentials. First-owner bootstrap can use private hPanel variables or the stdin-based server script; neither resets an existing owner. Configure this clinic's own accounts, masters, external CRM and provider keys after deployment. No previous-client patients, users, bills or operational records are imported.

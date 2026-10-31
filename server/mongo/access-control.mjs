@@ -66,7 +66,7 @@ router.get('/users',requirePermission('users.manage'),async(_request,response)=>
   response.json(rows);
 });
 router.put('/users/:id',requirePermission('users.manage'),async(request,response)=>{
-  const userId=id.parse(request.params.id),input=z.object({role_id:id.optional(),is_active:z.boolean().optional(),reset_password:z.string().min(12).max(200).optional()}).strict().refine(value=>Object.keys(value).length>0).parse(request.body);
+  const userId=id.parse(request.params.id),input=z.object({role_id:id.optional(),is_active:z.boolean().optional(),reset_password:z.string().min(12).max(200).optional(),patient_uhid:z.string().trim().min(1).max(100).optional()}).strict().refine(value=>Object.keys(value).length>0).parse(request.body);
   const password_hash=input.reset_password?await hashPassword(input.reset_password):null,tenant_id=response.locals.account.tenant_id;
   await transaction(async session=>{
     const granted=await lockActor(response,'users.manage',session),filter=await scopeFor(response,{id:userId},session);
@@ -84,6 +84,14 @@ router.put('/users/:id',requirePermission('users.manage'),async(request,response
       validateRoleGrant(granted,role.permissions??[]);
       Object.assign(changes,{role_codes:[role.code],portal_code:portal,role:baseRoles[portal]});
     }
+    if((changes.role??user.role)==='patient'){
+      const permissions=await permissionsFor(response.locals.account,session);
+      if(!permissions.includes('*')&&!permissions.includes('patient.view'))throw failure('Patient record access is required to link a patient account.',403);
+      const patient=await db.collection('patients').findOne(await scopeFor(response,{...(input.patient_uhid?{medical_record_number:input.patient_uhid}:{id:user.patient_id??'not-linked'}),deleted_at:null},session),{session});
+      if(!patient||patient.branch_id!==user.branch_id)throw failure('Link an existing patient UHID in the account branch.');
+      changes.patient_id=patient.id;
+    }else if(input.patient_uhid)throw failure('Patient identity links are only available for patient accounts.');
+    else if(input.role_id)changes.patient_id=null;
     await db.collection('users').updateOne(filter,{$set:changes,$inc:{session_version:1}},{session});
     await db.collection('sessions').deleteMany({user_id:userId},{session});
     const staffChanges={updated_at:new Date(),...(input.is_active!==undefined?{status:input.is_active?'Active':'Inactive','employment.status':input.is_active?'Active':'Inactive','account.account_status':input.is_active?'Active':'Inactive'}:{})};

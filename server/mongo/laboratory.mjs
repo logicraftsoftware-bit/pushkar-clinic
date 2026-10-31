@@ -14,6 +14,7 @@ const router=Router(),uuid=z.string().uuid(),money=z.coerce.number().finite().no
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 const escape=escapeSearch;
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+router.patch('/work-items/:id/radiology-action',requirePermission('radiology.view'),(_request,response)=>response.status(410).json({error:'Use the Laboratory order workflow for pathology and radiology.'}));
 router.use(async(request,response,next)=>{
   if(!request.path.startsWith('/lab-')&&!/^\/work-items\/[^/]+\/(?:lab-|sample-action)/.test(request.path))return next();
   const account=response.locals.account;
