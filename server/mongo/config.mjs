@@ -16,6 +16,9 @@ const parsed = z.object({
   GROQ_VISION_MODEL:z.string().min(1).default('qwen/qwen3.8-27b'),
   CRM_INTEGRATION_ENABLED:z.enum(['true','false']).default('false'),
   CRM_API_BASE_URL:z.string().url().regex(/^https:\/\//).optional(),
+  BOOTSTRAP_ADMIN_USERNAME:z.string().trim().min(3).max(100).optional(),
+  BOOTSTRAP_ADMIN_PASSWORD:z.string().min(12).max(200).optional(),
+  BOOTSTRAP_ADMIN_NAME:z.string().trim().min(2).max(160).default('Clinic Owner'),
 }).safeParse({ ...process.env, API_PORT: process.env.PORT ?? process.env.API_PORT });
 if (!parsed.success) throw new Error(`Invalid backend environment: ${[...new Set(parsed.error.issues.map(issue => issue.path.join('.')))].join(', ')}`);
 export const config = parsed.data;

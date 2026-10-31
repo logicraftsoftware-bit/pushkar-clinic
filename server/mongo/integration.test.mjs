@@ -667,6 +667,25 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
       invalid=true;assert.equal((await request('/doctor/soap','POST',body,staffLogin.data.token)).status,502);assert.equal(await db.collection('doctor_clinical_records').countDocuments({tenant_id:hospital.data.id}),count);assert.equal(calls,4);
     }finally{globalThis.fetch=originalFetch;}
   });
+  await t.test('accountant AI reports use authorized branch totals and validated summaries',async()=>{
+    const userId='00000000-0000-4000-8000-000000000023';
+    await db.collection('users').insertOne({id:userId,tenant_id:hospital.data.id,branch_id:branch.id,first_name:'Synthetic',last_name:'Accountant',email:'finance@example.invalid',role:'accountant',role_codes:['ACCOUNTANT'],portal_code:'ACCOUNTANT',is_active:true,password_hash:await hashPassword(password),session_version:0});
+    await db.collection('login_limits').deleteMany({});
+    const login=await request('/auth/login','POST',{identifier:'finance@example.invalid',password,portal:'accountant'});assert.equal(login.status,200,JSON.stringify(login.data));
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),from=today.slice(0,7)+'-01',otherBranch=await db.collection('branches').findOne({tenant_id:hospital.data.id,code:'CRMTEST'});
+    assert.ok(otherBranch);await db.collection('finance_records').insertOne({id:'00000000-0000-4000-8000-000000000024',tenant_id:hospital.data.id,branch_id:otherBranch.id,kind:'payments',record_number:'SYNTHETIC-OTHER-BRANCH',amount:9999,status:'Paid',record_date:today});
+    const [own]=await db.collection('finance_records').aggregate([{$match:{tenant_id:hospital.data.id,branch_id:branch.id,kind:'payments',status:{$nin:['Draft','Rejected','Cancelled','Refunded']},record_date:{$gte:from,$lte:today}}},{$group:{_id:null,total:{$sum:'$amount'}}}]).toArray();
+    const originalFetch=globalThis.fetch;let providerCalls=0;
+    globalThis.fetch=async(url,options)=>{
+      if(String(url)!=='https://api.groq.com/openai/v1/chat/completions')return originalFetch(url,options);
+      providerCalls++;const payload=JSON.parse(options.body);assert.equal(payload.messages[0].content.includes('SYNTHETIC-OTHER-BRANCH'),false);assert.equal(payload.messages[0].content.includes('Synthetic CRM Branch'),false);
+      return Response.json({choices:[{message:{content:JSON.stringify({title:'Synthetic report',executive_summary:'Synthetic verified summary',highlights:[],risks:[],recommendations:[],conclusion:'Synthetic review'})}}]});
+    };
+    try{
+      const result=await request('/ai-assistant/finance-report','POST',{prompt:'Summarize verified collections',from,to:today},login.data.token);assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.dataset.totals.collected,own.total);assert.equal(result.data.analysis_source,'ai_draft');assert.equal(providerCalls,1);
+      assert.equal((await request('/ai-assistant/finance-report','POST',{prompt:'Attempt wrong role'},staffLogin.data.token)).status,403);
+    }finally{globalThis.fetch=originalFetch;}
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

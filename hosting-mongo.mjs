@@ -6,11 +6,13 @@ import {fileURLToPath} from 'node:url';
 import api from './server/mongo/app.mjs';
 import {config} from './server/mongo/config.mjs';
 import {client,initializeMongo} from './server/mongo/database.mjs';
+import {ensureInitialAdministrator} from './server/mongo/initial-administrator.mjs';
 
 const frontend=fileURLToPath(new URL('./dist/',import.meta.url));
 const index=fileURLToPath(new URL('./dist/index.html',import.meta.url));
 if(!existsSync(index))throw new Error('Frontend build missing. Run npm run build:hostinger on the hosting build service.');
 await initializeMongo();
+await ensureInitialAdministrator(config);
 const app=express();
 app.disable('x-powered-by');
 app.use(helmet());

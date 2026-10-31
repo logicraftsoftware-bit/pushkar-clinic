@@ -1,7 +1,9 @@
 import app from './app.mjs';
 import { config } from './config.mjs';
 import { client, initializeMongo } from './database.mjs';
+import {ensureInitialAdministrator} from './initial-administrator.mjs';
 await initializeMongo();
+await ensureInitialAdministrator(config);
 const server = app.listen(config.API_PORT, '0.0.0.0', () => console.log(`MongoDB API listening on port ${config.API_PORT}; workflow migration is incomplete.`));
 let stopping = false;
 function shutdown() {
