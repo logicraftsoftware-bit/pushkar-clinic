@@ -450,6 +450,7 @@ function PurchaseModal({
     [addingSupplier, setAddingSupplier] = useState(false),
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const [requestId] = useState(() => crypto.randomUUID());
   const update = (i: number, key: keyof Line, value: string) =>
     setLines((rows) =>
       rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)),
@@ -475,7 +476,7 @@ function PurchaseModal({
     try {
       await api("/purchases", token, {
         method: "POST",
-        body: JSON.stringify({ ...raw, items: lines }),
+        body: JSON.stringify({ ...raw, items: lines, request_id: requestId }),
       });
       saved();
     } catch (x) {
@@ -668,6 +669,7 @@ function AdjustModal({
 }) {
   const [saving, setSaving] = useState(false),
     [error, setError] = useState("");
+  const [requestId] = useState(() => crypto.randomUUID());
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaving(true);
@@ -675,7 +677,7 @@ function AdjustModal({
     try {
       await api(`/batches/${row.id}/adjust`, token, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, request_id: requestId }),
       });
       saved();
     } catch (x) {
