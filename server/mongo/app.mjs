@@ -17,6 +17,7 @@ import documents from './documents.mjs';
 import workspaces from './workspaces.mjs';
 import labQuality from './lab-quality.mjs';
 import labOrderEdit from './lab-order-edit.mjs';
+import labStatusReport from './lab-status-report.mjs';
 import pharmacyForecast from './pharmacy-forecast.mjs';
 import finance from './finance.mjs';
 import diagnosticMasters from './diagnostic-masters.mjs';
@@ -194,7 +195,7 @@ app.use('/api/v1/dashboard',authenticate('careframe-portal'),dashboard);
 app.use('/api/v1/ot',authenticate('careframe-portal'),ot);
 app.use('/api/v1/dietary',authenticate('careframe-portal'),dietary);
 app.use('/api/v1/referrals',authenticate(['careframe-portal','careframe-broker']),referrals);
-app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labOrderEdit,labResults,labReports,labQuality,nursing,nursingTasks,registrationLinks,workspaces);
+app.use('/api/v1/workspaces',authenticate('careframe-portal'),laboratory,labOrderEdit,labResults,labReports,labQuality,labStatusReport,nursing,nursingTasks,registrationLinks,workspaces);
 app.use('/api/v1/self-registration',selfRegistration);
 app.use('/api/v1/lab-report-shares',publicReports);
 // Never route unconverted workflows into PostgreSQL or return fake empty success.

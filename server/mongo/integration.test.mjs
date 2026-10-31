@@ -611,6 +611,12 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/workspaces/work-items/${laboratoryOrder.id}`,'PATCH',{status:'Completed',data:{details:'forged'}},staffLogin.data.token)).status,403);
     assert.equal((await request('/workspaces/work-items','POST',{kind:'orders',title:'Bypass diagnostic workflow',data:{details:'forged'}},staffLogin.data.token)).status,403);
   });
+  await t.test('per-test status reports classify mixed orders by saved values',async()=>{
+    const id='00000000-0000-4000-8000-000000000021',first=laboratoryOrder.data.tests[0].test_id,second='00000000-0000-4000-8000-000000000022';
+    await db.collection('role_work_items').insertOne({id,tenant_id:hospital.data.id,branch_id:branch.id,patient_id:patient.id,workspace:'laboratory',kind:'results',status:'Processing',data:{tests:[{test_id:first,name:'SyntheticMixed complete'},{test_id:second,name:'SyntheticMixed pending'}],lab_results:[{test_id:first,parameters:[{parameter_id:null,result_type_id:'3',value:'7'}]}]},occurred_at:new Date()});
+    const report=await request(`/workspaces/lab/test-status-report?from=${today}&to=${today}&test_search=SyntheticMixed`,'GET',null,staffLogin.data.token);assert.equal(report.status,200,JSON.stringify(report.data));assert.equal(report.data.summary.total,2);assert.equal(report.data.summary.conducted,1);assert.equal(report.data.summary.pending,1);assert.equal(report.data.rows.find(row=>row.test_id===first).result_status,'Completed');
+    const pending=await request(`/workspaces/lab/test-status-report?from=${today}&to=${today}&test_search=SyntheticMixed&status=pending`,'GET',null,staffLogin.data.token);assert.equal(pending.status,200,JSON.stringify(pending.data));assert.equal(pending.data.total,1);assert.equal(pending.data.rows[0].test_id,second);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
