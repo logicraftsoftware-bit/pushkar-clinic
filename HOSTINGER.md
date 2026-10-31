@@ -4,7 +4,7 @@ Use the managed **Node.js web app** on Cloud Startup for `erp.pushkarpharmaceuti
 
 | Setting | Value |
 | --- | --- |
-| Repository / branch | `logicraftsoftware-bit/pushkar-clinic` / `main` |
+| Repository / branch | `logicraftsoftware-bit/pushkar-clinic` / `production` |
 | Root | Repository root |
 | Framework | Express / Other |
 | Node.js | 22 |
@@ -13,6 +13,12 @@ Use the managed **Node.js web app** on Cloud Startup for `erp.pushkarpharmaceuti
 | Start | `npm start` |
 | Entry if requested | `hosting.mjs` |
 | Health check | `/api/v1/health` |
+
+## Automatic deployment
+
+`.github/workflows/deploy.yml` promotes the latest `main` revision to `production` only after **Validate project** passes. Older CI runs cannot promote over a newer main revision; promotion is fast-forward only. In hPanel, change the connected branch to **production** and enable auto-deployment. Hostinger's GitHub App handles deployment when this branch changes; no VPS action, SSH password or Hostinger API token is needed. The repository workflow cannot change your private hPanel setting.
+
+`npm run build` and `npm run build:hostinger` both build the frontend, install server dependencies and compile compatibility sources. Build-time type declarations are included in production dependencies because hosting may omit devDependencies when `NODE_ENV=production`. CI explicitly checks this installation mode.
 
 The server serves React and the MongoDB API on one port. Hostinger supplies `PORT`. Set `TRUST_PROXY_HOPS=1` for the hosting reverse proxy so login limits use the forwarded client IP; adjust only if Hostinger specifies a different proxy chain. Keep `VITE_API_URL` unset. Use Hostinger's [Node.js guide](https://www.hostinger.com/support/how-to-deploy-a-nodejs-website-in-hostinger/) and [private environment settings](https://www.hostinger.com/support/how-to-add-environment-variables-during-node-js-application-deployment/).
 

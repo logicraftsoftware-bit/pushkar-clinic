@@ -1,0 +1,44 @@
+name: Deploy validated update
+
+on:
+  workflow_run:
+    workflows: [Validate project]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hostinger-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Promote checked revision for Hostinger auto-deployment
+        env:
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VALIDATED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$current_main" != "$VALIDATED_SHA" ]]; then
+            echo "A newer main revision exists; its CI run will handle deployment."
+            exit 0
+          fi
+          # Fast-forward only: never overwrite independent production history.
+          git push origin "$VALIDATED_SHA:refs/heads/production"
+          echo "Validated revision promoted to production." >> "$GITHUB_STEP_SUMMARY"
+          echo "Hostinger must track production with auto-deployment enabled." >> "$GITHUB_STEP_SUMMARY"

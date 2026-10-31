@@ -7,12 +7,13 @@
     "dev": "vite",
     "migrate": "tsx server/src/migrate.ts",
     "migrate:charges": "tsx server/src/seed-hospital-charges.ts",
-    "build": "tsc -b && vite build",
-    "build:hostinger": "npm run build && npm --prefix server ci --include=dev --no-audit --no-fund && npm --prefix server run build",
+    "build": "npm run build:web && npm --prefix server ci --include=dev --no-audit --no-fund && npm --prefix server run build",
+    "build:hostinger": "npm run build",
     "start": "node hosting.mjs",
     "test": "tsx --test server/tests/*.test.ts",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:web": "tsc -b && vite build"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
@@ -34,16 +35,16 @@
     "sweetalert2": "^11.26.25",
     "typescript": "~5.7.2",
     "vite": "^6.0.5",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
+    "zod": "^3.25.76",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.30",
     "@types/pg": "^8.15.4",
     "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
+    "@types/react-dom": "^18.3.5"
+  },
+  "devDependencies": {
     "eslint": "^9.17.0",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.18.2"

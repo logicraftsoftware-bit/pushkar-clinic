@@ -22,9 +22,14 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             server/package-lock.json
-      - run: npm ci --include=dev --no-audit --no-fund
+      - name: Reproduce the production-only Hostinger dependency installation
+        run: npm ci --omit=dev --no-audit --no-fund
       - id: build
         run: npm run build:hostinger 2>&1 | tee /tmp/clinic-build.log
+        env:
+          NODE_ENV: production
+      - name: Install compatibility test tooling after the production build
+        run: npm ci --include=dev --no-audit --no-fund
       - id: legacy_tests
         run: npm test 2>&1 | tee /tmp/clinic-tests.log
       - name: Expose validation failure details in check annotations
