@@ -23,6 +23,7 @@ import activity from './activity.mjs';
 import clinicalAI from './clinical-ai.mjs';
 import aiAssistant from './ai-assistant.mjs';
 import crm,{crmAdmin} from './crm.mjs';
+import {withinJsonBudget} from './json-budget.mjs';
 import finance from './finance.mjs';
 import diagnosticMasters from './diagnostic-masters.mjs';
 import laboratory from './laboratory.mjs';
@@ -54,6 +55,7 @@ app.set('trust proxy',config.TRUST_PROXY_HOPS);
 app.use(helmet());
 app.use(cors({ origin: config.FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '20mb' }));
+app.use((request,response,next)=>withinJsonBudget(request.body)?next():response.status(413).json({error:'Request is too large or deeply nested. Submit fewer records.'}));
 app.use((_request, response, next) => { response.set('Cache-Control', 'no-store'); next(); });
 app.use(async (_request, response, next) => {
   try { await initializeMongo(); next(); }

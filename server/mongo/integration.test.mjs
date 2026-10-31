@@ -47,6 +47,7 @@ after(async()=>{
 });
 test('native MongoDB authentication and atomic clinic provisioning', async t => {
   await t.test('validation rejects oversized invalid arrays before accumulating element errors',async()=>{
+    assert.equal((await request('/auth/login','POST',{payload:Array(2001).fill(null)})).status,413);
     const {z}=await import('zod');
     const input=z.array(z.object({name:z.string()})).max(5),result=input.safeParse(Array.from({length:10000},()=>({name:null})));
     assert.equal(result.success,false);assert.equal(result.error.issues.length,1);assert.equal(result.error.issues[0].code,'too_big');
