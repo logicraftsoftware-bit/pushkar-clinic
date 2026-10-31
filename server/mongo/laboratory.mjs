@@ -103,7 +103,11 @@ router.get('/lab-orders',async(request,response)=>{
   const filter=await scopeFor(response,extra),search=z.string().max(150).default('').parse(request.query.search);
   if(search)filter.$and.push({$or:['title','data.customer_name','data.medical_record_number','data.bill_number'].map(field=>({[field]:{$regex:escape(search),$options:'i'}}))});
   const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
-  const rows=await db.collection('role_work_items').find(filter,{projection:{_id:0,'data.lab_results':0,'data.result_history':0}}).sort({occurred_at:-1}).skip((page-1)*pageSize).limit(pageSize).toArray();
+  const billing=request.query.billing==='1',status=z.string().max(100).default('').parse(request.query.status);
+  const join=[{$lookup:{from:'finance_records',let:{bill:'$data.bill_id',tenant:'$tenant_id'},pipeline:[{$match:{$expr:{$and:[{$eq:['$id','$$bill']},{$eq:['$tenant_id','$$tenant']},{$eq:['$kind','invoices']}]}}}],as:'invoice'}},{$set:{invoice:{$arrayElemAt:['$invoice',0]}}},{$set:{payment_status:{$cond:[{$in:['$invoice.status',['Cancelled','Refunded']]},'$invoice.status',{$cond:[{$ne:[{$ifNull:['$invoice.id',null]},null]},{$cond:[{$lte:['$invoice.due',0]},'Paid',{$cond:[{$gt:['$invoice.paid',0]},'Partially Paid','Unpaid']}]},'Not billed']}]},sample_status:{$switch:{branches:[{case:{$eq:['$status','Cancelled']},then:'Cancelled'},{case:{$or:[{$eq:['$status','Rejected']},{$eq:['$data.processing_status','Rejected']}]},then:'Rejected'},{case:{$ne:[{$ifNull:['$data.collected_at',null]},null]},then:{$cond:[{$or:[{$eq:['$data.result_status','In Progress']},{$eq:['$data.processing_status','Accepted']}]},'Processing','Sample Collected']}},{case:{$eq:['$status','Barcode Generated']},then:'Barcode Generated'},{case:{$or:[{$eq:['$kind','sample collection']},{$ne:[{$ifNull:['$data.sample_requested_at',null]},null]}]},then:'Awaiting Sample'}],default:'$status'}}}}];
+  const pipeline=[{$match:filter},...join,...(billing?[{$match:{'invoice.id':{$exists:true}}}]:[]),...(status?[{$match:{[billing?'payment_status':'sample_status']:status}}]:[])];
+  const [count]=await db.collection('role_work_items').aggregate([...pipeline,{$count:'total'}]).toArray();
+  const rows=await db.collection('role_work_items').aggregate([...pipeline,{$sort:{occurred_at:-1}},{$skip:(page-1)*pageSize},{$limit:pageSize},{$project:{_id:0,invoice:0,'data.lab_results':0,'data.result_history':0}}]).toArray();
   for(let index=0;index<rows.length;index++){const row=rows[index],bill=row.data.bill_id?await billFor(row):{id:null,record_number:null,total:0,paid:0,due:0,status:'Not billed'};row.bill_id=bill.id;row.bill_number=bill.record_number;row.bill_total=bill.total;row.bill_paid=bill.paid;row.bill_due=bill.due;row.bill_status=bill.status;row.report_available=Boolean(row.data.doctor_approval?.test_ids?.length&&bill.status==='Paid'&&Number(bill.due)===0&&Number(bill.paid)>=Number(bill.total));row.patient_name=row.data.customer_name;row.medical_record_number=row.data.medical_record_number;if(stage==='Sample Collection')rows[index]=sampleCollectionRow(row);}
   const alive={$not:[{$in:['$status',['Cancelled','Rejected']]}]},collected={$ne:[{$ifNull:['$data.collected_at',null]},null]},resultComplete={$in:['$data.result_status',['Completed','Partially Completed']]};
   const metrics={total:true,awaiting:{$and:[alive,{$not:[collected]}]},progress:{$and:[alive,collected,{$not:[resultComplete]}]},ready:{$and:[alive,resultComplete,{$ne:[{$ifNull:['$data.doctor_approval',null]},null]}]},unpaid:{$and:[alive,{$gt:['$data.due_amount',0]}]}};
@@ -113,7 +117,16 @@ router.get('/lab-orders',async(request,response)=>{
     aggregate[key+suffix]={$sum:{$cond:[period?{$and:[condition,{$eq:[month,period]}]}:condition,1,0]}};empty[key+suffix]=0;
   }
   const [summary]=await db.collection('role_work_items').aggregate([{$match:await scopeFor(response,{workspace:'laboratory'})},{$group:aggregate},{$project:{_id:0}}]).toArray();
-  response.json({rows,total:await db.collection('role_work_items').countDocuments(filter),summary:summary??empty,page,page_size:pageSize});
+  let displaySummary=summary??empty;
+  if(billing){
+    const fields={_id:null},defaults={};
+    for(const key of ['total','paid','partial','unpaid','revenue'])for(const [suffix,period] of [['',null],['_current',current],['_previous',previous]]){
+      const condition=key==='total'||key==='revenue'?true:{$eq:['$payment_status',{paid:'Paid',partial:'Partially Paid',unpaid:'Unpaid'}[key]]};
+      fields[key+suffix]={$sum:{$cond:[period?{$and:[condition,{$eq:[month,period]}]}:condition,key==='revenue'?{$ifNull:['$invoice.paid',0]}:1,0]}};defaults[key+suffix]=0;
+    }
+    const [totals]=await db.collection('role_work_items').aggregate([{$match:await scopeFor(response,{workspace:'laboratory'})},...join,{$match:{'invoice.id':{$exists:true}}},{$sort:{occurred_at:-1}},{$group:{_id:'$invoice.id',row:{$first:'$$ROOT'}}},{$replaceRoot:{newRoot:'$row'}},{$group:fields},{$project:{_id:0}}]).toArray();displaySummary=totals??defaults;
+  }
+  response.json({rows,total:count?.total??0,summary:displaySummary,page,page_size:pageSize});
 });
 router.get('/work-items/:id/lab-bill',async(request,response)=>{
   const row=await orderFor(response,uuid.parse(request.params.id)),bill=await billFor(row);delete bill._id;

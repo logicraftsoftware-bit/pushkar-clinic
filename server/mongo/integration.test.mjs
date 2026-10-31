@@ -583,7 +583,16 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const list=await request('/workspaces/lab-orders?stage=Lab%20Orders','GET',null,staffLogin.data.token);assert.equal(list.status,200,JSON.stringify(list.data));assert.ok(list.data.rows.some(row=>row.id===id&&row.bill_status==='Not billed'));
     const path=`/workspaces/work-items/${id}/lab-action`,attempts=await Promise.all([request(path,'PATCH',{action:'send_bill'},staffLogin.data.token),request(path,'PATCH',{action:'send_bill'},staffLogin.data.token)]);assert.deepEqual(attempts.map(row=>row.status),[200,200],JSON.stringify(attempts));assert.equal(attempts[0].data.bill.id,attempts[1].data.bill.id);assert.equal(attempts[0].data.bill.total,120);
     assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,'data.lab_order_id':id,kind:'invoices'}),1);
+    const current=await db.collection('role_work_items').findOne({id}),edit={test_ids:[laboratoryOrder.data.tests[0].test_id],discount:10,updated_at:current.updated_at.toISOString(),diagnosis:'Synthetic corrected diagnosis',urgent:true};
+    const edited=await request(`/workspaces/work-items/${id}/lab-order`,'PATCH',edit,staffLogin.data.token);assert.equal(edited.status,200,JSON.stringify(edited.data));assert.equal(edited.data.data.due_amount,110);
+    assert.equal((await request(`/workspaces/work-items/${id}/lab-order`,'PATCH',edit,staffLogin.data.token)).status,409);
+    assert.equal((await request(path,'PATCH',{action:'send_sample'},staffLogin.data.token)).status,200);
+    assert.equal((await request(`/workspaces/work-items/${id}/lab-order`,'PATCH',{...edit,updated_at:edited.data.updated_at},staffLogin.data.token)).status,409);
+
     assert.equal((await request(path,'PATCH',{action:'cancel'},staffLogin.data.token)).status,409);
+    const waiting=await request('/workspaces/lab-orders?status=Awaiting%20Sample','GET',null,staffLogin.data.token);assert.equal(waiting.status,200,JSON.stringify(waiting.data));assert.ok(waiting.data.rows.some(row=>row.id===id));
+    const unpaid=await request('/workspaces/lab-orders?billing=1&status=Unpaid','GET',null,staffLogin.data.token);assert.equal(unpaid.status,200,JSON.stringify(unpaid.data));assert.ok(unpaid.data.rows.some(row=>row.id===id));assert.ok(unpaid.data.summary.unpaid>=1);assert.ok(unpaid.data.rows.every(row=>row.payment_status==='Unpaid'));
+
   });
   await t.test('laboratory quality controls enforce expiry and expose workflow queues',async()=>{
     const parameter=await db.collection('hospital_diagnostic_masters').findOne({tenant_id:hospital.data.id,domain:'pathology',kind:'parameter'});assert.ok(parameter);
