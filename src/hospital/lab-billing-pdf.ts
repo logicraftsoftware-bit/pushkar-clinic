@@ -1,6 +1,6 @@
 import {doctorWithQualification} from '../../server/src/doctor-print-display';
 import {labBillingPrintHtml} from './lab-billing-print';
-import {jsPDF} from "jspdf";
+import {jsPDF} from './pdf-engine.js';
 import {patientName} from '../../server/src/patient-name-display';
 import autoTable from "jspdf-autotable";
 import {reportPlainText} from "./lab-report-pdf";

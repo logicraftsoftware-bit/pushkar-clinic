@@ -4,7 +4,7 @@ import {isPapSmearTest,normalizeLabResultFormats} from '../src/lab-result-format
 import {prepareLabResults} from '../src/lab-result-entry.js';
 import {reportRows,createLabReportPdf} from '../../src/hospital/lab-report-pdf.js';
 import {readFileSync} from 'node:fs';
-import {jsPDF} from 'jspdf';
+import {jsPDF} from '../../src/hospital/pdf-engine.js';
 const pap={test_id:'pap',name:'PAP SMEAR',parameters:[{parameter_id:'report',name:'PAP Smear',result_type_id:'3',value:'Existing description',remarks:'Previous note'}]};
 const text='SPECIMEN ADEQUACY\nSatisfactory for evaluation.\n\nMICROSCOPIC DESCRIPTION\n'+('Descriptive cytology report text. '.repeat(50))+'\n\nIMPRESSION\nFinal narrative impression.';
 

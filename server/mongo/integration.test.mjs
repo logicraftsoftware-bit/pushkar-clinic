@@ -335,6 +335,27 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const users=await request('/access-control/users','GET',null,staffLogin.data.token);assert.equal(users.status,200);assert.equal(users.data.find(row=>row.id===userId).password_hash,undefined);
     assert.equal(await db.collection('audit_events').countDocuments({tenant_id:hospital.data.id,action:'account_access_updated',record_id:userId}),1);
   });
+  await t.test('inventory transfer retries move stock once and overdraw rolls back every write',async()=>{
+    const supplier=await request('/operations/inventory/suppliers','POST',{data:{name:'Synthetic Supplier'}},staffLogin.data.token);assert.equal(supplier.status,201,JSON.stringify(supplier.data));
+    const otherBranch=await request('/hospital-management/branches','POST',{name:'Synthetic Stock Branch',code:'STOCKBR'},staffLogin.data.token);assert.equal(otherBranch.status,201,JSON.stringify(otherBranch.data));
+    const source=await request('/operations/inventory/items','POST',{branch_id:branch.id,data:{name:'Synthetic Gauze',unit:'box',reorder_level:3},quantity:10},staffLogin.data.token);
+    const destination=await request('/operations/inventory/items','POST',{branch_id:otherBranch.data.id,data:{name:'Synthetic Gauze',unit:'box'},quantity:0},staffLogin.data.token);
+    assert.equal(source.status,201,JSON.stringify(source.data));assert.equal(destination.status,201,JSON.stringify(destination.data));
+    const body={branch_id:branch.id,item_id:source.data.id,quantity:6,data:{to_branch:otherBranch.data.id,destination_item_id:destination.data.id},request_id:'00000000-0000-4000-8000-000000000091'};
+    const results=await Promise.all([request('/operations/inventory/stock-transfers','POST',body,staffLogin.data.token),request('/operations/inventory/stock-transfers','POST',body,staffLogin.data.token)]);
+    assert.deepEqual(results.map(row=>row.status),[201,201],JSON.stringify(results));assert.equal(results[0].data.id,results[1].data.id);
+    assert.equal((await db.collection('inventory_records').findOne({id:source.data.id})).quantity,4);assert.equal((await db.collection('inventory_records').findOne({id:destination.data.id})).quantity,6);
+    assert.equal((await request('/operations/inventory/stock-transfers','POST',{...body,quantity:7,request_id:'00000000-0000-4000-8000-000000000092'},staffLogin.data.token)).status,409);
+    assert.equal(await db.collection('inventory_records').countDocuments({tenant_id:hospital.data.id,kind:'stock-transfers'}),1);
+    assert.equal((await request('/operations/inventory/stock-transfers','POST',{...body,quantity:1},staffLogin.data.token)).status,409);
+    const purchased=await request('/operations/inventory/purchases','POST',{branch_id:branch.id,item_id:source.data.id,supplier_id:supplier.data.id,quantity:2.125,amount:10,data:{}},staffLogin.data.token);assert.equal(purchased.status,201,JSON.stringify(purchased.data));
+    assert.equal((await db.collection('inventory_records').findOne({id:source.data.id})).quantity,6.125);
+    assert.equal((await request(`/operations/inventory/purchases/${purchased.data.id}`,'PUT',{quantity:999,data:{}},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/operations/inventory/items/${source.data.id}`,'PUT',{...source.data,quantity:100},staffLogin.data.token)).status,409);
+    const lookup=await request('/operations/lookups?keys=items,suppliers,branches','GET',null,staffLogin.data.token);assert.equal(lookup.status,200);assert.equal(lookup.data.items.find(row=>row.id===source.data.id).stock,6.125);
+    const low=await request('/operations/inventory/low-stock','GET',null,staffLogin.data.token);assert.equal(low.status,200);assert.equal(low.data.some(row=>row.id===source.data.id),false);
+    const events=await fetch(`${base}/session/events`,{headers:{Authorization:`Bearer ${staffLogin.data.token}`}});assert.equal(events.status,200);assert.match(events.headers.get('content-type'),/text\/event-stream/);const reader=events.body.getReader();const first=await reader.read();assert.match(new TextDecoder().decode(first.value),/data: refresh/);await reader.cancel();
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

@@ -1,5 +1,5 @@
 import {doctorWithQualification} from '../../server/src/doctor-print-display';
-import {jsPDF} from "jspdf";
+import {jsPDF} from './pdf-engine.js';
 import {patientName} from '../../server/src/patient-name-display';
 import autoTable from "jspdf-autotable";
 import {BILL_PDF_OPTIONS,BILL_PAGE} from "./billing-paper";

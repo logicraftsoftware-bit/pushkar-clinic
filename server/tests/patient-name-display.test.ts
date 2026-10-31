@@ -4,7 +4,7 @@ import {once} from 'node:events';
 import type {AddressInfo} from 'node:net';
 import express from 'express';
 import {readFileSync} from 'node:fs';
-import {jsPDF} from 'jspdf';
+import {jsPDF} from '../../src/hospital/pdf-engine.js';
 import {displayPatientNames,patientName} from '../src/patient-name-display.js';
 import {patientNameResponse} from '../src/patient-name-response.js';
 import {createLabReportPdf} from '../../src/hospital/lab-report-pdf.js';

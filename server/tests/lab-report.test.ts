@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {reportSignatories,testReportSignatories} from "../src/lab-signatories.js";
 import {decodeReportPdf,newReportShareToken,shareTokenHash} from "../src/lab-report-share-data.js";
 import {createLabReportPdf,reportRows} from "../../src/hospital/lab-report-pdf.js";
-import {jsPDF} from 'jspdf';
+import {jsPDF} from '../../src/hospital/pdf-engine.js';
 import {reportParameters} from '../src/lab-report-parameters.js';
 import {primarySampleNames} from '../src/lab-report-specimens.js';
 const fonts={regular:readFileSync(new URL("../../public/fonts/NotoSans-Regular.ttf",import.meta.url)).toString("base64"),bold:readFileSync(new URL("../../public/fonts/NotoSans-Bold.ttf",import.meta.url)).toString("base64")};

@@ -5,7 +5,7 @@ import {primarySampleNames} from '../../server/src/lab-report-specimens';
 import {isPapSmearTest} from '../../server/src/lab-result-format';
 import {reportParameters} from '../../server/src/lab-report-parameters';
 import {reportableLabTests} from "../../server/src/lab-result-completion";
-import {jsPDF} from "jspdf";
+import {jsPDF} from './pdf-engine.js';
 import autoTable from "jspdf-autotable";
 import {patientAgeLabel} from "./patient-age";
 import JsBarcode from "jsbarcode";

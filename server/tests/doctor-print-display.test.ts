@@ -26,7 +26,7 @@ test('laboratory invoice and payment receipt include the referring qualification
  for(const payment of [undefined,{record_number:'PAY-TEST',amount:200,data:{balance_after:300}}]){const html=labBillingPrintHtml(bill,payment);assert.ok(html.includes('Dr Example (MBBS, MD)'));assert.ok(html.includes('INR 300.00'));}
 });
 import {readFileSync} from 'node:fs';
-import {jsPDF} from 'jspdf';
+import {jsPDF} from '../../src/hospital/pdf-engine.js';
 import {createLabReportPdf} from '../../src/hospital/lab-report-pdf.js';
 import {createLabBillingPdf} from '../../src/hospital/lab-billing-pdf.js';
 test('generated laboratory PDFs include referring and signing doctor qualifications in brackets',async()=>{
