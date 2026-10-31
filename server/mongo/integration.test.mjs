@@ -421,6 +421,21 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const history=await request(`/doctor/patients/${patient.id}`,'GET',null,login.data.token);assert.equal(history.status,200);assert.ok(history.data.records.some(row=>row.id===completed.data.id));
     assert.equal((await request('/doctor/soap','POST',{appointment_id:appointment.id,transcript:'Synthetic test transcript'},login.data.token)).status,503);
   });
+  await t.test('pharmacy purchases create priced batches and used stock cannot be removed by purchase editing',async()=>{
+    const supplier=await request('/operations/pharmacy/suppliers','POST',{name:'Synthetic Medicine Supplier'},staffLogin.data.token);assert.equal(supplier.status,201,JSON.stringify(supplier.data));
+    const medicine=await request('/operations/pharmacy/medicines','POST',{name:'Synthetic Medicine Master',tax:10},staffLogin.data.token);assert.equal(medicine.status,201,JSON.stringify(medicine.data));
+    const body={supplier_id:supplier.data.id,branch_id:branch.id,invoice_number:'SYNTHETIC-PURCHASE-1',purchase_date:new Date().toISOString().slice(0,10),payment_status:'Unpaid',request_id:'00000000-0000-4000-8000-000000000041',items:[{medicine_id:medicine.data.id,batch_number:'TEST-BATCH',expiry_date:'2030-12',quantity:10,free_quantity:2,purchase_rate:5,mrp:8,gst_percent:10,discount_percent:10}]};
+    const created=await request('/operations/pharmacy/purchases','POST',body,staffLogin.data.token);assert.equal(created.status,201,JSON.stringify(created.data));assert.equal(created.data.amount,49.50);
+    const retried=await request('/operations/pharmacy/purchases','POST',body,staffLogin.data.token);assert.equal(retried.status,201);assert.equal(retried.data.id,created.data.id);
+    const details=await request(`/operations/pharmacy/purchases/${created.data.id}`,'GET',null,staffLogin.data.token);assert.equal(details.status,200);assert.equal(details.data.items[0].current_quantity,12);assert.equal(details.data.items[0].expiry_date,'2030-12-31');
+    const batchId=details.data.items[0].id,adjustment={quantity:3,reason:'Synthetic stock correction',type:'Remove',request_id:'00000000-0000-4000-8000-000000000042'};
+    const updates=await Promise.all([request(`/operations/pharmacy/batches/${batchId}/adjust`,'POST',adjustment,staffLogin.data.token),request(`/operations/pharmacy/batches/${batchId}/adjust`,'POST',adjustment,staffLogin.data.token)]);assert.deepEqual(updates.map(row=>row.status),[200,200],JSON.stringify(updates));assert.equal((await db.collection('inventory_records').findOne({id:batchId})).quantity,9);
+    assert.equal((await request(`/operations/pharmacy/batches/${batchId}/adjust`,'POST',{...adjustment,quantity:10,request_id:'00000000-0000-4000-8000-000000000043'},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/operations/pharmacy/purchases/${created.data.id}`,'PUT',body,staffLogin.data.token)).status,409);
+    assert.equal((await request(`/operations/pharmacy/purchases/${created.data.id}`,'DELETE',null,staffLogin.data.token)).status,409);
+    assert.equal((await request(`/operations/pharmacy/suppliers/${supplier.data.id}`,'DELETE',null,staffLogin.data.token)).status,409);
+    const summary=await request('/operations/pharmacy/summary','GET',null,staffLogin.data.token);assert.equal(summary.status,200);assert.equal(summary.data.units,9);
+  });
   await t.test('nursing charts are ward-scoped and concurrent medication recording creates one outcome',async()=>{
     const admission=await db.collection('ipd_admissions').findOne({tenant_id:hospital.data.id,patient_id:patient.id,active:true});
     const nurse=await request('/hospital-management/staff/save','POST',{first_name:'Synthetic',last_name:'Nurse',staff_type:'Nurse',branch_ids:[branch.id],department_id:department.id,personal:{},employment:{},professional:{ward_assignment:admission.ward_id},account:{role:'NURSE',login_email:'nurse@example.invalid',username:'synthetic-nurse',password,account_status:'Active'}},staffLogin.data.token);assert.equal(nurse.status,201,JSON.stringify(nurse.data));
