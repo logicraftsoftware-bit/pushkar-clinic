@@ -389,6 +389,25 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const claims=await request('/workforce/insurance','GET',null,staffLogin.data.token);assert.equal(claims.status,200);assert.equal(claims.data.length,1);assert.equal(claims.data[0].request_hash,undefined);
     const lookups=await request('/workforce/lookups','GET',null,staffLogin.data.token);assert.equal(lookups.status,200);assert.ok(lookups.data.employees.some(row=>row.id===doctor.id));
   });
+  await t.test('approved OPD cancellation retains the agreed amount and refund retries post once',async()=>{
+    const booked=await request('/clinical/appointments','POST',{branch_id:branch.id,department_id:department.id,doctor_id:doctor.user_id,patient_id:patient.id,appointment_date:future,appointment_time:'10:40',appointment_type:'OPD',visit_type:'New',consultation_fee:100,paid_amount:50,payment_mode:'Cash'},staffLogin.data.token);assert.equal(booked.status,201,JSON.stringify(booked.data));
+    const body={type:'OPD',target_id:booked.data.id,reason:'Synthetic patient request',amount:30};
+    const submitted=await request('/cancellations','POST',body,staffLogin.data.token);assert.equal(submitted.status,201,JSON.stringify(submitted.data));
+    assert.equal((await request('/cancellations','POST',body,staffLogin.data.token)).status,409);
+    assert.equal((await request(`/cancellations/${submitted.data.id}/refund`,'POST',{amount:30,method:'Cash',payment_key:'00000000-0000-4000-8000-000000000061'},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/cancellations/${submitted.data.id}/review`,'POST',{decision:'approve',amount:31,note:'Synthetic approval'},staffLogin.data.token)).status,400);
+    const approved=await request(`/cancellations/${submitted.data.id}/review`,'POST',{decision:'approve',amount:30,note:'Synthetic approval'},staffLogin.data.token);assert.equal(approved.status,200,JSON.stringify(approved.data));
+    const cancelled=await db.collection('clinical_appointments').findOne({id:booked.data.id});assert.equal(cancelled.status,'Cancelled');assert.equal(cancelled.cancellation_retained_amount,20);
+    const refund={amount:30,method:'Cash',payment_key:'00000000-0000-4000-8000-000000000061'};
+    const retries=await Promise.all([request(`/cancellations/${submitted.data.id}/refund`,'POST',refund,staffLogin.data.token),request(`/cancellations/${submitted.data.id}/refund`,'POST',refund,staffLogin.data.token)]);
+    assert.deepEqual(retries.map(row=>row.status),[200,200],JSON.stringify(retries));assert.equal(retries[0].data.refund.id,retries[1].data.refund.id);
+    assert.equal(retries[0].data.request.status,'Completed');assert.equal((await db.collection('clinical_appointments').findOne({id:booked.data.id})).paid_amount,20);
+    assert.equal((await request(`/cancellations/${submitted.data.id}/refund`,'POST',{...refund,amount:1},staffLogin.data.token)).status,409);
+    assert.equal((await request('/cancellations','POST',{type:'OPD',target_id:appointment.id,reason:'Already checked in',amount:10},staffLogin.data.token)).status,409);
+    assert.equal((await request('/cancellations','POST',{type:'Lab',target_id:laboratoryOrder.data.bill_id,reason:'Already collected',amount:10},staffLogin.data.token)).status,409);
+    const events=await request(`/cancellations/${submitted.data.id}/events`,'GET',null,staffLogin.data.token);assert.equal(events.status,200);assert.deepEqual(events.data.map(row=>row.action),['Requested','Approved','Refund Paid']);
+    const list=await request('/cancellations?stage=refunds','GET',null,staffLogin.data.token);assert.equal(list.status,200);assert.equal(list.data.rows[0].status,'Completed');assert.equal(list.data.pending_refund,0);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
