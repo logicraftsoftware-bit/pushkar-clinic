@@ -46,6 +46,11 @@ async function references(response,name,body,session){
 router.get('/profile',requirePermission('hospital.manage'),async(_request,response)=>{
   response.json(publicRecord(await db.collection('hospitals').findOne({id:response.locals.account.tenant_id,deleted_at:null})));
 });
+router.put('/profile',requirePermission('hospital.manage'),async(request,response)=>{
+  const body=z.object({name:text.optional(),code:z.string().trim().regex(/^[A-Za-z0-9_-]{2,40}$/).optional(),logo_url:z.string().max(2850000).refine(value=>!value||/^data:image\/(png|jpeg|webp);base64,/i.test(value)||/^https:\/\//i.test(value)).optional(),hospital_type:z.string().max(100).optional(),registration_number:z.string().max(100).optional(),establishment_date:z.string().date().or(z.literal('')).nullable().optional(),email:z.string().email().or(z.literal('')).optional(),phone:phone.optional(),emergency_phone:phone.optional(),website:z.string().url().or(z.literal('')).optional(),gstin:z.string().max(30).optional(),address_line:z.string().max(1000).optional(),city:z.string().max(150).optional(),state:z.string().max(150).optional(),pin_code:z.string().regex(/^\d{6}$|^$/).optional(),country:z.string().max(100).optional(),currency:z.string().regex(/^[A-Z]{3}$/).optional(),timezone:z.string().max(100).refine(value=>{try{new Intl.DateTimeFormat('en',{timeZone:value});return true;}catch{return false;}}).optional()}).parse(request.body);
+  if(!Object.keys(body).length)throw failure('No profile fields supplied.');
+  const row=await transaction(async session=>{const updated=await db.collection('hospitals').findOneAndUpdate({id:response.locals.account.tenant_id,deleted_at:null},{$set:{...body,updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});if(!updated)throw failure('Clinic not found.',404);await writeAudit(response,'hospital_profile_updated',updated.id,session,{fields:Object.keys(body)});return publicRecord(updated);});response.json(row);
+});
 router.get('/staff/list',requirePermission('staff.view'),async(request,response)=>{
   const extra=request.query.type?{staff_type:z.string().max(100).parse(request.query.type)}:{};
   const rows=await db.collection('staff_members').find(await scopeFor(response,extra),{projection:{_id:0}}).sort({created_at:-1}).toArray();
@@ -158,6 +163,12 @@ router.delete('/staff/:id/appointment-schedule/:date',requirePermission('staff.u
     await writeAudit(response,'doctor_schedule_removed',staff.id,session,{date:day});
   });response.status(204).end();
 });
+router.get('/branches/:id/overview',requirePermission('hospital.manage'),async(request,response)=>{
+  const branch=await assertBranch(response,id.parse(request.params.id)),tenant_id=branch.tenant_id,assignments=await db.collection('user_branch_access').find({tenant_id,branch_id:branch.id},{projection:{user_id:1}}).toArray(),counts={};
+  counts.doctors=await db.collection('users').countDocuments({tenant_id,role:'doctor',$or:[{branch_id:branch.id},{id:{$in:assignments.map(row=>row.user_id)}}]});
+  for(const [key,collection,extra] of [['patients','patients',{deleted_at:null}],['lab_orders','role_work_items',{workspace:'laboratory'}],['appointments','clinical_appointments',{}],['admissions','ipd_admissions',{}],['departments','departments',{}],['beds','beds',{}]])counts[key]=await db.collection(collection).countDocuments({tenant_id,branch_id:branch.id,...extra});
+  response.json({branch:publicRecord(branch),counts});
+});
 router.get('/:resource',requirePermission('hospital.manage'),async(request,response)=>{
   const name=resource.parse(request.params.resource);
   const extra=['branches','departments'].includes(name)&&request.query.include_inactive!=='true'?{is_active:true}:{};
@@ -181,4 +192,16 @@ async function saveMaster(request,response){
 }
 router.post('/:resource',requirePermission('hospital.manage'),saveMaster);
 router.put('/:resource/:id',requirePermission('hospital.manage'),saveMaster);
+router.delete('/:resource/:id',requirePermission('hospital.manage'),async(request,response)=>{
+  const name=resource.parse(request.params.resource),identity=id.parse(request.params.id);
+  await transaction(async session=>{
+    const tenant_id=response.locals.account.tenant_id,old=await db.collection(table(name)).findOne(await masterScope(response,name,{id:identity},session),{session});if(!old)throw failure('Record not found.',404);
+    await db.collection('workflow_locks').updateOne({_id:`${tenant_id}:master-delete`},{$inc:{version:1}},{session,upsert:true});
+    const field={branches:'branch_id',departments:'department_id',wards:'ward_id',rooms:'room_id',beds:'bed_id','refer-pharmacies':'data.refer_pharmacy_id'}[name];
+    if(!field)throw failure('This master cannot be deleted. Set it inactive instead.',409);
+    const collections=['users','user_branch_access','staff_members','patients','departments','wards','rooms','beds','clinical_appointments','ipd_admissions','ipd_bed_stays','finance_records','inventory_records','role_work_items','hospital_documents','ot_cases','ot_rooms','dietary_orders','referral_partners'];
+    for(const collection of collections){const filter={tenant_id,[field]:identity,...(collection===table(name)?{id:{$ne:identity}}:{})};if(await db.collection(collection).findOne(filter,{session,projection:{_id:1}}))throw failure('This master has linked records or history. Set it inactive instead.',409);}
+    await db.collection(table(name)).deleteOne({tenant_id,id:identity},{session});await writeAudit(response,`${name}_deleted`,identity,session);
+  });response.status(204).end();
+});
 export default router;
