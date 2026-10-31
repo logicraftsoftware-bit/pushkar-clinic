@@ -436,6 +436,18 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/operations/pharmacy/suppliers/${supplier.data.id}`,'DELETE',null,staffLogin.data.token)).status,409);
     const summary=await request('/operations/pharmacy/summary','GET',null,staffLogin.data.token);assert.equal(summary.status,200);assert.equal(summary.data.units,9);
   });
+  await t.test('pharmacy bills compute tax and discount and finalized bills cannot be overwritten',async()=>{
+    const medicine=await db.collection('hospital_pharmacy_masters').findOne({tenant_id:hospital.data.id,kind:'medicine',name:'Synthetic Medicine Master'}),batch=await db.collection('inventory_records').findOne({tenant_id:hospital.data.id,kind:'pharmacy-batch','data.medicine_id':medicine.id});
+    const body={action:'generate',customer_name:'Synthetic walk-in',discount_percent:10,items:[{medicine_id:medicine.id,name:medicine.name,quantity:2,rate:5,gst_percent:10}],request_id:'00000000-0000-4000-8000-000000000031'};
+    const created=await request('/operations/pharmacy/pos','POST',body,staffLogin.data.token);assert.equal(created.status,201,JSON.stringify(created.data));assert.equal(created.data.total,9.9);assert.equal(created.data.status,'Bill Generated');
+    const retried=await request('/operations/pharmacy/pos','POST',body,staffLogin.data.token);assert.equal(retried.status,201);assert.equal(retried.data.id,created.data.id);
+    assert.equal((await request(`/operations/pharmacy/pos/${created.data.id}`,'PUT',{...body,updated_at:created.data.updated_at},staffLogin.data.token)).status,409);
+    assert.equal((await db.collection('inventory_records').findOne({id:batch.id})).quantity,batch.quantity,'bill generation is separate from dispensing');
+    const prescription=await db.collection('role_work_items').insertOne({id:'00000000-0000-4000-8000-000000000032',tenant_id:hospital.data.id,branch_id:branch.id,patient_id:patient.id,workspace:'pharmacy',kind:'prescription',status:'Pending',created_by:doctor.user_id,data:{doctor_id:doctor.user_id,medicines:[{medicine_id:medicine.id,name:medicine.name,quantity:2,dose:'Synthetic dose'}]},created_at:new Date(),updated_at:new Date(),occurred_at:new Date()});
+    const path='/operations/pharmacy/prescriptions/00000000-0000-4000-8000-000000000032/bill';
+    const drafts=await Promise.all([request(path,'POST',{},staffLogin.data.token),request(path,'POST',{},staffLogin.data.token)]);assert.deepEqual(drafts.map(row=>row.status),[201,201],JSON.stringify(drafts));assert.equal(drafts[0].data.id,drafts[1].data.id);assert.equal(drafts[0].data.total,16);
+    const listed=await request('/operations/pharmacy/pos','GET',null,staffLogin.data.token);assert.equal(listed.status,200);assert.ok(listed.data.bills.some(row=>row.id===created.data.id));
+  });
   await t.test('nursing charts are ward-scoped and concurrent medication recording creates one outcome',async()=>{
     const admission=await db.collection('ipd_admissions').findOne({tenant_id:hospital.data.id,patient_id:patient.id,active:true});
     const nurse=await request('/hospital-management/staff/save','POST',{first_name:'Synthetic',last_name:'Nurse',staff_type:'Nurse',branch_ids:[branch.id],department_id:department.id,personal:{},employment:{},professional:{ward_assignment:admission.ward_id},account:{role:'NURSE',login_email:'nurse@example.invalid',username:'synthetic-nurse',password,account_status:'Active'}},staffLogin.data.token);assert.equal(nurse.status,201,JSON.stringify(nurse.data));

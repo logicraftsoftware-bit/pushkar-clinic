@@ -307,6 +307,7 @@ function BillEditor({
     [availableMedicines, setAvailableMedicines] = useState(medicines),
     [addingMedicine, setAddingMedicine] = useState(false),
     [customerName, setCustomerName] = useState(row.patient_name || "Walk-in Customer");
+  const [requestId] = useState(() => crypto.randomUUID());
   const subtotal = items.reduce(
       (n, x) => n + Number(x.quantity || 0) * Number(x.rate || 0),
       0,
@@ -315,7 +316,7 @@ function BillEditor({
     taxable = subtotal - discount,
     tax = items.reduce((n, x) => n + Number(x.quantity || 0) * Number(x.rate || 0) * (1 - discountPercent / 100) * Number(x.gst_percent || 0) / 100, 0),
     total = taxable + tax,
-    readOnly = row.status === "Rejected";
+    readOnly = row.status === "Rejected" || row.status === "Bill Generated";
   function update(index: number, key: string, value: unknown) {
     setItems((x) =>
       x.map((r, i) => (i === index ? { ...r, [key]: value } : r)),
@@ -340,6 +341,7 @@ function BillEditor({
     );
   }
   async function submit(action: "generate" | "reject") {
+    if(saving||readOnly)return;
     if (action === "generate" && !items.length) {
       setError("Add at least one medicine before generating the bill");
       return;
@@ -350,6 +352,8 @@ function BillEditor({
       await api(row.id ? `/pos/${row.id}` : "/pos", token, {
         method: row.id ? "PUT" : "POST",
         body: JSON.stringify({
+          request_id: requestId,
+          updated_at: row.updated_at,
           action,
           items,
           discount_percent: discountPercent,

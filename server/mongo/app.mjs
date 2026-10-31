@@ -29,6 +29,7 @@ import doctor from './doctor.mjs';
 import {doctorDischarge,receptionDischarge,nursingTasks} from './discharge.mjs';
 import nursing from './nursing.mjs';
 import pharmacyStock,{pharmacyMasters} from './pharmacy-stock.mjs';
+import pharmacySales from './pharmacy-sales.mjs';
 import { hasActiveRole } from './access.mjs';
 
 const app = express();
@@ -167,7 +168,7 @@ app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),pharmacyMasters,diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient,receptionDischarge);
 app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings);
-app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory,pharmacyStock);
+app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory,pharmacyStock,pharmacySales);
 app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
 app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge);
