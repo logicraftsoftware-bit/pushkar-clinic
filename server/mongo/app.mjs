@@ -19,6 +19,7 @@ import labQuality from './lab-quality.mjs';
 import labOrderEdit from './lab-order-edit.mjs';
 import labStatusReport from './lab-status-report.mjs';
 import pharmacyForecast from './pharmacy-forecast.mjs';
+import activity from './activity.mjs';
 import finance from './finance.mjs';
 import diagnosticMasters from './diagnostic-masters.mjs';
 import laboratory from './laboratory.mjs';
@@ -182,6 +183,7 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
 });
 app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
 app.use('/api/v1/access-control',authenticate(['careframe-portal','careframe-broker']),accessControl);
+app.use('/api/v1/activity',authenticate('careframe-portal'),activity);
 app.get('/api/v1/session/events',authenticate(['careframe-portal','careframe-broker']),accessEvents);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),hospitalMasters,pharmacyMasters,diagnosticMasters,management);

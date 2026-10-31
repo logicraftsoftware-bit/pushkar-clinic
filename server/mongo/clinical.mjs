@@ -8,6 +8,10 @@ import {cents,appointmentTotal,paymentStatus} from './money.mjs';
 import {operationalSettings,configuredPrefix} from './settings.mjs';
 import {escapeSearch} from './search.mjs';
 const router=Router(),uuid=z.string().uuid();
+router.get('/print-template/:document',requirePermission('appointment.view'),async(request,response)=>{
+  const document=z.enum(['appointment','opd-bill','opd-prescription']).parse(request.params.document);
+  response.json(await db.collection('hospital_print_templates').findOne({tenant_id:response.locals.account.tenant_id,document_type:document},{projection:{_id:0,header_image:1,footer_content:1}})??{header_image:'',footer_content:''});
+});
 const date=z.string().date(),time=z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::00)?$/).transform(value=>value.slice(0,5));
 const amount=z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01);
 const appointmentInput=z.object({branch_id:uuid,department_id:uuid,patient_id:uuid,doctor_id:uuid,appointment_date:date,appointment_time:time,

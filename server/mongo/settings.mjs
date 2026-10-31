@@ -35,9 +35,16 @@ router.put('/settings/:section',requirePermission('settings.manage'),async(reque
   });response.status(204).end();
 });
 router.get('/audit',requirePermission('audit.view'),async(_request,response)=>{
-  response.json(await db.collection('audit_events').find(await scopeFor(response,{}),{projection:{_id:0}}).sort({created_at:-1}).limit(1000).toArray());
+  const rows=await db.collection('audit_events').find(await scopeFor(response,{}),{projection:{_id:0}}).sort({created_at:-1}).limit(1000).toArray();
+  const actors=new Map(),branches=new Map();
+  for(const row of rows){
+    if(!actors.has(row.actor_id))actors.set(row.actor_id,await db.collection('users').findOne({tenant_id:row.tenant_id,id:row.actor_id},{projection:{first_name:1,last_name:1,role:1}}));
+    if(row.branch_id&&!branches.has(row.branch_id))branches.set(row.branch_id,await db.collection('branches').findOne({tenant_id:row.tenant_id,id:row.branch_id},{projection:{name:1}}));
+    const actor=actors.get(row.actor_id);row.user_name=actor?`${actor.first_name} ${actor.last_name}`.trim():'System';row.role=actor?.role??'system';row.branch_name=branches.get(row.branch_id)?.name??'';row.module=row.metadata?.module??String(row.action).split('_')[0];
+  }response.json(rows);
 });
 router.get('/login-activity',requirePermission('audit.view'),async(_request,response)=>{
-  response.json(await db.collection('login_activity').find(await scopeFor(response,{}),{projection:{_id:0}}).sort({login_time:-1}).limit(1000).toArray());
+  const rows=await db.collection('login_activity').find(await scopeFor(response,{}),{projection:{_id:0}}).sort({login_time:-1}).limit(1000).toArray();
+  for(const row of rows){const user=await db.collection('users').findOne({tenant_id:row.tenant_id,id:row.user_id},{projection:{first_name:1,last_name:1}}),staff=await db.collection('staff_members').findOne({tenant_id:row.tenant_id,user_id:row.user_id},{projection:{first_name:1,last_name:1,employee_id:1}}),branch=await db.collection('branches').findOne({tenant_id:row.tenant_id,id:row.branch_id},{projection:{name:1}});Object.assign(row,{user_name:user?`${user.first_name} ${user.last_name}`:'',employee_name:staff?`${staff.first_name} ${staff.last_name}`:'',employee_code:staff?.employee_id??'',branch_name:branch?.name??''});}response.json(rows);
 });
 export default router;

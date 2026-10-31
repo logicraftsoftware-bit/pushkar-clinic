@@ -624,6 +624,11 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request(`/hospital-management/branches/${branch.id}`,'DELETE',null,staffLogin.data.token)).status,409);
     assert.equal((await request('/hospital-management/profile','PUT',{timezone:'Invalid/Timezone'},staffLogin.data.token)).status,400);
   });
+  await t.test('print templates and recorded activity remain accessible without exposing credentials',async()=>{
+    assert.equal((await request('/clinical/print-template/appointment','GET',null,staffLogin.data.token)).status,200);
+    for(const route of ['/hospital-admin/login-activity','/hospital-admin/audit','/activity','/activity/record?module=patients&id='+patient.id]){const result=await request(route,'GET',null,staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(JSON.stringify(result.data).includes('password_hash'),false);}
+    const me=await request('/admin/me','GET',null,token);assert.equal(me.status,200,JSON.stringify(me.data));assert.equal(me.data.role,'super_admin');assert.equal(me.data.password_hash,undefined);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

@@ -9,6 +9,10 @@ import { initializeRoles } from './access.mjs';
 import {escapeSearch} from './search.mjs';
 
 const router = Router();
+router.get('/me',async(_request,response)=>{
+  const account=response.locals.account;
+  response.json({id:account.id,username:account.username,display_name:account.display_name??account.username,role:'super_admin'});
+});
 const planFields = {
   name:'name',code:'code',description:'description',monthlyPrice:'monthly_price',yearlyPrice:'yearly_price',
   trialDays:'trial_days',maxBranches:'max_branches',maxUsers:'max_users',maxDoctors:'max_doctors',
@@ -25,7 +29,7 @@ router.get('/modules', async (_request,response) => {
   response.json(rows);
 });
 router.get('/plans', async (_request,response) => {
-  const plans = await db.collection('subscription_plans').find({}, { projection:{_id:0} }).sort({created_at:-1}).toArray();
+  const plans = await db.collection('subscription_plans').find({archived:{$ne:true}}, { projection:{_id:0} }).sort({created_at:-1}).toArray();
   for (const plan of plans) {
     plan.modules = await db.collection('platform_modules').find({id:{$in:plan.module_ids ?? []}}, {projection:{_id:0}}).toArray();
     plan.hospital_count = await db.collection('subscriptions').countDocuments({plan_id:plan.id,status:{$in:['active','trial']}});
@@ -36,6 +40,13 @@ router.get('/plans/:id', async (request,response) => {
   const row=await db.collection('subscription_plans').findOne({id:z.string().uuid().parse(request.params.id)});
   if(!row)return response.status(404).json({error:'Plan not found'});
   response.json(publicRecord(row));
+});
+router.delete('/plans/:id',async(request,response)=>{
+  const id=z.string().uuid().parse(request.params.id);
+  const result=await transaction(async session=>{
+    if(await db.collection('subscriptions').findOne({plan_id:id,status:{$in:['active','trial']}},{session}))throw Object.assign(new Error('Deactivate this plan instead; it is assigned to a clinic.'),{status:409});
+    return db.collection('subscription_plans').updateOne({id,archived:{$ne:true}},{$set:{archived:true,status:'inactive',updated_at:new Date()}},{session});
+  });if(!result.matchedCount)return response.status(404).json({error:'Plan not found'});response.status(204).end();
 });
 router.post('/plans', async (request,response) => {
   const input=planInput.parse(request.body),id=randomUUID(),now=new Date();
