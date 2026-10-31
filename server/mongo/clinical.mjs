@@ -135,6 +135,48 @@ router.post('/appointments',requirePermission('appointment.create'),async(reques
     return record;
   });response.status(201).json(result);
 });
+router.put('/appointments/:id',requirePermission('appointment.update'),async(request,response)=>{
+  const input=appointmentInput.extend({status:z.string(),updated_at:z.string().datetime()}).parse(request.body),recordId=uuid.parse(request.params.id),tenant=response.locals.account.tenant_id;
+  const saved=await transaction(async session=>{
+    const filter=await scopeFor(response,{id:recordId},session),previous=await db.collection('clinical_appointments').findOne(filter,{session});
+    if(!previous)throw failure('Appointment not found.',404);
+    if(previous.status!==input.status||new Date(previous.updated_at).toISOString()!==input.updated_at)throw failure('Appointment changed. Refresh before editing.',409);
+    if(['Cancelled','Completed','No Show'].includes(previous.status))throw failure('This appointment is read-only.',409);
+    const moved=['branch_id','department_id','doctor_id','appointment_date','appointment_time'].some(key=>String(previous[key]).slice(0,key==='appointment_time'?5:undefined)!==String(input[key]));
+    if(moved&&!['Booked','Confirmed'].includes(previous.status))throw failure('An appointment already checked in cannot be moved.',409);
+    const priorPaid=cents(previous.paid_amount),paid=cents(input.paid_amount);
+    if(paid<priorPaid)throw failure('Payments cannot be removed through editing. Use an approved refund.',409);
+    if(priorPaid&&(input.patient_id!==previous.patient_id||input.branch_id!==previous.branch_id))throw failure('A collected payment cannot be moved to another patient or branch.',409);
+    for(const lock of [...new Set([`${tenant}:doctor:${previous.doctor_id}:${previous.appointment_date}`,`${tenant}:doctor:${input.doctor_id}:${input.appointment_date}`])].sort())await db.collection('workflow_locks').updateOne({_id:lock},{$inc:{version:1}},{session,upsert:true});
+    const doctor=await doctorFor(response,input.branch_id,input.department_id,input.doctor_id,session);
+    await db.collection('staff_members').updateOne({tenant_id:tenant,id:doctor.staff.id},{$inc:{workflow_version:1}},{session});
+    await db.collection('users').updateOne({tenant_id:tenant,id:doctor.user.id},{$inc:{booking_version:1}},{session});
+    if(!await db.collection('patients').findOne({tenant_id:tenant,id:input.patient_id,deleted_at:null},{session}))throw failure('Selected patient is unavailable.');
+    const slot=moved?(await slotsFor(doctor,input.appointment_date,input.slot_interval,recordId,session)).find(row=>row.time===input.appointment_time):{serial:previous.slot_serial};
+    if(!slot)throw failure('This doctor slot is unavailable. Select a future available slot.',409);
+    const charges=input.charges.filter(charge=>!charge.doctor_fee);
+    // Existing selected doctor fees retain the prices captured at booking.
+    charges.push(...(previous.charges??[]).filter(charge=>charge.doctor_fee));
+    const {_id,...old}=previous;
+    const row={...old,...input,charges,slot_serial:slot.serial,updated_at:new Date(Math.max(Date.now(),new Date(previous.updated_at).getTime()+1))};
+    delete row.doctor_fee_selection;
+    const total=appointmentTotal(row),collected=paid-priorPaid;
+    if(paid>total)throw failure('The appointment total cannot be less than its collected payments.');
+    if(collected&&!(await methods(tenant,session)).includes(row.payment_mode))throw failure('Select a valid payment method.');
+    if(!collected)row.payment_mode=previous.payment_mode;
+    row.payment_status=paymentStatus(total,paid);
+    if(moved){
+      const initials=`${doctor.user.first_name} ${doctor.user.last_name}`.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').toUpperCase();
+      const preserve=input.slot_interval===5&&input.doctor_id===previous.doctor_id&&input.appointment_date===previous.appointment_date;
+      if(preserve){row.slot_serial=previous.slot_serial;row.token_number=previous.token_number;}
+      else row.token_number=`${input.appointment_date.split('-').reverse().join('')}/${initials}/${doctor.department.name.replace(/[^a-z0-9]/gi,'').slice(0,5).toUpperCase()}/${String(slot.serial).padStart(3,'0')}`;
+    }
+    await db.collection('clinical_appointments').replaceOne(filter,row,{session});
+    await receipt(response,row,collected,`OPD-EDIT-${recordId}-${paid}`,session);
+    await writeAudit(response,'appointment_updated',recordId,session,{moved,collected:collected/100});
+    return row;
+  });response.json(saved);
+});
 router.patch('/appointments/:id/check-in',requirePermission('appointment.update'),async(request,response)=>{
   const input=z.object({payment:z.object({amount,method:z.string().max(100),reference:z.string().max(150).default('')}).optional()}).parse(request.body),recordId=uuid.parse(request.params.id);
   const result=await transaction(async session=>{

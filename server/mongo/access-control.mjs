@@ -19,7 +19,7 @@ router.get('/me',async(_request,response)=>{
   const account=response.locals.account,permissions=await permissionsFor(account);
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
   const managed_roles=permissions.some(code=>['*','roles.manage','staff.view'].includes(code))?await db.collection('rbac_roles').find({tenant_id:account.tenant_id,is_system:false},{projection:{_id:0,id:1,name:1,code:1,is_system:1}}).sort({name:1}).toArray():[];
-  response.json({permissions,roles,managed_roles});
+  response.json({permissions:permissions.includes('*')?permissionCatalog.map(row=>row.code):permissions,roles,managed_roles});
 });
 router.get('/permissions',requirePermission('roles.manage'),(_request,response)=>response.json(permissionCatalog));
 router.get('/roles',requirePermission('roles.manage'),async(_request,response)=>{

@@ -136,6 +136,18 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(await db.collection('clinical_appointments').countDocuments({tenant_id:hospital.data.id}),1);
     assert.equal(appointment.payment_status,'Unpaid');
   });
+  await t.test('appointment editing detects stale forms and serializes competing slot moves',async()=>{
+    const path=`/clinical/appointments/${appointment.id}`;
+    const moved=await request(path,'PUT',{...appointment,appointment_time:'10:10',notes:'Synthetic edited notes'},staffLogin.data.token);
+    assert.equal(moved.status,200,JSON.stringify(moved.data));assert.equal(moved.data.appointment_number,appointment.appointment_number);assert.equal(moved.data.appointment_time,'10:10');
+    assert.equal((await request(path,'PUT',{...appointment,notes:'Stale form'},staffLogin.data.token)).status,409);
+    appointment=moved.data;
+    const other=await request('/clinical/appointments','POST',{...appointment,appointment_time:'10:20',paid_amount:0},staffLogin.data.token);assert.equal(other.status,201,JSON.stringify(other.data));
+    assert.equal((await request(path,'PUT',{...appointment,appointment_time:'10:20'},staffLogin.data.token)).status,409);
+    assert.equal((await db.collection('clinical_appointments').findOne({id:appointment.id})).appointment_time,'10:10');
+    // Keep the later queue assertions focused on the first appointment.
+    await db.collection('clinical_appointments').deleteOne({id:other.data.id});
+  });
   await t.test('check-in cannot overcollect, skip payment, or post two receipts',async()=>{
     const path=`/clinical/appointments/${appointment.id}/check-in`;
     assert.equal((await request(path,'PATCH',{payment:{amount:101,method:'Cash'}},staffLogin.data.token)).status,400);
@@ -144,6 +156,9 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.deepEqual(attempts.map(row=>row.status).sort(),[200,409],JSON.stringify(attempts));
     assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,record_number:`OPD-CHECKIN-${appointment.id}`}),1);
     const stored=await db.collection('clinical_appointments').findOne({id:appointment.id});assert.equal(stored.paid_amount,100);assert.equal(stored.status,'Checked In');
+    const edit={...stored,updated_at:stored.updated_at.toISOString()};
+    assert.equal((await request(`/clinical/appointments/${appointment.id}`,'PUT',{...edit,paid_amount:0},staffLogin.data.token)).status,409);
+    assert.equal((await request(`/clinical/appointments/${appointment.id}`,'PUT',{...edit,appointment_time:'10:30'},staffLogin.data.token)).status,409);
   });
   await t.test('appointment pages retain filtered totals, queue dates and printable identity fields',async()=>{
     const result=await request(`/clinical/appointments?page=1&page_size=1&queue=1&date=${future}&search=Updated`,'GET',null,staffLogin.data.token);

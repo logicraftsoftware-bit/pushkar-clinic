@@ -20,7 +20,8 @@ import platform from './platform.mjs';
 import labResults from './lab-results.mjs';
 import labReports,{publicReports} from './lab-reports.mjs';
 import accessControl from './access-control.mjs';
-import { permissionsFor } from './access.mjs';
+import {accessEvents} from './live-access.mjs';
+import { hasActiveRole } from './access.mjs';
 
 const app = express();
 app.disable('x-powered-by');
@@ -75,6 +76,7 @@ function authenticate(audience) {
     if (!admin) {
       if (claims.role !== account.role || claims.branchId !== account.branch_id) return response.status(401).json({ error: 'Account access changed. Sign in again.' });
       if (!authorizedPortal(account, claims.portal)) return response.status(401).json({ error: 'Workspace access revoked.' });
+      if (!await hasActiveRole(account)) return response.status(401).json({ error: 'Role access revoked.' });
       const branch = await db.collection('branches').findOne({ id: account.branch_id, tenant_id: account.tenant_id, is_active: true });
       if (!branch) return response.status(401).json({ error: 'Branch access revoked.' });
       const hospital = await db.collection('hospitals').findOne({ id: account.tenant_id });
@@ -116,7 +118,7 @@ app.post('/api/v1/auth/login', rateLimit, async (request, response) => {
   const hospital = account ? await db.collection('hospitals').findOne({ id: account.tenant_id }) : null;
   const branch = account ? await db.collection('branches').findOne({ id: account.branch_id, tenant_id: account.tenant_id, is_active: true }) : null;
   const portal = authorizedPortal(account, body.portal);
-  if (!account || !branch || !activeAccount(account, hospital) || !portal || !await verifyPassword(body.password, account.password_hash)) return response.status(401).json({ error: 'Invalid login details, role, or hospital access.' });
+  if (!account || !branch || !activeAccount(account, hospital) || !portal || !await hasActiveRole(account) || !await verifyPassword(body.password, account.password_hash)) return response.status(401).json({ error: 'Invalid login details, role, or hospital access.' });
   const token = await issueSession(account, 'careframe-portal', { tenantId: account.tenant_id, branchId: account.branch_id, role: account.role, portal });
   const activityId = randomUUID();
   await db.collection('login_activity').insertOne({ id: activityId, tenant_id: account.tenant_id, user_id: account.id, role: account.role, branch_id: account.branch_id, login_status: 'Success', login_time: new Date() });
@@ -152,6 +154,7 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
 });
 app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
 app.use('/api/v1/access-control',authenticate('careframe-portal'),accessControl);
+app.get('/api/v1/session/events',authenticate('careframe-portal'),accessEvents);
 app.use('/api/v1/patients',authenticate('careframe-portal'),patients);
 app.use('/api/v1/hospital-management',authenticate('careframe-portal'),diagnosticMasters,management);
 app.use('/api/v1/clinical',authenticate('careframe-portal'),clinical,inpatient);

@@ -251,6 +251,7 @@ export default function ClinicalOperations({
     setError("");
     const data = new FormData(e.currentTarget),
       body: R = Object.fromEntries(data);
+    if(edit?.updated_at)body.updated_at=edit.updated_at;
     body.symptoms = data.getAll("symptoms").map(String);
     body.charges = JSON.parse(String(data.get("charges_payload") || "[]"));
     delete body.charges_payload;

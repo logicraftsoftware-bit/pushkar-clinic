@@ -11,6 +11,10 @@ export async function permissionsFor(account,session) {
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{session}).toArray();
   return [...new Set(roles.flatMap(role=>role.permissions??[]))];
 }
+export async function hasActiveRole(account,session) {
+  if(!account||(account.role_codes??[]).length===0)return false;
+  return Boolean(await db.collection('rbac_roles').findOne({tenant_id:account.tenant_id,code:{$in:account.role_codes},status:'Active'},{session,projection:{_id:1}}));
+}
 export function requirePermission(code) {
   return async (_request,response,next)=>{
     const permissions=await permissionsFor(response.locals.account);
