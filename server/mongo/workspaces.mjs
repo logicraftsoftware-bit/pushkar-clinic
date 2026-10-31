@@ -32,7 +32,8 @@ router.get('/overview',async(_request,response)=>{
   // Patient-facing clinical publication is handled by its dedicated record endpoints.
   // Do not include raw laboratory drafts or nursing handovers in this shared response.
   const workspaces=workspace==='all'?['reception','nurse','laboratory','pharmacy','accounting','hr','inventory']:workspace==='branch'?['reception','inventory']:['reception','laboratory','pharmacy','accounting','hr','inventory'].includes(workspace)?[workspace]:[];
-  const workItems=await rows('role_work_items',!patientPortal&&workspaces.length>0,{...clinicalFilter,workspace:{$in:workspaces}}, {occurred_at:-1},150);
+  const permittedWorkspaces=workspaces.filter(value=>({reception:can('patient.view'),nurse:can('ipd.view'),laboratory:can('lab.order.view'),pharmacy:can('pharmacy.view'),accounting:can('billing.view'),hr:can('hr.view'),inventory:can('inventory.view')})[value]);
+  const workItems=await rows('role_work_items',!patientPortal&&permittedWorkspaces.length>0,{...clinicalFilter,workspace:{$in:permittedWorkspaces}}, {occurred_at:-1},150);
   const patientById=new Map(patients.map(row=>[row.id,row]));
   for(const row of [...appointments,...admissions,...finances,...workItems]){
     const patient=patientById.get(row.patient_id);

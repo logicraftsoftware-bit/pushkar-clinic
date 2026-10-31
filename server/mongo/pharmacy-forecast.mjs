@@ -1,0 +1,24 @@
+import {Router} from 'express';
+import {z} from 'zod';
+import {db} from './database.mjs';
+import {scopeFor,allowedBranches,assertBranch,requirePermission} from './access.mjs';
+import {hospitalDay} from './finance-ledger.mjs';
+const router=Router();
+router.get('/pharmacy/forecast',requirePermission('pharmacy.view'),async(request,response)=>{
+  const options=z.object({lookback_days:z.coerce.number().int().min(7).max(365).default(30),horizon_days:z.coerce.number().int().min(7).max(180).default(30),branch_id:z.string().uuid().optional()}).parse(request.query);
+  if(options.branch_id)await assertBranch(response,options.branch_id);
+  const tenant_id=response.locals.account.tenant_id,branchFilter=options.branch_id?{branch_id:options.branch_id}:{},today=hospitalDay(new Date()),end=new Date(today+'T00:00:00Z');end.setUTCDate(end.getUTCDate()+options.horizon_days);const horizon=end.toISOString().slice(0,10),start=new Date();start.setDate(start.getDate()-Math.max(14,options.lookback_days));const usageStart=Date.now()-options.lookback_days*86400000;
+  const masters=await db.collection('hospital_pharmacy_masters').find({tenant_id,kind:'medicine'},{projection:{_id:0}}).sort({name:1}).toArray();
+  const batches=await db.collection('inventory_records').find(await scopeFor(response,{kind:'pharmacy-batch',...branchFilter}),{projection:{_id:0}}).toArray();
+  const adjustments=await db.collection('pharmacy_stock_adjustments').find(await scopeFor(response,{...branchFilter,created_at:{$gte:start}}),{projection:{_id:0}}).toArray();
+  const items=masters.map(master=>{
+    const stock=batches.filter(row=>row.data?.medicine_id===master.id),batchIds=new Set(stock.map(row=>row.id)),movements=adjustments.filter(row=>batchIds.has(row.batch_id)&&new Date(row.created_at).getTime()>=usageStart);
+    const current=stock.reduce((sum,row)=>sum+Number(row.quantity??0),0),expired=stock.filter(row=>row.data.expiry_date&&row.data.expiry_date<today).reduce((sum,row)=>sum+Number(row.quantity??0),0),expiring=stock.filter(row=>row.data.expiry_date>=today&&row.data.expiry_date<=horizon).reduce((sum,row)=>sum+Number(row.quantity??0),0);
+    const removed=movements.filter(row=>row.adjustment_type==='Remove').reduce((sum,row)=>sum+Math.max(0,row.quantity_before-row.quantity_after),0),added=movements.filter(row=>row.adjustment_type==='Add').reduce((sum,row)=>sum+Math.max(0,row.quantity_after-row.quantity_before),0),daily=removed/options.lookback_days,reorder=Math.max(0,Number(master.data?.reorder_level??master.data?.min_level??10),...stock.map(row=>Number(row.data.reorder_level??0))),usable=Math.max(0,current-expired),forecast=daily*options.horizon_days,days=daily?usable/daily:null;
+    return {medicine_id:master.id,medicine_name:master.name,medicine_data:master.data,current_stock:current,usable_stock:usable,received_stock:stock.reduce((sum,row)=>sum+Number(row.data.purchased_quantity??0)+Number(row.data.free_quantity??0),0),stock_value:stock.reduce((sum,row)=>sum+Math.round(Number(row.quantity??0)*Number(row.data.purchase_rate??0)*100),0)/100,expired_stock:expired,expiring_stock:expiring,next_expiry:stock.filter(row=>row.quantity>0&&row.data.expiry_date).map(row=>row.data.expiry_date).sort()[0]??null,reorder_level:reorder,removed_units:removed,added_units:added,removal_events:movements.filter(row=>row.adjustment_type==='Remove').length,average_daily_usage:daily,forecast_demand:forecast,projected_stock:Math.max(0,usable-forecast),days_cover:days,suggested_order:Math.max(0,Math.ceil(forecast+reorder-usable)),status:expired>0?'Expired stock':usable<=reorder?'Reorder now':days!==null&&days<=options.horizon_days?'Reorder soon':expiring>0?'Expiry risk':!removed?'No usage data':'Healthy'};
+  });
+  const trend=[];for(let offset=13;offset>=0;offset--){const date=new Date(today+'T00:00:00Z');date.setUTCDate(date.getUTCDate()-offset);const day=date.toISOString().slice(0,10);trend.push({day,removed:adjustments.filter(row=>row.adjustment_type==='Remove'&&hospitalDay(new Date(row.created_at))===day).reduce((sum,row)=>sum+Math.max(0,row.quantity_before-row.quantity_after),0)});}
+  const ids=await allowedBranches(response.locals.account,response.locals.claims.portal),branches=await db.collection('branches').find({tenant_id,is_active:true,...(ids===null?{}:{id:{$in:ids}})},{projection:{_id:0,id:1,name:1}}).toArray();
+  const sum=key=>items.reduce((value,row)=>value+row[key],0);response.json({generated_at:new Date().toISOString(),lookback_days:options.lookback_days,horizon_days:options.horizon_days,summary:{medicines:items.length,current_units:sum('current_stock'),stock_value:sum('stock_value'),forecast_demand:sum('forecast_demand'),suggested_order:sum('suggested_order'),reorder_items:items.filter(row=>['Reorder now','Reorder soon'].includes(row.status)).length,expiry_risk_items:items.filter(row=>row.expired_stock>0||row.expiring_stock>0).length},items,trend,branches});
+});
+export default router;

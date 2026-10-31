@@ -585,6 +585,15 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,'data.lab_order_id':id,kind:'invoices'}),1);
     assert.equal((await request(path,'PATCH',{action:'cancel'},staffLogin.data.token)).status,409);
   });
+  await t.test('laboratory quality controls enforce expiry and expose workflow queues',async()=>{
+    const parameter=await db.collection('hospital_diagnostic_masters').findOne({tenant_id:hospital.data.id,domain:'pathology',kind:'parameter'});assert.ok(parameter);
+    const body={name:'Synthetic QC',parameter_id:parameter.id,lot:'TEST-LOT',level:'Normal',target:10,sd:2,expires_on:future};
+    const control=await request('/workspaces/lab/qc/controls','POST',body,staffLogin.data.token);assert.equal(control.status,201,JSON.stringify(control.data));
+    const recorded=await request('/workspaces/lab/qc/runs','POST',{control_id:control.data.id,value:16},staffLogin.data.token);assert.equal(recorded.status,201,JSON.stringify(recorded.data));assert.equal(recorded.data.status,'Out of Control');assert.equal(recorded.data.z_score,3);
+    await db.collection('lab_qc_controls').updateOne({id:control.data.id},{$set:{expires_on:'2000-01-01'}});
+    assert.equal((await request('/workspaces/lab/qc/runs','POST',{control_id:control.data.id,value:10},staffLogin.data.token)).status,400);
+    for(const route of ['/workspaces/lab/qc','/workspaces/lab/summary','/workspaces/lab/workflow?view=processing','/workspaces/lab/workflow-filter-options','/operations/pharmacy/forecast']){const result=await request(route,'GET',null,staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));}
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);
