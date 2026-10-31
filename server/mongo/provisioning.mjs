@@ -9,10 +9,6 @@ import { initializeRoles } from './access.mjs';
 import {escapeSearch} from './search.mjs';
 
 const router = Router();
-router.get('/me',async(_request,response)=>{
-  const account=response.locals.account;
-  response.json({id:account.id,username:account.username,display_name:account.display_name??account.username,role:'super_admin'});
-});
 const planFields = {
   name:'name',code:'code',description:'description',monthlyPrice:'monthly_price',yearlyPrice:'yearly_price',
   trialDays:'trial_days',maxBranches:'max_branches',maxUsers:'max_users',maxDoctors:'max_doctors',

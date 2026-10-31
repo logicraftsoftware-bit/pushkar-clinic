@@ -627,7 +627,45 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
   await t.test('print templates and recorded activity remain accessible without exposing credentials',async()=>{
     assert.equal((await request('/clinical/print-template/appointment','GET',null,staffLogin.data.token)).status,200);
     for(const route of ['/hospital-admin/login-activity','/hospital-admin/audit','/activity','/activity/record?module=patients&id='+patient.id]){const result=await request(route,'GET',null,staffLogin.data.token);assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(JSON.stringify(result.data).includes('password_hash'),false);}
-    const me=await request('/admin/me','GET',null,token);assert.equal(me.status,200,JSON.stringify(me.data));assert.equal(me.data.role,'super_admin');assert.equal(me.data.password_hash,undefined);
+    const me=await request('/admin/me','GET',null,token);assert.equal(me.status,200,JSON.stringify(me.data));assert.ok(me.data.id);assert.equal(typeof me.data.username,'string');assert.equal(me.data.password_hash,undefined);
+  });
+  await t.test('CRM synchronization is tenant bound retry safe and cannot overwrite processed encounters',async()=>{
+    const originalFetch=globalThis.fetch;
+    globalThis.fetch=async(url,options)=>String(url)==='https://crm.example.invalid/api/patient/clinics'?Response.json({data:[{id:'synthetic-crm-clinic',name:'Synthetic Clinic'}]}):originalFetch(url,options);
+    try{
+      assert.equal((await request('/admin/crm-clinics','GET',null,token)).status,200);
+      const connection=await request('/admin/crm-connections','POST',{tenantId:hospital.data.id,clinicExternalId:'synthetic-crm-clinic',clinicName:'Synthetic Clinic'},token);assert.equal(connection.status,201);assert.ok(connection.data.apiKey);assert.equal(connection.data.api_key_hash,undefined);
+      const key=connection.data.apiKey;
+      const body={branches:[{externalId:'b1',name:'Synthetic CRM Branch',code:'CRMTEST'}],departments:[{externalId:'dep1',branchExternalId:'b1',name:'Synthetic CRM Department',code:'CRMDEP'}],doctors:[{externalId:'d1',branchExternalId:'b1',departmentExternalId:'dep1',name:'Synthetic CRM Doctor',consultationFee:50,schedules:[{date:future,from:'09:00',to:'12:00',maxSlots:20}]}],patients:[{externalId:'p1',branchExternalId:'b1',name:'Synthetic CRM Patient',mobile:'9999999976',medicalRecordNumber:'UNTRUSTED-EXTERNAL-UHID'}],appointments:[{externalId:'a1',appointmentNumber:'CRM-TEST-1',branchExternalId:'b1',departmentExternalId:'dep1',doctorExternalId:'d1',patientExternalId:'p1',startsAt:future+'T10:00:00+05:30'}]};
+      const result=await request('/crm-sync/bootstrap','POST',body,key);assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.summary.appointments,1);
+      const before=await db.collection('call_centre_crm_mappings').findOne({connection_id:connection.data.id,entity_type:'appointment',external_id:'a1'});assert.ok(before);
+      const patientMapping=await db.collection('call_centre_crm_mappings').findOne({connection_id:connection.data.id,entity_type:'patient',external_id:'p1'}),registered=await db.collection('patients').findOne({id:patientMapping.erp_id});assert.notEqual(registered.medical_record_number,'UNTRUSTED-EXTERNAL-UHID');
+      const retry=await request('/crm-sync/bootstrap','POST',body,key);assert.equal(retry.status,200,JSON.stringify(retry.data));assert.equal(await db.collection('clinical_appointments').countDocuments({tenant_id:hospital.data.id,appointment_number:'CRM-TEST-1'}),1);
+      await db.collection('clinical_appointments').updateOne({id:before.erp_id},{$set:{status:'Checked In'}});
+      const changed=structuredClone(body);changed.patients[0].name='Forbidden Overwrite';changed.appointments[0].reason='changed';assert.equal((await request('/crm-sync/bootstrap','POST',changed,key)).status,409);assert.equal((await db.collection('patients').findOne({id:patientMapping.erp_id})).first_name,'Synthetic');
+      assert.equal((await request('/admin/crm-connections','POST',{tenantId:hospital.data.id,clinicExternalId:'different-client'},token)).status,409);
+      const rotated=await request('/admin/crm-connections','POST',{tenantId:hospital.data.id,clinicExternalId:'synthetic-crm-clinic'},token);assert.equal(rotated.status,201);
+      assert.equal((await request('/crm-sync/bootstrap','POST',body,key)).status,401);
+      const list=await request('/admin/crm-connections','GET',null,token);assert.equal(list.status,200);assert.equal(JSON.stringify(list.data).includes(rotated.data.apiKey),false);assert.equal(JSON.stringify(list.data).includes('api_key_hash'),false);
+      assert.equal((await request(`/admin/crm-connections/${connection.data.id}/status`,'PATCH',{isActive:false},token)).status,200);assert.equal((await request('/crm-sync/bootstrap','POST',body,rotated.data.apiKey)).status,401);
+    }finally{globalThis.fetch=originalFetch;}
+  });
+  await t.test('AI calls use mocked providers and clinical responses remain unsaved reviewed drafts',async()=>{
+    const originalFetch=globalThis.fetch;let invalid=false,calls=0;
+    globalThis.fetch=async(url,options)=>{
+      if(String(url)!=='https://api.groq.com/openai/v1/chat/completions')return originalFetch(url,options);
+      calls++;const payload=JSON.parse(options.body);assert.equal(options.headers.Authorization,'Bearer synthetic-provider-key-used-only-with-mocked-fetch');
+      const content=invalid?'invalid JSON':payload.response_format?JSON.stringify({symptoms:'Synthetic symptom',medicines:[],lab_tests:[]}):'Synthetic provider response';return Response.json({choices:[{message:{content}}]});
+    };
+    try{
+      const record=await db.collection('clinical_appointments').findOne({tenant_id:hospital.data.id,status:{$nin:['Cancelled','No Show']}}),count=await db.collection('doctor_clinical_records').countDocuments({tenant_id:hospital.data.id});assert.ok(record);
+      const body={appointment_id:record.id,transcript:'Synthetic patient conversation for documentation only'};
+      const soap=await request('/doctor/soap','POST',body,staffLogin.data.token);assert.equal(soap.status,200,JSON.stringify(soap.data));assert.equal(soap.data.soap.symptoms,'Synthetic symptom');assert.equal(await db.collection('doctor_clinical_records').countDocuments({tenant_id:hospital.data.id}),count);
+      const denied=await request('/doctor/soap','POST',{...body,appointment_id:'00000000-0000-4000-8000-000000000099'},staffLogin.data.token);assert.equal(denied.status,404);
+      const handwriting=await request('/doctor/handwriting','POST',{image:syntheticSignature(),section:'Symptoms'},staffLogin.data.token);assert.equal(handwriting.status,200,JSON.stringify(handwriting.data));assert.equal(handwriting.data.text,'Synthetic provider response');
+      const chat=await request('/ai-assistant/chat','POST',{message:'Show my current workflow summary'},staffLogin.data.token);assert.equal(chat.status,200,JSON.stringify(chat.data));assert.equal(chat.data.answer,'Synthetic provider response');
+      invalid=true;assert.equal((await request('/doctor/soap','POST',body,staffLogin.data.token)).status,502);assert.equal(await db.collection('doctor_clinical_records').countDocuments({tenant_id:hospital.data.id}),count);assert.equal(calls,4);
+    }finally{globalThis.fetch=originalFetch;}
   });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);

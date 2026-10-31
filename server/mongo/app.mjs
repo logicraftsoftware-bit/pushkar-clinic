@@ -20,6 +20,9 @@ import labOrderEdit from './lab-order-edit.mjs';
 import labStatusReport from './lab-status-report.mjs';
 import pharmacyForecast from './pharmacy-forecast.mjs';
 import activity from './activity.mjs';
+import clinicalAI from './clinical-ai.mjs';
+import aiAssistant from './ai-assistant.mjs';
+import crm,{crmAdmin} from './crm.mjs';
 import finance from './finance.mjs';
 import diagnosticMasters from './diagnostic-masters.mjs';
 import laboratory from './laboratory.mjs';
@@ -181,7 +184,9 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   await db.collection('sessions').deleteOne({ _id: response.locals.claims.jti, user_id: response.locals.account.id });
   response.status(204).end();
 });
-app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform);
+app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform,crmAdmin);
+app.use('/api/v1/crm-sync',crm);
+app.use('/api/v1/ai-assistant',authenticate('careframe-portal'),aiAssistant);
 app.use('/api/v1/access-control',authenticate(['careframe-portal','careframe-broker']),accessControl);
 app.use('/api/v1/activity',authenticate('careframe-portal'),activity);
 app.get('/api/v1/session/events',authenticate(['careframe-portal','careframe-broker']),accessEvents);
@@ -192,7 +197,7 @@ app.use('/api/v1/hospital-admin',authenticate('careframe-portal'),settings,docum
 app.use('/api/v1/operations',authenticate('careframe-portal'),finance,financePosting,inventory,pharmacyStock,pharmacySales,pharmacyForecast);
 app.use('/api/v1/workforce',authenticate('careframe-portal'),workforce);
 app.use('/api/v1/cancellations',authenticate('careframe-portal'),cancellations);
-app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,doctorDischarge);
+app.use('/api/v1/doctor',authenticate('careframe-portal'),doctor,clinicalAI,doctorDischarge);
 app.use('/api/v1/dashboard',authenticate('careframe-portal'),dashboard);
 app.use('/api/v1/ot',authenticate('careframe-portal'),ot);
 app.use('/api/v1/dietary',authenticate('careframe-portal'),dietary);
@@ -206,7 +211,7 @@ app.use((error, _request, response, _next) => {
   if (error instanceof z.ZodError) return response.status(400).json({ error: 'Check the submitted values.', fields: error.issues.map(issue => issue.path.join('.')) });
   if (error?.code === 11000) return response.status(409).json({ error: 'A record with these details already exists.' });
   if (error instanceof SyntaxError && 'body' in error) return response.status(400).json({ error: 'Invalid JSON.' });
-  if ([400,401,402,403,404,409,422,429,501,503].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
+  if ([400,401,402,403,404,409,422,429,501,502,503].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });
   // Driver error messages can contain hosts or credentials. Do not print them.
   console.error('MongoDB request failed', error?.name ?? 'Error');
   response.status(500).json({ error: 'Request failed. Check the server configuration.' });

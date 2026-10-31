@@ -78,6 +78,9 @@ jobs:
           MONGODB_DB: pushkar_test_ci
           JWT_SECRET: synthetic-ci-secret-for-disposable-tests-only
           FRONTEND_ORIGIN: https://erp.example.invalid
+          CRM_INTEGRATION_ENABLED: 'true'
+          CRM_API_BASE_URL: https://crm.example.invalid/api
+          GROQ_API_KEY: synthetic-provider-key-used-only-with-mocked-fetch
       - name: Report MongoDB integration failure
         if: failure()
         run: |

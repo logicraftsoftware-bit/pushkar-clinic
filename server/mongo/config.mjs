@@ -11,6 +11,11 @@ const parsed = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   FRONTEND_ORIGIN: z.string().url(),
   NODE_ENV: z.enum(['development','test','production']).default('production'),
+  GROQ_API_KEY:z.string().default(''),
+  GROQ_MODEL:z.string().min(1).default('openai/gpt-oss-120b'),
+  GROQ_VISION_MODEL:z.string().min(1).default('qwen/qwen3.8-27b'),
+  CRM_INTEGRATION_ENABLED:z.enum(['true','false']).default('false'),
+  CRM_API_BASE_URL:z.string().url().regex(/^https:\/\//).optional(),
 }).safeParse({ ...process.env, API_PORT: process.env.PORT ?? process.env.API_PORT });
 if (!parsed.success) throw new Error(`Invalid backend environment: ${[...new Set(parsed.error.issues.map(issue => issue.path.join('.')))].join(', ')}`);
 export const config = parsed.data;

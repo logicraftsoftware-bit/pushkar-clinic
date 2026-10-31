@@ -19,6 +19,12 @@ export function initializeMongo() {
     // No patients, staff, partners or sample hospital records are seeded.
     for (const [collection, keys, settings] of [
       ['super_admin_users', { username: 1 }, { unique: true }],
+      ['ai_limits',{expires_at:1},{expireAfterSeconds:0}],
+      ['call_centre_crm_connections',{id:1},{unique:true}],
+      ['call_centre_crm_connections',{tenant_id:1},{unique:true}],
+      ['call_centre_crm_connections',{clinic_external_id:1},{unique:true}],
+      ['call_centre_crm_connections',{api_key_hash:1},{unique:true}],
+      ['call_centre_crm_mappings',{connection_id:1,entity_type:1,external_id:1},{unique:true}],
       ['hospitals', { code: 1 }, { unique: true }],
       ['users', { email: 1 }, { unique: true }],
       ['users', { tenant_id: 1, branch_id: 1 }, {}],

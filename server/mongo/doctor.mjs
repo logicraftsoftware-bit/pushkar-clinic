@@ -40,7 +40,7 @@ router.get('/prescription-masters',requirePermission('prescription.view'),async(
   for(const row of await db.collection('hospital_diagnostic_masters').find({tenant_id,domain:'pathology',kind:'test'},{projection:{_id:0}}).sort({name:1}).toArray())if(laboratoryTestAvailable(row.data??{},branch))grouped[row.data?.test_type==='Radiology'?'radiology_test':'pathology_test'].push({...row,data:{...row.data,amount:laboratoryPrice(row.data??{},branch)}});
   response.json(grouped);
 });
-router.post(['/soap','/handwriting'],requirePermission('opd.create'),(_request,response)=>response.status(503).json({error:'Clinical AI is not configured for this deployment. Enter and review the clinical notes manually.'}));
+
 router.patch('/appointments/:id/status',requirePermission('appointment.update'),async(request,response)=>{
   const status=z.enum(['Present','Absent','Waiting']).parse(request.body?.status),identity=uuid.parse(request.params.id);
   const saved=await transaction(async session=>{
