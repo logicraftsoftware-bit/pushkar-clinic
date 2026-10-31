@@ -1,4 +1,5 @@
 import {Router} from 'express';
+import {platformSettingsWithDefaults} from './platform-settings.mjs';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
@@ -91,12 +92,12 @@ router.put('/hospitals/:id/modules',async(request,response)=>{
     if(!result.matchedCount)throw failure('Hospital not found',404);await audit(response,'hospital_modules_updated',id,session);
   });response.status(204).end();
 });
-router.get('/settings',async(_request,response)=>response.json(await db.collection('platform_settings').find({},{projection:{_id:0}}).sort({category:1,key:1}).toArray()));
+router.get('/settings',async(_request,response)=>response.json(platformSettingsWithDefaults(await db.collection('platform_settings').find({},{projection:{_id:0}}).sort({category:1,key:1}).toArray())));
 router.put('/settings/:key',async(request,response)=>{
   const key=z.enum(['platform_name','platform_logo','support_email','trial_days','maintenance_mode','session_timeout_minutes']).parse(request.params.key),body=z.object({value:z.unknown()}).parse(request.body);
   const schemas={platform_name:z.string().trim().min(2).max(160),platform_logo:z.string().max(900000),support_email:z.string().email(),trial_days:z.coerce.number().int().min(0).max(365),maintenance_mode:z.boolean(),session_timeout_minutes:z.coerce.number().int().min(5).max(1440)};
   const value=schemas[key].parse(body.value),is_public=['platform_name','platform_logo','maintenance_mode'].includes(key);
-  const row=await db.collection('platform_settings').findOneAndUpdate({key},{$set:{value,is_public,category:key.startsWith('platform_')?'branding':'general',updated_by:response.locals.account.id,updated_at:new Date()}},{upsert:true,returnDocument:'after',projection:{_id:0}});response.json(row);
+  const row=await db.collection('platform_settings').findOneAndUpdate({key},{$set:{value,is_public,category:key.startsWith('platform_')?'branding':'general',updated_by:response.locals.account.id,updated_at:new Date()}},{upsert:true,returnDocument:'after',projection:{_id:0}});response.json(platformSettingsWithDefaults([row]).find(setting=>setting.key===key));
 });
 router.get('/monitoring',async(_request,response)=>{
   const stats=await db.command({dbStats:1});
