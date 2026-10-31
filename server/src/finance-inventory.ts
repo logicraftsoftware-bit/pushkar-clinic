@@ -235,13 +235,13 @@ const kinds = [
 ] as const;
 const body = z.object({
   id: z.string().uuid().optional(),
-  branch_id: z.string().optional().prefault(""),
-  patient_id: z.string().optional().prefault(""),
-  invoice_id: z.string().optional().prefault(""),
-  supplier_id: z.string().optional().prefault(""),
-  category_id: z.string().optional().prefault(""),
-  item_id: z.string().optional().prefault(""),
-  record_date: z.string().optional().prefault(""),
+  branch_id: z.string().prefault(""),
+  patient_id: z.string().prefault(""),
+  invoice_id: z.string().prefault(""),
+  supplier_id: z.string().prefault(""),
+  category_id: z.string().prefault(""),
+  item_id: z.string().prefault(""),
+  record_date: z.string().prefault(""),
   status: z.string().prefault("Active"),
   amount: z.coerce.number().prefault(0),
   total: z.coerce.number().prefault(0),
@@ -252,17 +252,17 @@ const body = z.object({
 });
 const pharmacyPurchaseBody = z.object({
   supplier_id: z.string().uuid(),
-  branch_id: z.string().optional().prefault(""),
+  branch_id: z.string().prefault(""),
   invoice_number: z.string().min(1),
   purchase_date: z.string().min(1),
   payment_status: z.string().prefault("Unpaid"),
-  notes: z.string().optional().prefault(""),
+  notes: z.string().prefault(""),
   items: z
     .array(
       z.object({
         medicine_id: z.string().uuid(),
         batch_number: z.string().min(1),
-        manufacturing_date: z.string().optional().prefault(""),
+        manufacturing_date: z.string().prefault(""),
         expiry_date: z.string().min(1).transform((value) => value.length === 7
           ? `${value}-${String(new Date(Date.UTC(Number(value.slice(0,4)),Number(value.slice(5,7)),0)).getUTCDate()).padStart(2,"0")}`
           : value),
@@ -278,14 +278,14 @@ const pharmacyPurchaseBody = z.object({
 });
 const pharmacySupplierBody = z.object({
   name: z.string().trim().min(2),
-  contact_person: z.string().trim().optional().prefault(""),
-  phone: z.string().trim().optional().prefault(""),
-  email: z.string().trim().optional().prefault(""),
-  drug_license_number: z.string().trim().optional().prefault(""),
-  gstin: z.string().trim().optional().prefault(""),
-  address: z.string().trim().optional().prefault(""),
+  contact_person: z.string().trim().prefault(""),
+  phone: z.string().trim().prefault(""),
+  email: z.string().trim().prefault(""),
+  drug_license_number: z.string().trim().prefault(""),
+  gstin: z.string().trim().prefault(""),
+  address: z.string().trim().prefault(""),
   status: z.enum(["Active", "Inactive"]).prefault("Active"),
-  notes: z.string().trim().optional().prefault(""),
+  notes: z.string().trim().prefault(""),
 });
 
 router.get("/pharmacy/suppliers", async (req: R, res) => {
@@ -651,13 +651,13 @@ router.get("/pharmacy/pos/print-template", async (req: R, res) => {
 });
 
 router.post("/pharmacy/medicines", async (req: R, res) => {
-  const body = z.object({name:z.string().trim().min(1),hsn_code:z.string().trim().optional().prefault(""),tax:z.coerce.number().min(0).max(100).prefault(0),packing_type:z.string().trim().prefault("Box"),units_per_strip:z.coerce.number().positive().optional(),volume_ml:z.coerce.number().nonnegative().optional()}).parse(req.body);
+  const body = z.object({name:z.string().trim().min(1),hsn_code:z.string().trim().prefault(""),tax:z.coerce.number().min(0).max(100).prefault(0),packing_type:z.string().trim().prefault("Box"),units_per_strip:z.coerce.number().positive().optional(),volume_ml:z.coerce.number().nonnegative().optional()}).parse(req.body);
   const data={hsn_code:body.hsn_code,tax:body.tax,packing_type:body.packing_type,units_per_strip:body.units_per_strip,volume_ml:body.volume_ml};
   const result=await pool.query(`INSERT INTO hospital_pharmacy_masters(tenant_id,kind,name,data) VALUES($1,'medicine',$2,$3) RETURNING id,name,data,0::numeric price`,[req.portalUser!.tenantId,body.name,data]);
   res.status(201).json(result.rows[0]);
 });
 
-const pharmacyBillBody=z.object({action:z.enum(["save","generate","reject"]),customer_name:z.string().trim().optional().prefault("Walk-in Customer"),discount_percent:z.coerce.number().min(0).max(100).prefault(0),items:z.array(z.object({medicine_id:z.string().optional().prefault(""),name:z.string().trim().min(1),type:z.string().optional().prefault(""),hsn_code:z.string().optional().prefault(""),gst_percent:z.coerce.number().min(0).max(100).prefault(0),dose:z.string().optional().prefault(""),quantity:z.coerce.number().positive(),rate:z.coerce.number().min(0),instruction:z.string().optional().prefault("")})).min(1)});
+const pharmacyBillBody=z.object({action:z.enum(["save","generate","reject"]),customer_name:z.string().trim().prefault("Walk-in Customer"),discount_percent:z.coerce.number().min(0).max(100).prefault(0),items:z.array(z.object({medicine_id:z.string().prefault(""),name:z.string().trim().min(1),type:z.string().prefault(""),hsn_code:z.string().prefault(""),gst_percent:z.coerce.number().min(0).max(100).prefault(0),dose:z.string().prefault(""),quantity:z.coerce.number().positive(),rate:z.coerce.number().min(0),instruction:z.string().prefault("")})).min(1)});
 
 router.post("/pharmacy/pos",async(req:R,res)=>{
   const body=pharmacyBillBody.parse(req.body),t=req.portalUser!.tenantId;

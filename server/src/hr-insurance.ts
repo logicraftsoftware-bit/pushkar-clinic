@@ -94,13 +94,13 @@ const claim = z.object({
   insurance_company: z.string().min(1),
   tpa: z.string().prefault(""),
   policy_number: z.string().prefault(""),
-  policy_validity: z.string().optional().prefault(""),
+  policy_validity: z.string().prefault(""),
   reference_type: z.string().prefault(""),
   reference_number: z.string().prefault(""),
   claimed_amount: z.coerce.number().prefault(0),
   approved_amount: z.coerce.number().prefault(0),
   settled_amount: z.coerce.number().prefault(0),
-  submission_date: z.string().optional().prefault(""),
+  submission_date: z.string().prefault(""),
   status: z.string().prefault("Draft"),
   documents: z.string().prefault(""),
   remarks: z.string().prefault(""),
@@ -169,9 +169,9 @@ router.put("/insurance/:id", async (req: R, res) => {
   res.json(r.rows[0]);
 });
 const hr = z.object({
-  employee_id: z.string().optional().prefault(""),
-  branch_id: z.string().optional().prefault(""),
-  record_date: z.string().optional().prefault(""),
+  employee_id: z.string().prefault(""),
+  branch_id: z.string().prefault(""),
+  record_date: z.string().prefault(""),
   status: z.string().prefault("Active"),
   amount: z.coerce.number().prefault(0),
   data: z.record(z.string(), z.unknown()).prefault({}),

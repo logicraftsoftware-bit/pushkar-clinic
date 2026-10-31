@@ -323,7 +323,7 @@ const hospitalInput = z.object({
   state: z.string().min(2).max(100),
   pinCode: z.string().min(3).max(20),
   country: z.string().min(2).max(100),
-  gstin: z.string().max(30).optional().prefault(''),
+  gstin: z.string().max(30).prefault(''),
   branchName: z.string().min(2).max(160),
   planId: z.string().uuid(),
   subscriptionStartDate: z.string().date(),

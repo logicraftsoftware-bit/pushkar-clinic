@@ -42,7 +42,7 @@ export const patientInput = z
           /^https?:\/\//i.test(value),
         "Photo must be JPEG, PNG or WebP",
       )
-      .optional()
+      
       .prefault(""),
     date_of_birth: z
       .string()
@@ -69,7 +69,7 @@ export const patientInput = z
     sex: z.enum(["male", "female", "other", "unknown"]).prefault("unknown"),
     blood_group: z
       .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown", ""])
-      .optional()
+      
       .prefault(""),
     phone: optionalPhone.prefault(""),
     email: z

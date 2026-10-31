@@ -316,8 +316,8 @@ const ap = z.object({
   token_number: z.string().prefault(""),
   status: z.string(),
   notes: z.string().prefault(""),
-  symptoms:z.array(z.string()).optional().prefault([]),
-  charges:z.array(z.unknown()).optional().prefault([]),
+  symptoms:z.array(z.string()).prefault([]),
+  charges:z.array(z.unknown()).prefault([]),
   doctor_fee_selection:z.preprocess(value=>{if(typeof value==='string'){try{return JSON.parse(value);}catch{return value;}}return value;},z.object({registration_fee:z.boolean(),maintenance_fee:z.boolean()}).optional()),
   discount:z.coerce.number().min(0).prefault(0),
   payment_mode:z.string().prefault(""),
@@ -508,7 +508,7 @@ router.patch("/appointments/:id/check-in", async (req: R, res) => {
 });
 const appointmentStatusBody=z.object({
   status:z.enum(["Booked","Confirmed","Checked In","Waiting","In Consultation","Completed","Cancelled","No Show"]),
-  cancellation_reason:z.string().trim().max(500).optional().prefault(""),
+  cancellation_reason:z.string().trim().max(500).prefault(""),
 });
 const appointmentTransitions:Record<string,string[]>={
   "booked":["Confirmed","Checked In","Cancelled","No Show"],
@@ -554,11 +554,11 @@ const ipd = z.object({
   insurance_tpa: z.string().prefault(""),
   advance: z.coerce.number().prefault(0),
   deposit_amount: z.coerce.number().min(0).prefault(0),
-  charges: z.array(z.unknown()).optional().prefault([]),
+  charges: z.array(z.unknown()).prefault([]),
   paid_amount: z.coerce.number().min(0).prefault(0),
   consultation_fee: z.coerce.number().min(0).prefault(0),
   bed_daily_charge: z.coerce.number().min(0).prefault(0),
-  patient_documents: z.record(z.string(),z.object({name:z.string().max(255),type:z.string().max(100),data:z.string().max(4000000)})).optional().prefault({}),
+  patient_documents: z.record(z.string(),z.object({name:z.string().max(255),type:z.string().max(100),data:z.string().max(4000000)})).prefault({}),
   payment_mode: z.string().prefault(""),
   payment_reference: z.string().prefault(""),
   discount: z.coerce.number().min(0).prefault(0),
