@@ -1,6 +1,25 @@
 // GitHub runner only: never permit this suite to reset a real clinic database.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { deflateSync } from 'node:zlib';
+// Generate a valid RGBA PNG, including CRCs, instead of relying on a copied image.
+function syntheticSignature() {
+  function chunk(type, data) {
+    const payload = Buffer.concat([Buffer.from(type), data]);
+    let crc = 0xffffffff;
+    for (const byte of payload) {
+      crc ^= byte;
+      for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const checksum = Buffer.alloc(4); checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+    return Buffer.concat([length, payload, checksum]);
+  }
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(2, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 6;
+  const png = Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.from([0,0,0,0,255,0,0,0,255]))), chunk('IEND', Buffer.alloc(0))]);
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
 if (process.env.MONGODB_INTEGRATION_TEST !== 'true' || !/^pushkar_test_[a-z0-9_]+$/.test(process.env.MONGODB_DB ?? '')) {
   throw new Error('Use an explicitly enabled, disposable pushkar_test_* database.');
 }
@@ -213,7 +232,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(list.status,200,JSON.stringify(list.data));assert.equal(list.data.summary.total,1);assert.equal(list.data.summary.progress,1);assert.equal(list.data.summary.ready,0);
   });
   let resultRecord,parameter,signatory,reportSharePath;
-  const signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jV2kAAAAASUVORK5CYII=';
+  const signature=syntheticSignature();
   await t.test('lab editors reject stale parameter definitions and retain reviewed reference snapshots',async()=>{
     const unit=await request('/hospital-management/diagnostic-masters/pathology/unit','POST',{name:'Synthetic Unit',data:{}},staffLogin.data.token);assert.equal(unit.status,201);
     const configured=await request('/hospital-management/diagnostic-masters/pathology/parameter','POST',{name:'Synthetic Measurement',data:{unit_id:unit.data.id,result_type_id:'1',reference_from:'1',reference_to:'99'}},staffLogin.data.token);assert.equal(configured.status,201);parameter=configured.data;
