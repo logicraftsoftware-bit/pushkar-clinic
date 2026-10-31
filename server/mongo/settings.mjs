@@ -2,6 +2,7 @@ import {Router} from 'express';
 import {z} from 'zod';
 import {db,transaction} from './database.mjs';
 import {requirePermission,scopeFor,writeAudit} from './access.mjs';
+import {maskSettings,preserveSettingsSecrets} from './settings-secrets.mjs';
 export async function operationalSettings(tenantId,session){
   const rows=await db.collection('hospital_settings').find({tenant_id:tenantId,section:{$in:['GeneralSetting','PaymentMethods','PrefixSetting']}},{session}).toArray();
   const section=name=>Object.fromEntries(rows.filter(row=>row.section===name).map(row=>[row.key,row.value]));
@@ -18,7 +19,7 @@ router.get('/settings',requirePermission('settings.view'),async(_request,respons
   const rows=await db.collection('hospital_settings').find({tenant_id:response.locals.account.tenant_id},{projection:{_id:0}}).toArray();
   const settings=Object.assign(Object.create(null),{General:Object.assign(Object.create(null),{currency:'INR',date_format:'DD/MM/YYYY',time_format:'12 Hour'}),Patient:Object.assign(Object.create(null),{registration_fee:0,registration_addons:[]}),Security:Object.assign(Object.create(null),{minimum_password_length:12})});
   for(const row of rows)(settings[row.section]??=Object.create(null))[row.key]=row.value;
-  response.json(settings);
+  response.json(maskSettings(settings));
 });
 router.put('/settings/:section',requirePermission('settings.manage'),async(request,response)=>{
   if(response.locals.claims.portal!=='hospital_admin')return response.status(403).json({error:'Clinic-wide settings require Hospital Admin.'});
@@ -29,7 +30,7 @@ router.put('/settings/:section',requirePermission('settings.manage'),async(reque
   if(section==='PrefixSetting')for(const [key,value] of Object.entries(data))data[key]=z.string().regex(/^[A-Za-z0-9_-]{1,20}$/).parse(value);
   if(section==='Security'&&'minimum_password_length' in data)data.minimum_password_length=z.coerce.number().int().min(12).max(200).parse(data.minimum_password_length);
   await transaction(async session=>{
-    for(const [key,value] of Object.entries(data))await db.collection('hospital_settings').updateOne({tenant_id:response.locals.account.tenant_id,section,key},{$set:{value,updated_by:response.locals.account.id,updated_at:new Date()}},{session,upsert:true});
+    for(const [key,value] of Object.entries(data)){const previous=await db.collection('hospital_settings').findOne({tenant_id:response.locals.account.tenant_id,section,key},{session});await db.collection('hospital_settings').updateOne({tenant_id:response.locals.account.tenant_id,section,key},{$set:{value:preserveSettingsSecrets(value,previous?.value,key),updated_by:response.locals.account.id,updated_at:new Date()}},{session,upsert:true});}
     await writeAudit(response,'settings_updated',null,session,{section,keys:Object.keys(data)});
   });response.status(204).end();
 });

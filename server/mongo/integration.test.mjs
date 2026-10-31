@@ -568,6 +568,23 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal((await request('/self-registration/'+encodeURIComponent(staffLogin.data.token))).status,401);
     assert.equal((await request(`/workspaces/self-registration-link/${link.data.id}`,'DELETE',null,staffLogin.data.token)).status,204);assert.equal((await request(path)).status,401);
   });
+  await t.test('shared overview, document access and masked settings are MongoDB backed',async()=>{
+    const overview=await request('/workspaces/overview','GET',null,staffLogin.data.token);assert.equal(overview.status,200,JSON.stringify(overview.data));assert.equal(overview.data.workspace,'all');assert.ok(overview.data.patients.some(row=>row.id===patient.id));
+    const document=await request('/hospital-admin/documents','POST',{name:'Synthetic policy',document_type:'Policy',branch_id:branch.id,access_level:'Branch',file_data:'data:text/plain;base64,VGVzdA=='},staffLogin.data.token);assert.equal(document.status,201,JSON.stringify(document.data));
+    const documents=await request('/hospital-admin/documents','GET',null,staffLogin.data.token);assert.equal(documents.status,200);assert.ok(documents.data.some(row=>row.id===document.data.id));
+    assert.equal((await request('/hospital-admin/settings/SyntheticCredentials','PUT',{api_key:'synthetic-private-key',password:'synthetic-private-password'},staffLogin.data.token)).status,204);
+    const settings=await request('/hospital-admin/settings','GET',null,staffLogin.data.token);assert.equal(settings.data.SyntheticCredentials.api_key,'********');assert.equal(settings.data.SyntheticCredentials.password,'********');
+    assert.equal((await request('/hospital-admin/settings/SyntheticCredentials','PUT',settings.data.SyntheticCredentials,staffLogin.data.token)).status,204);
+    assert.equal((await db.collection('hospital_settings').findOne({tenant_id:hospital.data.id,section:'SyntheticCredentials',key:'password'})).value,'synthetic-private-password');
+  });
+  await t.test('clinical lab requests list before billing and generate one server priced invoice',async()=>{
+    const id='00000000-0000-4000-8000-000000000020';
+    await db.collection('role_work_items').insertOne({id,tenant_id:hospital.data.id,branch_id:branch.id,patient_id:patient.id,workspace:'laboratory',kind:'orders',status:'Pending',priority:'Normal',title:'Synthetic clinical request',data:{tests:[{test_id:laboratoryOrder.data.tests[0].test_id,amount:99999}]},occurred_at:new Date(),updated_at:new Date()});
+    const list=await request('/workspaces/lab-orders?stage=Lab%20Orders','GET',null,staffLogin.data.token);assert.equal(list.status,200,JSON.stringify(list.data));assert.ok(list.data.rows.some(row=>row.id===id&&row.bill_status==='Not billed'));
+    const path=`/workspaces/work-items/${id}/lab-action`,attempts=await Promise.all([request(path,'PATCH',{action:'send_bill'},staffLogin.data.token),request(path,'PATCH',{action:'send_bill'},staffLogin.data.token)]);assert.deepEqual(attempts.map(row=>row.status),[200,200],JSON.stringify(attempts));assert.equal(attempts[0].data.bill.id,attempts[1].data.bill.id);assert.equal(attempts[0].data.bill.total,120);
+    assert.equal(await db.collection('finance_records').countDocuments({tenant_id:hospital.data.id,'data.lab_order_id':id,kind:'invoices'}),1);
+    assert.equal((await request(path,'PATCH',{action:'cancel'},staffLogin.data.token)).status,409);
+  });
   await t.test('platform maintenance blocks staff access while preserving owner administration',async()=>{
     assert.equal((await request('/admin/settings/maintenance_mode','PUT',{value:true},token)).status,200);
     assert.equal((await request('/patients','GET',null,staffLogin.data.token)).status,503);

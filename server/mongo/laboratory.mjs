@@ -104,7 +104,7 @@ router.get('/lab-orders',async(request,response)=>{
   if(search)filter.$and.push({$or:['title','data.customer_name','data.medical_record_number','data.bill_number'].map(field=>({[field]:{$regex:escape(search),$options:'i'}}))});
   const page=z.coerce.number().int().min(1).max(100000).default(1).parse(request.query.page),pageSize=z.coerce.number().int().min(1).max(100).default(25).parse(request.query.page_size);
   const rows=await db.collection('role_work_items').find(filter,{projection:{_id:0,'data.lab_results':0,'data.result_history':0}}).sort({occurred_at:-1}).skip((page-1)*pageSize).limit(pageSize).toArray();
-  for(let index=0;index<rows.length;index++){const row=rows[index],bill=await billFor(row);row.bill_id=bill.id;row.bill_number=bill.record_number;row.bill_total=bill.total;row.bill_paid=bill.paid;row.bill_due=bill.due;row.bill_status=bill.status;row.report_available=Boolean(row.data.doctor_approval?.test_ids?.length&&bill.status==='Paid'&&Number(bill.due)===0&&Number(bill.paid)>=Number(bill.total));row.patient_name=row.data.customer_name;row.medical_record_number=row.data.medical_record_number;if(stage==='Sample Collection')rows[index]=sampleCollectionRow(row);}
+  for(let index=0;index<rows.length;index++){const row=rows[index],bill=row.data.bill_id?await billFor(row):{id:null,record_number:null,total:0,paid:0,due:0,status:'Not billed'};row.bill_id=bill.id;row.bill_number=bill.record_number;row.bill_total=bill.total;row.bill_paid=bill.paid;row.bill_due=bill.due;row.bill_status=bill.status;row.report_available=Boolean(row.data.doctor_approval?.test_ids?.length&&bill.status==='Paid'&&Number(bill.due)===0&&Number(bill.paid)>=Number(bill.total));row.patient_name=row.data.customer_name;row.medical_record_number=row.data.medical_record_number;if(stage==='Sample Collection')rows[index]=sampleCollectionRow(row);}
   const alive={$not:[{$in:['$status',['Cancelled','Rejected']]}]},collected={$ne:[{$ifNull:['$data.collected_at',null]},null]},resultComplete={$in:['$data.result_status',['Completed','Partially Completed']]};
   const metrics={total:true,awaiting:{$and:[alive,{$not:[collected]}]},progress:{$and:[alive,collected,{$not:[resultComplete]}]},ready:{$and:[alive,resultComplete,{$ne:[{$ifNull:['$data.doctor_approval',null]},null]}]},unpaid:{$and:[alive,{$gt:['$data.due_amount',0]}]}};
   const current=day().slice(0,7),parts=day().split('-').map(Number),previous=new Date(Date.UTC(parts[0],parts[1]-2,1)).toISOString().slice(0,7),month={$dateToString:{date:'$occurred_at',format:'%Y-%m',timezone:'Asia/Kolkata'}};
@@ -144,9 +144,36 @@ router.patch('/work-items/:id/lab-bill',async(request,response)=>{
 });
 router.patch('/work-items/:id/lab-action',requirePermission('lab.order.view'),async(request,response)=>{
   const action=z.object({action:z.enum(['send_sample','send_bill','cancel'])}).parse(request.body).action;
-  if(action!=='send_sample')throw failure('Use the approved billing or cancellation workflow. This action is not converted yet.',501);
+  // Each action validates its own state inside the transaction.
   const saved=await transaction(async session=>{
     const row=await orderFor(response,uuid.parse(request.params.id),session);
+    if(action==='cancel'){
+      if(row.kind!=='orders'||row.status!=='Pending'||row.data.bill_id)throw failure('Use cancellation approvals for billed or processed orders.',409);
+      await db.collection('role_work_items').updateOne({tenant_id:row.tenant_id,id:row.id},{$set:{status:'Cancelled',updated_at:new Date()}},{session});
+      await writeAudit(response,'lab_pending_order_cancelled',row.id,session);return {...row,status:'Cancelled',_id:undefined};
+    }
+    if(action==='send_bill'){
+      if(row.data.bill_id){const bill=await billFor(row,session);delete bill._id;return {...row,_id:undefined,bill};}
+      if(row.kind!=='orders'||row.status!=='Pending'||row.data.cancellation_request_id)throw failure('Only pending laboratory orders can be billed.',409);
+      const permissions=await permissionsFor(response.locals.account,session);
+      if(!permissions.includes('*')&&!permissions.includes('billing.create')&&!permissions.includes('lab.order.view'))throw failure('Laboratory billing access required.',403);
+      const tests=[];
+      for(const item of row.data.tests??[]){
+        const master=await db.collection('hospital_diagnostic_masters').findOne({tenant_id:row.tenant_id,id:uuid.parse(item.test_id),domain:'pathology',kind:'test'},{session});
+        if(!master||!laboratoryTestAvailable(master.data,row.branch_id))throw failure('A requested test is unavailable in this branch.',409);
+        const amount=laboratoryPrice(master.data,row.branch_id);cents(amount);tests.push({...item,name:master.name,amount});
+      }
+      if(!tests.length)throw failure('Select at least one diagnostic test.');
+      const patient=await db.collection('patients').findOne({tenant_id:row.tenant_id,id:row.patient_id,deleted_at:null},{session});if(!patient)throw failure('Patient is unavailable.',409);
+      const total=tests.reduce((sum,item)=>sum+cents(item.amount),0)/100,now=new Date(),id=randomUUID();
+      const counter=await db.collection('counters').findOneAndUpdate({_id:`${row.tenant_id}:lab_invoice`},{$inc:{value:1}},{session,upsert:true,returnDocument:'after'});
+      const number=`${await configuredPrefix(row.tenant_id,'lab_prefix','LAB',session)}-${day().replaceAll('-','')}-${String(counter.value).padStart(6,'0')}`;
+      const data={...row.data,tests,customer_name:`${patient.first_name} ${patient.last_name}`,medical_record_number:patient.medical_record_number,phone:patient.phone,patient_type:row.data.admission_id?'IPD':'OPD',discount_amount:0,manual_discount_amount:0,paid_amount:0,due_amount:total,payment_mode:'Cash',bill_id:id,bill_number:number,billed_at:now.toISOString()};
+      const bill={id,tenant_id:row.tenant_id,branch_id:row.branch_id,patient_id:row.patient_id,kind:'invoices',record_number:number,data:{...data,source:'Laboratory',lab_order_id:row.id},amount:total,total,paid:0,due:total,status:paymentStatus(cents(total),0),record_date:day(),created_by:response.locals.account.id,created_at:now,updated_at:now};
+      await db.collection('finance_records').insertOne({...bill},{session});
+      await db.collection('role_work_items').updateOne({tenant_id:row.tenant_id,id:row.id},{$set:{kind:'pos',status:total?'Awaiting Payment':'Payment not required',data,updated_at:now}},{session});
+      await writeAudit(response,'lab_clinical_order_billed',row.id,session);return {...row,_id:undefined,kind:'pos',status:total?'Awaiting Payment':'Payment not required',data,bill};
+    }
     if(row.kind!=='pos'||row.status==='Cancelled'||row.data.cancellation_request_id)throw failure('Only a billed order can be sent for sample collection.',409);
     await billFor(row,session);
     const result=await db.collection('role_work_items').findOneAndUpdate({tenant_id:row.tenant_id,id:row.id},{$set:{kind:'sample collection',status:'Awaiting Sample','data.sample_requested_at':new Date().toISOString(),'data.sample_requested_by':response.locals.account.id,updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
