@@ -23,7 +23,7 @@ async function financeDataset(response,from,to){
 router.post('/chat',async(request,response)=>{
   const body=z.object({message:z.string().trim().min(1).max(2000),history:z.array(z.object({role:z.enum(['user','assistant']),content:z.string().trim().min(1).max(2000)})).max(8).prefault([])}).parse(request.body),account=response.locals.account,permissions=await permissionsFor(account),can=code=>permissions.includes('*')||permissions.includes(code);
   const financeAllowed=can('billing.view')&&['hospital_admin','accountant'].includes(response.locals.claims.portal);
-  if(!financeAllowed&&financeWords.test(body.message))return response.json({answer:'Financial information is not available from this workspace. Contact an authorized Hospital Admin or Accountant.'});
+  if(!financeAllowed&&financeWords.test(body.message))return response.json({answer:'Financial information is not available from this workspace. Contact an authorized Clinic Admin or Accountant.'});
   await aiLimit(response);
   const context={role:response.locals.claims.portal,generated_at:new Date().toISOString()};
   if(can('appointment.view'))context.appointments=await db.collection('clinical_appointments').aggregate([{$match:await scopeFor(response,{appointment_date:hospitalDay(),...(account.role==='doctor'?{doctor_id:account.id}:{})})},{$group:{_id:'$status',count:{$sum:1}}}]).toArray();

@@ -17,7 +17,7 @@ export function radiologyTargetBranches(branches:Row[]){
   const diagnostics=branches.filter(branch=>key(branch.name)==='medicity guwahati diagnostics');
   const exactHospital=branches.filter(branch=>key(branch.name)==='medicity guwahati hospital');
   const hospital=exactHospital.length?exactHospital:branches.filter(branch=>key(branch.name)==='medicity guwahati');
-  if(diagnostics.length!==1||hospital.length!==1)throw new Error('Select exactly one Medicity Guwahati Diagnostics and one Medicity Guwahati Hospital branch');
+  if(diagnostics.length!==1||hospital.length!==1)throw new Error('Select exactly one Medicity Guwahati Diagnostics and one Medicity Guwahati Clinic branch');
   return [hospital[0]!,diagnostics[0]!];
 }
 export function planRadiologyCatalog(input:unknown,existing:Row[]=[]){

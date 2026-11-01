@@ -59,14 +59,14 @@ const definitions: Record<
       { key: "discount_percentage", label: "Discount (%)", type: "number", required: true, min: 0, max: 100, step: "0.01" },
     ],
   },
-  "Hospital Profile": {
+  "Clinic Profile": {
     resource: "profile",
-    title: "Hospital Profile",
+    title: "Clinic Profile",
     fields: [
-      { key: "name", label: "Hospital Name", required: true },
-      { key: "code", label: "Hospital Code", required: true },
+      { key: "name", label: "Clinic Name", required: true },
+      { key: "code", label: "Clinic Code", required: true },
       { key: "logo_url", label: "Logo", type: "image" },
-      { key: "hospital_type", label: "Hospital Type" },
+      { key: "hospital_type", label: "Clinic Type" },
       { key: "registration_number", label: "Registration Number" },
       { key: "establishment_date", label: "Establishment Date", type: "date" },
       { key: "email", label: "Email", type: "email" },
@@ -187,7 +187,7 @@ async function request<T>(
 }
 
 const setupPages = new Set([
-  "Hospital Charges",
+  "Clinic Charges",
   "Print Header Footer",
   "Operations",
   "Pharmacy",
@@ -395,7 +395,7 @@ function BedSetup({ page, token }: { page: string; token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / Bed</small>
+          <small>Clinic Management / Bed</small>
           <h1>Bed Management</h1>
           <p>Configure floors, groups, types and live bed availability.</p>
         </div>
@@ -425,7 +425,7 @@ function BedSetup({ page, token }: { page: string; token: string }) {
               <p>
                 {status
                   ? "See real-time bed availability and allocation status."
-                  : `Manage ${title.toLowerCase()} for this hospital.`}
+                  : `Manage ${title.toLowerCase()} for this clinic.`}
               </p>
             </div>
             {!status && (
@@ -773,7 +773,7 @@ function BedSetupModal({
             <h2>
               {row.id ? "Edit" : "Add"} {page}
             </h2>
-            <p>Changes apply only to this hospital.</p>
+            <p>Changes apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -948,7 +948,7 @@ function BedSetupModal({
 }
 
 function HospitalSetupPage({ page, token }: { page: string; token: string }) {
-  if (page === "Hospital Charges")
+  if (page === "Clinic Charges")
     return <HospitalChargesSetup token={token} />;
   if (page === "Print Header Footer")
     return <PrintHeaderFooterSetup token={token} />;
@@ -975,9 +975,9 @@ function HospitalSetupPage({ page, token }: { page: string; token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</small>
+          <small>Clinic Management / {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</small>
           <h1>{page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</h1>
-          <p>Configure {page.toLowerCase()} for this hospital.</p>
+          <p>Configure {page.toLowerCase()} for this clinic.</p>
         </div>
       </header>
       <div className="hm-card">
@@ -1246,9 +1246,9 @@ function DiagnosticMasterSetup({
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</small>
+          <small>Clinic Management / {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</small>
           <h1>{page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</h1>
-          <p>Configure {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page.toLowerCase()} masters for this hospital.</p>
+          <p>Configure {page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page.toLowerCase()} masters for this clinic.</p>
         </div>
       </header>
       <div className="hm-settings-layout">
@@ -1273,7 +1273,7 @@ function DiagnosticMasterSetup({
             <div>
               <small>{page === "Pathology" ? DIAGNOSTIC_MODULE_NAME : page}</small>
               <h2>{section}</h2>
-              <p>Manage {section.toLowerCase()} for this hospital.</p>
+              <p>Manage {section.toLowerCase()} for this clinic.</p>
             </div>
             <button type="button" onClick={() => openEditor({})}>
               <Plus /> Add {section}
@@ -1686,7 +1686,7 @@ function DiagnosticModal({
             <h2>
               {row.id ? "Edit" : "Add"} {section}
             </h2>
-            <p>Changes apply only to this hospital.</p>
+            <p>Changes apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -1949,9 +1949,9 @@ function PharmacySetup({ token }: { token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / Pharmacy</small>
+          <small>Clinic Management / Pharmacy</small>
           <h1>Pharmacy</h1>
-          <p>Configure pharmacy masters for this hospital.</p>
+          <p>Configure pharmacy masters for this clinic.</p>
         </div>
       </header>
       <div className="hm-settings-layout">
@@ -1975,7 +1975,7 @@ function PharmacySetup({ token }: { token: string }) {
             <div>
               <small>Pharmacy</small>
               <h2>{section}</h2>
-              <p>Manage {section.toLowerCase()} for this hospital.</p>
+              <p>Manage {section.toLowerCase()} for this clinic.</p>
             </div>
             <button type="button" onClick={() => setEditing({})}>
               <Plus /> Add {section}
@@ -2078,7 +2078,7 @@ function PharmacyModal({
             <h2>
               {row.id ? "Edit" : "Add"} {section}
             </h2>
-            <p>Changes apply only to this hospital.</p>
+            <p>Changes apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -2378,7 +2378,7 @@ export function PharmacyMedicines({ token }: { token: string }) {
           <div>
             <small>Pharmacy / Medicines</small>
             <h1>Pharmacy Medicines</h1>
-            <p>Manage medicines and pharmacy master data for this hospital.</p>
+            <p>Manage medicines and pharmacy master data for this clinic.</p>
           </div>
         </header>
         {error && <div className="hm-error">{error}</div>}
@@ -2410,7 +2410,7 @@ export function PharmacyMedicines({ token }: { token: string }) {
               <div>
                 <small>Pharmacy</small>
                 <h2>Medicines</h2>
-                <p>Manage medicines for this hospital.</p>
+                <p>Manage medicines for this clinic.</p>
               </div>
               <div className="medicine-head-actions">
                 <button type="button" onClick={() => setBulkOpen(true)}>
@@ -2551,7 +2551,7 @@ export function PharmacyMedicines({ token }: { token: string }) {
           <div>
             <small>Pharmacy / Medicines</small>
             <h1>Pharmacy Medicines</h1>
-            <p>Manage medicines and pharmacy master data for this hospital.</p>
+            <p>Manage medicines and pharmacy master data for this clinic.</p>
           </div>
         </header>
         {error && <div className="hm-error">{error}</div>}
@@ -2583,7 +2583,7 @@ export function PharmacyMedicines({ token }: { token: string }) {
               <div>
                 <small>Pharmacy</small>
                 <h2>{section}</h2>
-                <p>Manage {section.toLowerCase()} for this hospital.</p>
+                <p>Manage {section.toLowerCase()} for this clinic.</p>
               </div>
               <button type="button" onClick={() => setEditing({})}>
                 <Plus /> Add {isMedicine ? "Medicine" : section}
@@ -2730,7 +2730,7 @@ export function PharmacyMedicines({ token }: { token: string }) {
         <div>
           <small>Pharmacy / Medicines</small>
           <h1>Pharmacy Medicines</h1>
-          <p>View hospital-configured pharmacy masters and manage medicines.</p>
+          <p>View clinic-configured pharmacy masters and manage medicines.</p>
         </div>
       </header>
       {error && <div className="hm-error">{error}</div>}
@@ -2762,8 +2762,8 @@ export function PharmacyMedicines({ token }: { token: string }) {
               <h2>{section}</h2>
               <p>
                 {section === "Medicines"
-                  ? "Manage medicines for this hospital."
-                  : `Hospital Admin configured ${section.toLowerCase()}.`}
+                  ? "Manage medicines for this clinic."
+                  : `Clinic Admin configured ${section.toLowerCase()}.`}
               </p>
             </div>
             {section === "Medicines" && (
@@ -2910,7 +2910,7 @@ function MedicineModal({
         <header>
           <div>
             <h2>{row.id ? "Edit" : "Add"} Medicine</h2>
-            <p>Medicine details apply only to this hospital.</p>
+            <p>Medicine details apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -3180,7 +3180,7 @@ function BulkMedicineModal({
           (group && !groupId)
         ) {
           errors.push(
-            `Row ${rowIndex + 1}: one or more master names do not match this hospital`,
+            `Row ${rowIndex + 1}: one or more master names do not match this clinic`,
           );
           continue;
         }
@@ -3235,7 +3235,7 @@ function BulkMedicineModal({
           <div>
             <h2>Bulk Add Medicines</h2>
             <p>
-              Upload medicines from CSV using hospital master names exactly as
+              Upload medicines from CSV using clinic master names exactly as
               configured.
             </p>
           </div>
@@ -3267,7 +3267,7 @@ function BulkMedicineModal({
           <small>
             Required columns: medicine_name, medicine_category, unit,
             box_packing. Category, Company, Group and Unit values must match
-            this hospital's master data.
+            this clinic's master data.
           </small>
           {result && <div className="bulk-success">{result}</div>}
           {issues.length > 0 && (
@@ -3380,9 +3380,9 @@ function OperationsSetup({ token }: { token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / Operations</small>
+          <small>Clinic Management / Operations</small>
           <h1>Operations</h1>
-          <p>Manage operation names and categories for this hospital.</p>
+          <p>Manage operation names and categories for this clinic.</p>
         </div>
       </header>
       <div className="hm-settings-layout">
@@ -3406,7 +3406,7 @@ function OperationsSetup({ token }: { token: string }) {
             <div>
               <small>Operations</small>
               <h2>{section}</h2>
-              <p>Manage {section.toLowerCase()} for this hospital.</p>
+              <p>Manage {section.toLowerCase()} for this clinic.</p>
             </div>
             <button type="button" onClick={() => setEditing({})}>
               <Plus /> Add {section}
@@ -3476,7 +3476,7 @@ function OperationsSetup({ token }: { token: string }) {
                 <h2>
                   {editing.id ? "Edit" : "Add"} {section}
                 </h2>
-                <p>Changes apply only to this hospital.</p>
+                <p>Changes apply only to this clinic.</p>
               </div>
               <button type="button" onClick={() => setEditing(null)}>
                 <X />
@@ -3548,9 +3548,9 @@ function PrintHeaderFooterSetup({ token }: { token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / Print Header Footer</small>
+          <small>Clinic Management / Print Header Footer</small>
           <h1>Print Header Footer</h1>
-          <p>Configure document headers and footers for this hospital.</p>
+          <p>Configure document headers and footers for this clinic.</p>
         </div>
       </header>
       <div className="hm-settings-layout">
@@ -3941,7 +3941,7 @@ function HospitalChargesSetup({ token }: { token: string }) {
       setRows(values[kind] ?? []);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Unable to load hospital charges",
+        e instanceof Error ? e.message : "Unable to load clinic charges",
       );
     } finally {
       setLoading(false);
@@ -4062,13 +4062,13 @@ function HospitalChargesSetup({ token }: { token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / Hospital Charges</small>
-          <h1>Hospital Charges</h1>
-          <p>Configure hospital charge masters and billing classifications.</p>
+          <small>Clinic Management / Clinic Charges</small>
+          <h1>Clinic Charges</h1>
+          <p>Configure clinic charge masters and billing classifications.</p>
         </div>
       </header>
       <div className="hm-settings-layout">
-        <nav className="hm-settings-menu" aria-label="Hospital charge sections">
+        <nav className="hm-settings-menu" aria-label="Clinic charge sections">
           {chargeSections.map((item) => (
             <button
               type="button"
@@ -4083,9 +4083,9 @@ function HospitalChargesSetup({ token }: { token: string }) {
         <section className="hm-settings-panel">
           <header className="hm-charge-head">
             <div>
-              <small>Hospital Charges</small>
+              <small>Clinic Charges</small>
               <h2>{section}</h2>
-              <p>Configure {section.toLowerCase()} for this hospital.</p>
+              <p>Configure {section.toLowerCase()} for this clinic.</p>
             </div>
             <button type="button" onClick={() => setEditing({})}>
               <Plus /> Add {section.replace(/s$/, "")}
@@ -4216,7 +4216,7 @@ function ChargeMasterModal({
             <h2>
               {row.id ? "Edit" : "Add"} {section.replace(/s$/, "")}
             </h2>
-            <p>Changes apply only to this hospital.</p>
+            <p>Changes apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -4434,7 +4434,7 @@ function BranchOverview({ branch, token, close }: { branch: RecordRow; token: st
 }
 
 function HospitalRecords({ page, token }: { page: string; token: string }) {
-  const definition = definitions[page] ?? definitions["Hospital Profile"];
+  const definition = definitions[page] ?? definitions["Clinic Profile"];
   const profile = definition.resource === "profile";
   const [viewingBranch, setViewingBranch] = useState<RecordRow | null>(null);
   const [rows, setRows] = useState<RecordRow[]>([]),
@@ -4550,9 +4550,9 @@ function HospitalRecords({ page, token }: { page: string; token: string }) {
     <section className="hm-page">
       <header className="hm-head">
         <div>
-          <small>Hospital Management / {definition.title}</small>
+          <small>Clinic Management / {definition.title}</small>
           <h1>{definition.title}</h1>
-          <p>Manage {definition.title.toLowerCase()} for this hospital only.</p>
+          <p>Manage {definition.title.toLowerCase()} for this clinic only.</p>
         </div>
         <button onClick={() => setEditing(profile ? (rows[0] ?? {}) : {})}>
           <Plus />{" "}
@@ -4627,12 +4627,12 @@ function HospitalRecords({ page, token }: { page: string; token: string }) {
               <div>
                 <h2>
                   {profile
-                    ? "Edit Hospital Profile"
+                    ? "Edit Clinic Profile"
                     : editing.id
                       ? `Edit ${definition.title}`
                       : `Add ${definition.title}`}
                 </h2>
-                <p>Changes apply only to your hospital workspace.</p>
+                <p>Changes apply only to your clinic workspace.</p>
               </div>
               <button type="button" onClick={() => setEditing(null)}>
                 <X />
@@ -4770,7 +4770,7 @@ function ProfileView({ row, fields }: { row: RecordRow; fields: Field[] }) {
         <div key={field.key}>
           {field.type === "image" ? (
             row[field.key] ? (
-              <img src={String(row[field.key])} alt="Hospital logo" />
+              <img src={String(row[field.key])} alt="Clinic logo" />
             ) : (
               <span className="hm-profile-logo">
                 <Building2 />

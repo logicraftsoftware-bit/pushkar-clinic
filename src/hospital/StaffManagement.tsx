@@ -300,7 +300,7 @@ export default function StaffManagement({
       ...new Set([
         ...staffTypes,
         ...roles
-          .filter((role) => role.status === "Active" && !["Hospital Admin", "Patient"].includes(role.name))
+          .filter((role) => role.status === "Active" && !["Clinic Admin", "Patient"].includes(role.name))
           .map((role) => String(role.name)),
       ]),
     ],

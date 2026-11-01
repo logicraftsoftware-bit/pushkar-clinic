@@ -246,7 +246,7 @@ export default function Workforce({
           <p>
             {insurance
               ? "Track policies, claims, approvals and settlements."
-              : `Manage ${page.toLowerCase()} for hospital employees.`}
+              : `Manage ${page.toLowerCase()} for clinic employees.`}
           </p>
         </div>
         <button
@@ -430,7 +430,7 @@ function Editor({
         <header>
           <div>
             <h2>{title}</h2>
-            <p>Changes apply only to this hospital.</p>
+            <p>Changes apply only to this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />

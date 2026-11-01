@@ -32,8 +32,8 @@ export function printPathologyReport(record: Row, tests: Row[], blocked: () => v
   const totals = parameters.reduce((all, parameter) => { all[status(parameter)]++; return all; }, { normal: 0, high: 0, low: 0, neutral: 0 });
   const abnormal = totals.high + totals.low, reported = totals.normal + abnormal;
   const collected = record.data?.collected_at, completed = record.data?.result_completed_at || record.updated_at || new Date();
-  const hospital = text(record.hospital_name, "Hospital Laboratory"), branch = text(record.branch_name, "Diagnostic Services");
-  const logo = record.hospital_logo ? `<img src="${esc(record.hospital_logo)}" alt="Hospital logo">` : `<b class="mark">✚</b>`;
+  const hospital = text(record.hospital_name, "Clinic Laboratory"), branch = text(record.branch_name, "Diagnostic Services");
+  const logo = record.hospital_logo ? `<img src="${esc(record.hospital_logo)}" alt="Clinic logo">` : `<b class="mark">✚</b>`;
   const brand = `<div class="brand">${logo}<div><strong>${hospital}</strong><span>${branch} · Laboratory Medicine</span></div></div>`;
   const headerArtwork = record.pathology_header_image ? `<img class="artwork" src="${esc(record.pathology_header_image)}" alt="Report header">` : brand;
   const patient = `<section class="patient"><div class="patient-main"><span>Patient</span><strong>${text(record.patient_name)}</strong><small>${text(record.medical_record_number)}</small></div><dl><div><dt>Gender / Age</dt><dd>${text(record.patient_gender || record.data?.gender)} / ${age(record)}</dd></div><div><dt>Patient type</dt><dd>${text(record.data?.patient_type || record.patient_type, "OPD")}</dd></div><div><dt>Collected</dt><dd>${esc(date(collected, true))}</dd></div><div><dt>Reported</dt><dd>${esc(date(completed, true))}</dd></div><div><dt>Collected by</dt><dd>${text(record.data?.collector)}</dd></div><div><dt>Report ID</dt><dd>${text(record.medical_record_number)}</dd></div></dl></section>`;

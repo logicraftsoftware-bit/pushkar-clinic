@@ -81,7 +81,7 @@ export function ReferralAdmin({ token }: { token: string }) {
     <section className="rw-page">
       <header>
         <div>
-          <small>Hospital / CRM / Accounts</small>
+          <small>Clinic / CRM / Accounts</small>
           <h1>Referral Partner & Commission Wallet</h1>
           <p>
             Audited referral attribution, commission approval and partner payout
@@ -99,7 +99,7 @@ export function ReferralAdmin({ token }: { token: string }) {
       </header>
       <div className="rw-compliance">
         Compliance control: enable commercial referral payments only after
-        hospital legal/ethics approval. Physician referral commissions and
+        clinic legal/ethics approval. Physician referral commissions and
         patient procurement may be prohibited.
       </div>
       {error && <div className="rw-error">{error}</div>}

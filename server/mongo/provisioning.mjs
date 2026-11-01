@@ -78,7 +78,7 @@ router.get('/hospitals', async (request,response) => {
 router.get('/hospitals/:id', async (request,response) => {
   const id=z.string().uuid().parse(request.params.id);
   const row=await db.collection('hospitals').findOne({id,deleted_at:null},{projection:{_id:0}});
-  if(!row)return response.status(404).json({error:'Hospital not found'});
+  if(!row)return response.status(404).json({error:'Clinic not found'});
   const branches=await db.collection('branches').find({tenant_id:id},{projection:{_id:0}}).sort({created_at:1}).toArray();
   const subscription=await db.collection('subscriptions').findOne({tenant_id:id},{sort:{created_at:-1}}),administrator=await db.collection('users').findOne({tenant_id:id,role_codes:'HOSPITAL_ADMIN'});
   response.json({...row,branches,branch_id:branches[0]?.id??null,branch_name:branches[0]?.name??'',subscription_id:subscription?.id??null,plan_id:subscription?.plan_id??null,subscription_start_date:subscription?.starts_at??null,billing_cycle:subscription?.billing_cycle??'monthly',trial_days:subscription?.trial_days??0,subscription_status:subscription?.status??null,admin_id:administrator?.id??null,admin_name:administrator?`${administrator.first_name} ${administrator.last_name}`:'',admin_email:administrator?.email??'',admin_phone:administrator?.phone??''});
@@ -116,7 +116,7 @@ router.patch('/hospitals/:id/status', async (request,response) => {
   const id=z.string().uuid().parse(request.params.id),body=z.object({status:z.enum(['active','trial','suspended','inactive'])}).parse(request.body);
   const row=await transaction(async session=>{
     const updated=await db.collection('hospitals').findOneAndUpdate({id,deleted_at:null},{$set:{status:body.status,updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
-    if(!updated)throw Object.assign(new Error('Hospital not found'),{status:404});
+    if(!updated)throw Object.assign(new Error('Clinic not found'),{status:404});
     if(!['active','trial'].includes(body.status))await db.collection('sessions').deleteMany({tenant_id:id},{session});
     await db.collection('audit_events').insertOne({id:randomUUID(),tenant_id:id,actor_id:response.locals.account.id,action:'hospital_status_changed',status:body.status,created_at:new Date()},{session});
     return updated;

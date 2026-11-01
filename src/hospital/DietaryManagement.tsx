@@ -968,7 +968,7 @@ function Form({
                   "Chargeable",
                   "Complimentary",
                   "Included in Room Package",
-                  "Included in Hospital Package",
+                  "Included in Clinic Package",
                   "Discounted",
                   "Staff Meal",
                   "Doctor Meal",

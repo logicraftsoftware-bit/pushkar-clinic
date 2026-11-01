@@ -305,7 +305,7 @@ router.get('/hospitals/:id', asyncRoute(async (request, response) => {
      WHERE h.id=$1 AND h.deleted_at IS NULL`,
     [request.params.id],
   )
-  if (!result.rows[0]) { response.status(404).json({ error: 'Hospital not found' }); return }
+  if (!result.rows[0]) { response.status(404).json({ error: 'Clinic not found' }); return }
   response.json(result.rows[0])
 }))
 
@@ -409,7 +409,7 @@ router.put('/hospitals/:id', asyncRoute(async (request, response) => {
         body.email, body.phone, body.emergencyPhone, body.address, body.city, body.state,
         body.pinCode, body.country, body.gstin || null, request.params.id],
     )).rows[0]
-    if (!hospital) { await client.query('ROLLBACK'); response.status(404).json({ error: 'Hospital not found' }); return }
+    if (!hospital) { await client.query('ROLLBACK'); response.status(404).json({ error: 'Clinic not found' }); return }
     await client.query(
       `UPDATE branches SET name=$1,phone=$2,address=jsonb_build_object('line',$3::text,'city',$4::text,'state',$5::text,'pinCode',$6::text,'country',$7::text)
        WHERE id=(SELECT id FROM branches WHERE tenant_id=$8 ORDER BY created_at LIMIT 1)`,
@@ -459,7 +459,7 @@ router.delete('/hospitals/:id', asyncRoute(async (request, response) => {
     `UPDATE hospitals SET deleted_at=now(),status='inactive' WHERE id=$1 AND deleted_at IS NULL RETURNING id`,
     [request.params.id],
   )
-  if (!result.rowCount) { response.status(404).json({ error: 'Hospital not found' }); return }
+  if (!result.rowCount) { response.status(404).json({ error: 'Clinic not found' }); return }
   await pool.query(`UPDATE users SET is_active=false WHERE tenant_id=$1`, [request.params.id])
   await pool.query(`UPDATE subscriptions SET status='cancelled' WHERE tenant_id=$1 AND status IN ('active','trial')`, [request.params.id])
   response.status(204).end()
@@ -473,7 +473,7 @@ router.patch('/hospitals/:id/status', asyncRoute(async (request, response) => {
     [body.status, request.params.id],
   )
   if (!result.rows[0]) {
-    response.status(404).json({ error: 'Hospital not found' })
+    response.status(404).json({ error: 'Clinic not found' })
     return
   }
   response.json(result.rows[0])

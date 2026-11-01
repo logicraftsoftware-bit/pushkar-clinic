@@ -66,7 +66,7 @@ export function createInvoicePdf(row:R,template:R={}) {
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(15);
   const top=template.header_image?29:12;
-  pdf.text(String(row.hospital_name || "Hospital"), 105, top, {
+  pdf.text(String(row.hospital_name || "Clinic"), 105, top, {
     align: "center",
   });
   pdf.setFontSize(11);
@@ -205,7 +205,7 @@ export function createInvoicePdf(row:R,template:R={}) {
 export function createPaymentReceiptPdf(payment:R,invoice:R,template:R={}){
   invoice={...invoice,patient_name:patientName(invoice.patient_name)};
   const pdf=new jsPDF(BILL_PDF_OPTIONS),method=payment.data?.payment_method||"--",note=payment.data?.note||payment.data?.notes||payment.data?.transaction_reference||"--",top=template.header_image?29:12;
-  pdf.setFont("helvetica","bold");pdf.setFontSize(13);pdf.text(String(invoice.hospital_name||"Hospital"),105,top,{align:"center"});pdf.setFontSize(11);pdf.text("Payment Receipt",105,top+7,{align:"center"});
+  pdf.setFont("helvetica","bold");pdf.setFontSize(13);pdf.text(String(invoice.hospital_name||"Clinic"),105,top,{align:"center"});pdf.setFontSize(11);pdf.text("Payment Receipt",105,top+7,{align:"center"});
   autoTable(pdf,{startY:top+13,margin:{left:14,right:14,top:template.header_image?28:10,bottom:27},styles:{fontSize:8,cellPadding:1.5},theme:"grid",body:[["Transaction ID",payment.record_number],["Invoice",invoice.record_number],["Patient",invoice.patient_name],["UHID",invoice.medical_record_number],["Date",formatBillDate(payment.created_at||payment.record_date)],["Payment Mode",method],["Note",note],["Paid Amount",`Rs. ${Number(payment.amount||0).toFixed(2)}`]],columnStyles:{0:{fontStyle:"bold",cellWidth:48},1:{cellWidth:134}}});
   const noteY=(pdf as R).lastAutoTable.finalY+8;if(noteY>BILL_PAGE.footerTop-4)pdf.addPage();pdf.setFont("helvetica","normal");pdf.setFontSize(8);pdf.text("This is a computer-generated payment receipt.",105,noteY>BILL_PAGE.footerTop-4?template.header_image?28:12:noteY,{align:"center"});applyPdfTemplate(pdf,template);return pdf;
 }

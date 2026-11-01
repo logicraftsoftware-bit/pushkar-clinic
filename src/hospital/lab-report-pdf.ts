@@ -46,7 +46,7 @@ export async function createLabReportPdf(record:Row,tests:Row[],fontFiles?:FontF
     if(/^data:image\/(png|jpeg|webp);base64,/.test(record.hospital_logo||"")){pdf.saveGraphicsState();pdf.setGState(pdf.GState({opacity:0.06}));drawImage(record.hospital_logo,20,110,170,100);pdf.restoreGraphicsState();}
     pdf.setFont("Report","normal");pdf.setTextColor(20,20,20);
     if(!preprinted&&record.pathology_header_image)drawImage(record.pathology_header_image,10,7,190,32);
-    else if(!preprinted){pdf.setFont("Report","bold");pdf.setFontSize(19);pdf.text(label(record.hospital_name,"Hospital Laboratory"),105,19,{align:"center"});pdf.setFont("Report","normal");pdf.setFontSize(9);pdf.text(label(record.branch_name,"Laboratory Services"),105,27,{align:"center"});}
+    else if(!preprinted){pdf.setFont("Report","bold");pdf.setFontSize(19);pdf.text(label(record.hospital_name,"Clinic Laboratory"),105,19,{align:"center"});pdf.setFont("Report","normal");pdf.setFontSize(9);pdf.text(label(record.branch_name,"Laboratory Services"),105,27,{align:"center"});}
     pdf.setFontSize(8);let y=metaStart;metaRows.forEach(({row,left,right,height})=>{pdf.setDrawColor(200);pdf.line(10,y+height-4,200,y+height-4);pdf.setFont("Report","normal");pdf.text(`${row[0]}:`,11,y);pdf.text(left,35,y);if(row[2]){pdf.text(`${row[2]}:`,112,y);pdf.text(right,144,y);}y+=height;});
     const specimens=primarySampleNames(test);if(specimens)pdf.text(`Primary Sample(s): ${specimens}`,11,primaryY);
     const bars=(barcode.encodings||[]).map(row=>row.data).join("");pdf.setFillColor(0,0,0);for(let index=0;index<bars.length;index++)if(bars[index]==="1")pdf.rect(45+index*120/bars.length,primaryY+3,120/bars.length,7,"F");
@@ -73,5 +73,5 @@ export async function createLabReportPdf(record:Row,tests:Row[],fontFiles?:FontF
     signatures(test,Math.min(((pdf as any).lastAutoTable?.finalY||tableTop)+10,signTop));
   }
   const count=pdf.getNumberOfPages();for(let page=1;page<=count;page++){pdf.setPage(page);pdf.setFont("Report","normal");pdf.setFontSize(6.5);pdf.text(`Page ${page} of ${count}`,199,preprinted?284:291,{align:"right"});}
-  pdf.setProperties({title:`Laboratory Report — ${record.patient_name||"Patient"}`,subject:"Pathology results",creator:record.hospital_name||"Hospital ERP"});return pdf;
+  pdf.setProperties({title:`Laboratory Report — ${record.patient_name||"Patient"}`,subject:"Pathology results",creator:record.hospital_name||"Clinic ERP"});return pdf;
 }

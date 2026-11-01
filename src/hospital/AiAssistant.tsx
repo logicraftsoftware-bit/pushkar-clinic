@@ -51,7 +51,7 @@ const roleQuestions: Record<string, QuickQuestion[]> = {
     { title: "When is my next appointment?", hint: "Your appointments only", icon: CalendarClock, tone: "blue" },
     { title: "How many prescriptions do I have?", hint: "Your medical records only", icon: ClipboardList, tone: "purple" },
     { title: "Do I have any outstanding bills?", hint: "Your own payment summary", icon: WalletCards, tone: "amber" },
-    { title: "Summarize my recent hospital records", hint: "Your personal record overview", icon: UserRound, tone: "cyan" },
+    { title: "Summarize my recent clinic records", hint: "Your personal record overview", icon: UserRound, tone: "cyan" },
   ],
   "Branch Admin": [
     { title: "How many patients are registered in my branch?", hint: "Your branch only", icon: Users, tone: "blue" },
@@ -65,13 +65,13 @@ const roleQuestions: Record<string, QuickQuestion[]> = {
     { title: "Summarize inventory status", hint: "Stock and transfer overview", icon: Bot, tone: "cyan" },
   ],
   Accountant: [
-    { title: "What is total revenue this month?", hint: "Current hospital collections", icon: CircleDollarSign, tone: "cyan" },
+    { title: "What is total revenue this month?", hint: "Current clinic collections", icon: CircleDollarSign, tone: "cyan" },
     { title: "What are the outstanding patient dues?", hint: "Outstanding invoice summary", icon: WalletCards, tone: "amber" },
     { title: "Summarize invoices and payments", hint: "Finance workload overview", icon: BarChart3, tone: "blue" },
     { title: "How many refunds are pending?", hint: "Pending finance records", icon: ClipboardList, tone: "pink" },
   ],
   "HR Manager": [
-    { title: "How many employees are active?", hint: "Hospital workforce summary", icon: Users, tone: "blue" },
+    { title: "How many employees are active?", hint: "Clinic workforce summary", icon: Users, tone: "blue" },
     { title: "How many leave requests are pending?", hint: "Pending HR workload", icon: CalendarClock, tone: "orange" },
     { title: "Summarize attendance records", hint: "Attendance overview", icon: ClipboardList, tone: "cyan" },
     { title: "How many payroll tasks are pending?", hint: "Payroll processing status", icon: WalletCards, tone: "purple" },
@@ -85,7 +85,7 @@ const roleQuestions: Record<string, QuickQuestion[]> = {
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
-export default function AiAssistant({ hospitalName = "your hospital", userName = "Hospital Admin", token, role = "Hospital Admin" }: { hospitalName?: string; userName?: string; token?: string; role?: string }) {
+export default function AiAssistant({ hospitalName = "your clinic", userName = "Clinic Admin", token, role = "Clinic Admin" }: { hospitalName?: string; userName?: string; token?: string; role?: string }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -119,18 +119,18 @@ export default function AiAssistant({ hospitalName = "your hospital", userName =
 
   return <section className="ai-page">
     <div className="ai-breadcrumb">Home <ChevronRight /> <span>AI Assistant</span></div>
-    <div className="ai-page-title"><h1>HosAI <Sparkles /></h1><p>Your intelligent hospital assistant. Get answers, insights and actionable data in seconds.</p></div>
+    <div className="ai-page-title"><h1>HosAI <Sparkles /></h1><p>Your intelligent clinic assistant. Get answers, insights and actionable data in seconds.</p></div>
     <div className="ai-layout">
       <section className="ai-chat-card">
-        <header className="ai-welcome"><div className="ai-spark-box"><Sparkles /></div><div><strong>Hello, {userName || "Hospital Admin"}! 👋</strong><p>I'm HosAI, your AI assistant for {hospitalName}. Ask me anything about your hospital, reports, statistics or daily operations.</p></div></header>
+        <header className="ai-welcome"><div className="ai-spark-box"><Sparkles /></div><div><strong>Hello, {userName || "Clinic Admin"}! 👋</strong><p>I'm HosAI, your AI assistant for {hospitalName}. Ask me anything about your clinic, reports, statistics or daily operations.</p></div></header>
         <div className="ai-conversation">
           {!messages.length ? <div className="ai-empty">
             <div className="ai-orbit"><span /><span /><div><Waves /></div><Sparkles /></div>
             <h2>How can I help you today?</h2>
-            <p>Ask me about patients, appointments, revenue, inventory,<br /> staff, reports or any other hospital related information.</p>
+            <p>Ask me about patients, appointments, revenue, inventory,<br /> staff, reports or any other clinic related information.</p>
           </div> : <div className="ai-messages">
             {messages.map((message) => <div className={`ai-message ${message.from}`} key={message.id}><div>{message.from === "ai" ? <Bot /> : <UserRound />}</div><p>{message.text}</p></div>)}
-            {loading && <div className="ai-message ai"><div><Bot /></div><p className="ai-thinking"><LoaderCircle /> HosAI is analysing your hospital data...</p></div>}
+            {loading && <div className="ai-message ai"><div><Bot /></div><p className="ai-thinking"><LoaderCircle /> HosAI is analysing your clinic data...</p></div>}
             <div ref={endRef} />
           </div>}
         </div>

@@ -17,7 +17,7 @@ export type DashboardFilters = {
 };
 
 const paths: Record<Role, string> = {
-  "Hospital Admin": "/api/v1/dashboard/hospital",
+  "Clinic Admin": "/api/v1/dashboard/hospital",
   Reception: "/api/v1/dashboard/reception",
   Doctor: "/api/v1/dashboard/doctor",
   Nurse: "/api/v1/dashboard/nurse",
@@ -57,7 +57,7 @@ export async function getDashboard(
       metrics: result.metrics.map(
         (metric: Record<string, unknown>, index: number) => ({
           ...metric,
-          icon: (roleMetrics[role as keyof typeof roleMetrics] ?? roleMetrics["Hospital Admin"])[index]?.icon ?? Activity,
+          icon: (roleMetrics[role as keyof typeof roleMetrics] ?? roleMetrics["Clinic Admin"])[index]?.icon ?? Activity,
         }),
       ),
       trendData: result.trendData.map((point: Record<string, number>) => ({
@@ -86,7 +86,7 @@ export async function getDashboard(
   await new Promise((resolve) => setTimeout(resolve, 350));
   return {
     endpoint,
-    metrics: roleMetrics[role as keyof typeof roleMetrics] ?? roleMetrics["Hospital Admin"],
+    metrics: roleMetrics[role as keyof typeof roleMetrics] ?? roleMetrics["Clinic Admin"],
     trendData,
     departments,
     queue,

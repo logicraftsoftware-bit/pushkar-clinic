@@ -31,7 +31,7 @@ export async function staffLoginFailure(identifier:string,password:string,doctor
   if(!account.password_valid)return {code:'INCORRECT_PASSWORD',error:'Incorrect password. Please try again or reset your password.'};
   if(!account.is_active)return {code:'ACCOUNT_INACTIVE',error:'Your login account is inactive. Contact your hospital administrator.'};
   if(account.expired)return {code:'ACCOUNT_EXPIRED',error:'Your login account has expired. Contact your hospital administrator.'};
-  if(account.deleted_at||!['active','trial'].includes(account.hospital_status))return {code:'HOSPITAL_ACCESS_INACTIVE',error:'Hospital access is inactive. Contact your hospital administrator.'};
+  if(account.deleted_at||!['active','trial'].includes(account.hospital_status))return {code:'HOSPITAL_ACCESS_INACTIVE',error:'Clinic access is inactive. Contact your hospital administrator.'};
   if(!account.branch_available)return {code:'BRANCH_NOT_ASSIGNED',error:'No valid hospital branch is assigned to your account. Contact your hospital administrator.'};
   if(Number(account.assigned_roles)>0&&Number(account.active_roles)===0)return {code:'STAFF_ROLE_INACTIVE',error:'Your staff role is inactive. Contact your hospital administrator.'};
   return {code:'STAFF_ROLE_MISMATCH',error:doctorOnly?'This account does not have Doctor access. Use Staff Login or contact your hospital administrator.':'Your account does not have a matching staff login role. Contact your hospital administrator.'};

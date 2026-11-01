@@ -1,4 +1,15 @@
 export function routeSlug(value: string) {
+  // Keep existing bookmarks and workspace URLs while updating visible labels.
+  const legacyLabels: Record<string, string> = {
+    "Clinic Admin": "Hospital Admin",
+    "Clinic Management": "Hospital Management",
+    "Clinic Charges": "Hospital Charges",
+    "Clinic Profile": "Hospital Profile",
+    "Clinics": "Hospitals",
+    "Create Clinic": "Create Hospital",
+    "Edit Clinic": "Edit Hospital",
+  };
+  value = legacyLabels[value] ?? value;
   return value.trim().toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 

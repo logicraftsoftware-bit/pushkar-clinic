@@ -125,7 +125,7 @@ const permissionCodes = [
   ].map((x) => [`menu.${x}`, "view"]),
 ] as string[][];
 const defaultRoles = [
-  "Hospital Admin",
+  "Clinic Admin",
   "Branch Admin",
   "Doctor",
   "Nurse",
@@ -186,7 +186,7 @@ async function initializeTenantAccess(tenantId: string) {
   await pool.query(`INSERT INTO rbac_roles(tenant_id,name,code,role_level,is_system)
     SELECT $1,name,code,role_level,true FROM jsonb_to_recordset($2::jsonb)
       AS r(name text,code text,role_level integer) ON CONFLICT DO NOTHING`,
-    [tenantId,JSON.stringify(defaultRoles.map((name,index)=>({name,code:name.toUpperCase().replaceAll(' ','_'),role_level:index===0?100:50})))]);
+    [tenantId,JSON.stringify(defaultRoles.map((name,index)=>({name,code:name==='Clinic Admin'?'HOSPITAL_ADMIN':name.toUpperCase().replaceAll(' ','_'),role_level:index===0?100:50})))]);
   for (const [obsolete,target] of [["PHARMACIST","PHARMACY_MANAGER"]]) {
     await pool.query(`INSERT INTO rbac_user_roles(tenant_id,user_id,role_id)
       SELECT ur.tenant_id,ur.user_id,target.id FROM rbac_user_roles ur

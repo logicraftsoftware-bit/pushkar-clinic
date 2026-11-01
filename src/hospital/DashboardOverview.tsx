@@ -131,7 +131,7 @@ export default function Overview({
           <h1>
             Good morning, {userName?.split(" ")[0] || "Admin"} <span>👋</span>
           </h1>
-          <p>Here’s what’s happening across your hospital today.</p>
+          <p>Here’s what’s happening across your clinic today.</p>
         </div>
         <div className="heading-actions">
           <button className="btn secondary">

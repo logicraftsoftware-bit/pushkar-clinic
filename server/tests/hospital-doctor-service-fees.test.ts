@@ -1,8 +1,8 @@
-﻿import {test} from 'node:test';
+import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {setHospitalDoctorServiceFees} from '../src/hospital-doctor-service-fees.js';
-test('Hospital doctors get registration 200 and maintenance 100 without changing other branches or default fees',async()=>{
+test('Clinic doctors get registration 200 and maintenance 100 without changing other branches or default fees',async()=>{
  const db=new PGlite();
  try{
   await db.exec(`CREATE TABLE hospitals(id text,name text,deleted_at timestamptz);CREATE TABLE branches(id text,tenant_id text,name text,is_active boolean);CREATE TABLE users(id text,tenant_id text,branch_id text);CREATE TABLE user_branch_access(user_id text,tenant_id text,branch_id text);CREATE TABLE staff_members(id text,tenant_id text,user_id text,staff_type text,branch_id text,professional jsonb,updated_at timestamptz);

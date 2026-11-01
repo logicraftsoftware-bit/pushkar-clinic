@@ -77,10 +77,10 @@ const portals: {
 }[] = [
   {
     value: "hospital_admin",
-    label: "Hospital Admin",
+    label: "Clinic Admin",
     description: "Administration & operations",
     icon: Building2,
-    role: "Hospital Admin",
+    role: "Clinic Admin",
   },
   {
     value: "accountant",
@@ -239,10 +239,10 @@ function PortalLogin({
           <h1>
             One secure workspace.
             <br />
-            Every hospital role.
+            Every clinic role.
           </h1>
           <p>
-            Sign in to your hospital’s private workspace for clinical,
+            Sign in to your clinic’s private workspace for clinical,
             operational and administrative workflows.
           </p>
           <div className="story-points">
@@ -260,7 +260,7 @@ function PortalLogin({
             </span>
           </div>
         </div>
-        <footer>{branding.name} Hospital ERP · Secure access portal</footer>
+        <footer>{branding.name} Clinic ERP · Secure access portal</footer>
       </section>
       <main className="portal-login-main">
         <form onSubmit={submit}>
@@ -272,7 +272,7 @@ function PortalLogin({
           <div className="portal-access-types" role="radiogroup" aria-label="Account type">
             <button type="button" role="radio" aria-checked={loginGroup === "admin"} className={loginGroup === "admin" ? "active" : ""} onClick={() => chooseGroup("admin")}>
               <Building2 />
-              <span><strong>Admin / Super Admin</strong><small>Platform and hospital administration</small></span>
+              <span><strong>Admin / Super Admin</strong><small>Platform and clinic administration</small></span>
               {loginGroup === "admin" && <CheckCircle2 />}
             </button>
             <button type="button" role="radio" aria-checked={loginGroup === "staff"} className={loginGroup === "staff" ? "active" : ""} onClick={() => chooseGroup("staff")}>
@@ -283,7 +283,7 @@ function PortalLogin({
           </div>
           {loginGroup === "admin" ? (
             <div className="portal-admin-choice">
-              <span>Hospital administrator credentials</span>
+              <span>Clinic administrator credentials</span>
               <button type="button" onClick={() => { updateBrowserPath("/superadmin"); window.location.reload(); }}>Super Admin access</button>
             </div>
           ) : <div className="portal-staff-note">For doctors, nurses, Lab Managers, technicians, pathologists and other staff. Your authorized workspace will open automatically after sign in.</div>}
@@ -295,7 +295,7 @@ function PortalLogin({
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
-                placeholder="name@hospital.com or phone number"
+                placeholder="name@clinic.com or phone number"
                 autoComplete="username"
               />
             </div>
@@ -320,7 +320,7 @@ function PortalLogin({
           </label>
           <div className="portal-login-tools">
             <label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Remember me</label>
-            <button type="button" onClick={() => Swal.fire("Forgot password?", "Please contact your hospital administrator to reset your password.", "info")}>Forgot password?</button>
+            <button type="button" onClick={() => Swal.fire("Forgot password?", "Please contact your clinic administrator to reset your password.", "info")}>Forgot password?</button>
           </div>
           {error && <div className="portal-error">{error}</div>}
           <button className="portal-submit" disabled={loading}>
@@ -334,7 +334,7 @@ function PortalLogin({
             )}
           </button>
           <div className="portal-help">
-            Access is managed by your hospital administrator.
+            Access is managed by your clinic administrator.
           </div>
         </form>
       </main>
@@ -361,7 +361,7 @@ export default function PortalEntry() {
     return()=>{window.removeEventListener('session-invalid',revoke);window.removeEventListener('password-change-required',requireChange);window.removeEventListener(TAB_SESSION_EVENT,sync);};
   },[]);
   useEffect(() => {
-    document.title = `${branding.name} — Hospital Operations`;
+    document.title = `${branding.name} — Clinic Operations`;
   }, [branding.name]);
   if(restoring)return <div role="status" style={{padding:24}}>Opening your signed-in workspace...</div>;
   if (!session) {
@@ -371,7 +371,7 @@ export default function PortalEntry() {
   if(session.forcePasswordChange)return <PasswordChange branding={branding} session={session} onChanged={()=>{const updated={...session,forcePasswordChange:false};writeTabSession(SESSION_KEY,JSON.stringify(updated));setSession(updated);}} />;
   const role =
     portals.find((item) => item.value === session.user.portal)?.role ??
-    "Hospital Admin";
+    "Clinic Admin";
   return (
     <Suspense fallback={<div role="status" style={{padding:24}}>Opening your workspace...</div>}>
     <App

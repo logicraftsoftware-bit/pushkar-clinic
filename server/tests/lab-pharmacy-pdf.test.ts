@@ -8,14 +8,14 @@ test('a two-test paid laboratory invoice and its receipt each fit one page with 
   const payment={record_number:'LAB-PAY-EXAMPLE-RECEIPT',record_date:'2026-10-27',amount:3000,data:{payment_method:'Cash',balance_after:0}};
   const bill={record_number:'LAB-EXAMPLE',patient_name:'Example Patient',medical_record_number:'UHID-EXAMPLE',patient_phone:'9876543210',
     patient_address:{line:'12 Example Road',city:'Guwahati',state:'Assam',pincode:'781006',age_years:29},record_date:'2026-10-27',
-    pathology_header_image:image,pathology_footer_content:'Hospital billing footer',
+    pathology_header_image:image,pathology_footer_content:'Clinic billing footer',
     tests:[{name:'PAP SMEAR',amount:2000},{name:'PAP SMEAR PROCEDURE CHARGE',amount:1000}],amount:3000,total:3000,paid:3000,due:0,
     data:{referred_by_name:'Dr Example Referral'},payments:[payment]};
   for(const receipt of [undefined,payment]){
     const pdf=await createLabBillingPdf(bill,receipt);
     assert.equal(pdf.getNumberOfPages(),1);
     const content=(pdf.internal as any).pages[1].join('\n');
-    for(const value of ['9876543210','29 years','Dr Example Referral','12 Example Road','Guwahati','781006',payment.record_number,'INR 3000.00','Hospital billing footer'])assert.ok(content.includes(value),value);
+    for(const value of ['9876543210','29 years','Dr Example Referral','12 Example Road','Guwahati','781006',payment.record_number,'INR 3000.00','Clinic billing footer'])assert.ok(content.includes(value),value);
   }
 });
 test('customer PDF hides pharmacy details and both copies keep identical payable totals',async()=>{

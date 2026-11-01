@@ -29,7 +29,7 @@ async function identity(auth: Auth) {
     pool.query(`SELECT name,code FROM hospitals WHERE id=$1 AND deleted_at IS NULL`, [auth.tenantId]),
     pool.query(`SELECT concat(first_name,' ',last_name) name,email,phone FROM users WHERE id=$1 AND tenant_id=$2 AND is_active=true`, [auth.sub, auth.tenantId]),
   ]);
-  if (!hospital.rows[0] || !user.rows[0]) throw new Error("Hospital account not found");
+  if (!hospital.rows[0] || !user.rows[0]) throw new Error("Clinic account not found");
   return { hospital: hospital.rows[0], user: user.rows[0] };
 }
 
@@ -77,7 +77,7 @@ async function roleContext(auth: Auth) {
 
   if (portal === "inventory_manager") {
     const records = await pool.query(`SELECT kind,status,count(*)::int records,coalesce(sum(quantity),0)::numeric quantity FROM inventory_records WHERE tenant_id=$1 GROUP BY kind,status ORDER BY kind,status`, [auth.tenantId]);
-    return { ...base, accessScope: "Hospital inventory and purchasing aggregates only", inventorySummary: records.rows };
+    return { ...base, accessScope: "Clinic inventory and purchasing aggregates only", inventorySummary: records.rows };
   }
 
   if (portal === "accountant") {
@@ -95,7 +95,7 @@ async function roleContext(auth: Auth) {
        FROM finance_records WHERE tenant_id=$1`, [auth.tenantId]),
       pool.query(`SELECT kind,status,count(*)::int records,coalesce(sum(amount),0)::numeric amount,coalesce(sum(due),0)::numeric due FROM finance_records WHERE tenant_id=$1 GROUP BY kind,status ORDER BY kind,status`, [auth.tenantId]),
     ]);
-    return { ...base, accessScope: "Hospital finance aggregates only; no clinical record details", verifiedFinanceTotals: totals.rows[0], financeSummary: records.rows };
+    return { ...base, accessScope: "Clinic finance aggregates only; no clinical record details", verifiedFinanceTotals: totals.rows[0], financeSummary: records.rows };
   }
 
   if (portal === "hr_manager") {
@@ -103,7 +103,7 @@ async function roleContext(auth: Auth) {
       pool.query(`SELECT count(*)::int total,count(*)FILTER(WHERE status='Active')::int active FROM staff_members WHERE tenant_id=$1`, [auth.tenantId]),
       pool.query(`SELECT kind,status,count(*)::int records FROM hr_records WHERE tenant_id=$1 GROUP BY kind,status ORDER BY kind,status`, [auth.tenantId]),
     ]);
-    return { ...base, accessScope: "Hospital workforce and HR aggregates only; no clinical or general finance data", staff: staff.rows[0], hrSummary: hr.rows };
+    return { ...base, accessScope: "Clinic workforce and HR aggregates only; no clinical or general finance data", staff: staff.rows[0], hrSummary: hr.rows };
   }
 
   const branchOnly = portal === "branch_admin";
@@ -129,7 +129,7 @@ router.post("/chat", authenticate, async (req: AuthedRequest, res) => {
   const financeAllowed = ["hospital_admin", "accountant", "patient"].includes(portal);
   if (!financeAllowed && financeWords.test(body.message)) {
     res.set("Cache-Control", "no-store");
-    res.json({ answer: "I can’t provide financial information from this workspace. Please contact an authorised Hospital Admin or Accountant." });
+    res.json({ answer: "I can’t provide financial information from this workspace. Please contact an authorised Clinic Admin or Accountant." });
     return;
   }
   const context = await roleContext(auth);

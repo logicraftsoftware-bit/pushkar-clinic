@@ -245,13 +245,13 @@ const hospitalMenu: HospitalMenuItem[] = [
     ],
   },
   {
-    label: "Hospital Management",
+    label: "Clinic Management",
     icon: Building2,
     children: [
       "Branches",
       "Departments",
       "Bed",
-      "Hospital Charges",
+      "Clinic Charges",
       "Print Header Footer",
       "Operations",
       "Pharmacy",
@@ -303,6 +303,31 @@ const hospitalMenu: HospitalMenuItem[] = [
   { label: "Integrations", icon: Plug },
   { label: "Settings", icon: Settings },
 ];
+// Visibility only: all menu definitions and page implementations remain available.
+const clinicAdminMenuVisibility: Record<string, readonly string[] | null> = {
+  "Reception Workspace": ["Reception Registration", "Reception OPD Appointments", "Reception OPD Queue", "Reception Billing", "Reception Accounting"],
+  "Patient Workspace": ["Patient Appointments", "Patient Medical Records", "Patient Prescriptions", "Patient Bills & Payments", "Patient Notifications", "Patient Profile"],
+  "Doctor Workspace": ["Doctor OPD Appointments", "Doctor Patient EMR", "Doctor Consultation", "Doctor Diagnosis", "Doctor Prescriptions", "Doctor Clinical Orders", "Doctor Follow-up"],
+  "Accounting Workspace": ["Accountant Billing", "Accountant Invoices", "Accountant Payments", "Accountant Accounting", "Accountant Revenue", "Accountant Financial Reports", "Accountant Tax & GST"],
+  "Clinic Management": ["Branches", "Departments", "Clinic Charges", "Print Header Footer", "Pharmacy", "Symptoms"],
+  "Staff Management": ["All Staff", "Branch Admin", "Doctor", "HR Manager", "Pharmacy Manager", "Receptionist"],
+  "Pharmacy Workspace": null,
+  "Notifications": null,
+  "Access Control": null,
+  "Audit Logs": null,
+  "Integrations": null,
+  "Settings": null,
+};
+
+function visibleMenuForRole(role: Role): HospitalMenuItem[] {
+  const menu = roleMenus[role] ?? hospitalMenu;
+  if (role !== "Clinic Admin") return menu;
+  return Object.entries(clinicAdminMenuVisibility).flatMap(([label, children]) => {
+    const item = menu.find(entry => entry.label === label);
+    return item ? [{...item, children: children === null ? item.children : item.children?.filter(child => children.includes(child))}] : [];
+  });
+}
+
 const doctorMenu: HospitalMenuItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "AI Assistant", icon: Bot },
@@ -484,7 +509,7 @@ const menuPermission: Record<string, string> = {
   Refunds:"menu.billing.view",
   "Lab Orders":"menu.billing.view",
   Dashboard: "menu.dashboard.view",
-  "Hospital Management": "menu.hospital.view",
+  "Clinic Management": "menu.hospital.view",
   "Staff Management": "menu.staff.view",
   Patients: "menu.patients.view",
   "Appointments & Queue": "menu.appointments.view",
@@ -677,16 +702,16 @@ function Sidebar({
           </div>
           {!collapsed && (
             <div>
-              <strong>{hospital?.name ?? "NovaCare Hospital"}</strong>
+              <strong>{hospital?.name ?? "NovaCare Clinic"}</strong>
               <small>{hospital?.branchName ?? "Central Branch"}</small>
             </div>
           )}
           {!collapsed && <ChevronDown size={15} />}
         </div>
         <nav className="hospital-nav">
-          {!collapsed && <p className="nav-label">HOSPITAL WORKSPACE</p>}
+          {!collapsed && <p className="nav-label">CLINIC WORKSPACE</p>}
           {!collapsed&&assignedRoles.filter(item=>!item.is_system).map(item=><p className="nav-label" key={item.id}>{item.name}</p>)}
-          {(roleMenus[role] ?? hospitalMenu)
+          {visibleMenuForRole(role)
             .filter(
               (item) =>
                 (item.label !== "AI Assistant" || role !== "Super Admin") &&
@@ -744,7 +769,7 @@ function Sidebar({
                           <span>{diagnosticMasterLabel(child)}</span>
                         </WorkspaceLink>
                       ))}
-                      {item.label==="Staff Management"&&managedRoles.map(custom=><WorkspaceLink href={`${pageHref('All Staff')}?${new URLSearchParams({staff_role:custom.name})}`} key={custom.id} title={`View ${custom.name} staff`} onNavigate={()=>{setPage("All Staff");const url=new URL(location.href);url.searchParams.set("staff_role",custom.name);history.replaceState({},"",url);window.dispatchEvent(new CustomEvent("staff-role-selected",{detail:custom.name}));closeMobile();}}><i/><span>{custom.name}</span></WorkspaceLink>)}
+                      {item.label==="Staff Management"&&role!=="Clinic Admin"&&managedRoles.map(custom=><WorkspaceLink href={`${pageHref('All Staff')}?${new URLSearchParams({staff_role:custom.name})}`} key={custom.id} title={`View ${custom.name} staff`} onNavigate={()=>{setPage("All Staff");const url=new URL(location.href);url.searchParams.set("staff_role",custom.name);history.replaceState({},"",url);window.dispatchEvent(new CustomEvent("staff-role-selected",{detail:custom.name}));closeMobile();}}><i/><span>{custom.name}</span></WorkspaceLink>)}
                     </div>
                   )}
                 </div>
@@ -869,7 +894,7 @@ function Reports() {
       <div className="report-hero">
         <div>
           <span>REPORTING & ANALYTICS</span>
-          <h2>Turn hospital data into clearer decisions.</h2>
+          <h2>Turn clinic data into clearer decisions.</h2>
           <p>
             Tenant-safe, permission-aware reporting with server-side filters and
             export-ready views.
@@ -1086,7 +1111,7 @@ function AdminRoleWorkspace({
 }
 
 function HospitalApp({
-  initialRole = "Hospital Admin",
+  initialRole = "Clinic Admin",
   session,
   onLogout,
   branding,
@@ -1117,7 +1142,7 @@ function HospitalApp({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [role, setRole] = useState<Role>(initialRole);
   const [page, setPage] = useState<Page>(
-    () => pageFromPath(initialPages, 2) ?? "Dashboard",
+    () => pageFromPath(initialPages, 2) ?? (initialRole === "Clinic Admin" ? "Reception Registration" : "Dashboard"),
   );
   const [data, setData] = useState<Awaited<
     ReturnType<typeof getDashboard>
@@ -1126,7 +1151,7 @@ function HospitalApp({
   const {ready:accessReady,permissions,roles:assignedRoles,managedRoles,error:accessError}=useLiveAccess();
 
   useEffect(() => {
-    document.title = `${branding.name} — Hospital Operations`;
+    document.title = `${branding.name} — Clinic Operations`;
   }, [branding.name]);
   useEffect(() => {
     updateBrowserPath(`/app/${routeSlug(role)}/${routeSlug(page)}`, true);
@@ -1139,7 +1164,7 @@ function HospitalApp({
           ...menu.flatMap((item) => [item.label, ...(item.children ?? [])]),
         ]),
       );
-      setPage(pageFromPath(pages, 2) ?? "Dashboard");
+      setPage(pageFromPath(pages, 2) ?? (role === "Clinic Admin" ? "Reception Registration" : "Dashboard"));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -1213,7 +1238,7 @@ function HospitalApp({
               role={role}
             />
           )}
-          {role === "Hospital Admin" &&
+          {role === "Clinic Admin" &&
             session?.token &&
             adminRoleWorkspacePages.has(page) && (
               <AdminRoleWorkspace
@@ -1417,7 +1442,7 @@ function HospitalApp({
           {!dedicatedRoles.has(role) &&
             page === "Operation Theatre" &&
             session?.token && <OperationTheatre token={session.token} />}
-          {role === "Hospital Admin" &&
+          {role === "Clinic Admin" &&
             page === "Food & Dietary" &&
             session?.token && <DietaryManagement token={session.token} />}
           {!dedicatedRoles.has(role) &&
@@ -1428,7 +1453,7 @@ function HospitalApp({
               "Branches",
               "Departments",
               "Bed",
-              "Hospital Charges",
+              "Clinic Charges",
               "Print Header Footer",
               "Operations",
               "Pharmacy",
@@ -1517,13 +1542,13 @@ function HospitalApp({
             page !== "Reports & Analytics" &&
             !adminRoleWorkspacePages.has(page) &&
             ![
-              "Hospital Profile",
+              "Clinic Profile",
               "Branches",
               "Departments",
               "Wards",
               "Rooms",
               "Bed",
-              "Hospital Charges",
+              "Clinic Charges",
               "Print Header Footer",
               "Operations",
               "Pharmacy",
@@ -1586,7 +1611,7 @@ function HospitalApp({
           </Suspense>
         </main>
       </div>
-      {session?.token && role !== "Super Admin" && page !== "AI Assistant" && (
+      {session?.token && role !== "Super Admin" && role !== "Clinic Admin" && page !== "AI Assistant" && (
         <HosAiLauncher userKey={`${session.hospital.code}:${session.user.id??session.user.name}`} onOpen={()=>navigateToPage('AI Assistant')}/>
       )}
       <nav className="mobile-app-nav" aria-label="Mobile navigation">
@@ -1594,13 +1619,13 @@ function HospitalApp({
           <Menu />
           <span>Menu</span>
         </button>
-        <button
+        {role !== "Clinic Admin" && <button
           className={page === "Dashboard" ? "active" : ""}
           onClick={() => navigateToPage("Dashboard")}
         >
           <LayoutDashboard />
           <span>Dashboard</span>
-        </button>
+        </button>}
         <button>
           <Zap />
           <span>Quick</span>

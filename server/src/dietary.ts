@@ -96,7 +96,7 @@ router.post(["/menu", "/rules"], (req: R, res, next) => {
     next();
   } catch (e) {
     res.status(403).json({
-      error: e instanceof Error ? e.message : "Hospital Admin access required",
+      error: e instanceof Error ? e.message : "Clinic Admin access required",
     });
   }
 });
@@ -127,7 +127,7 @@ router.post("/orders", async (req: R, res, next) => {
 });
 const adminOnly = (a: A) => {
   if (a.role !== "hospital_admin")
-    throw new Error("Hospital Admin access required");
+    throw new Error("Clinic Admin access required");
 };
 async function admissionAccess(a: A, id: string) {
   return (
@@ -374,7 +374,7 @@ router.post("/orders", async (req: R, res) => {
   )
     return void res
       .status(403)
-      .json({ error: "Complimentary meals require Hospital Admin approval" });
+      .json({ error: "Complimentary meals require Clinic Admin approval" });
   if (
     ["Complimentary", "Management Complimentary"].includes(billingClass) &&
     !m.complimentary_eligible
@@ -402,7 +402,7 @@ router.post("/orders", async (req: R, res) => {
     chargeable = ![
       "Complimentary",
       "Included in Room Package",
-      "Included in Hospital Package",
+      "Included in Clinic Package",
       "Management Complimentary",
     ].includes(billingClass),
     amount = chargeable ? rate * b.quantity : 0,
@@ -601,7 +601,7 @@ router.post("/schedules", async (req: R, res) => {
   if (a.role !== "hospital_admin")
     return void res
       .status(403)
-      .json({ error: "Hospital Admin access required" });
+      .json({ error: "Clinic Admin access required" });
   const b = z
     .object({
       meal_type: z.string().trim().min(2),
@@ -712,7 +712,7 @@ router.post("/generate", async (req: R, res) => {
   if (a.role !== "hospital_admin")
     return void res
       .status(403)
-      .json({ error: "Hospital Admin access required" });
+      .json({ error: "Clinic Admin access required" });
   const b = z
     .object({
       meal_type: z.string().trim().min(2),

@@ -8,7 +8,7 @@ test("uploaded image footers larger than the old text limit save without changin
   assert.equal(printTemplateBody.parse({footer_content:footer}).footer_content,footer);
   assert.ok(footer.includes('data-print-footer="image"'));
   assert.ok(footer.includes('width:100%'));
-  assert.equal(printTemplateBody.parse({footer_content:"<p>Hospital address</p>"}).footer_content,"<p>Hospital address</p>");
+  assert.equal(printTemplateBody.parse({footer_content:"<p>Clinic address</p>"}).footer_content,"<p>Clinic address</p>");
 });
 test("oversized footer has an actionable validation error",()=>{
   const result=printTemplateBody.safeParse({footer_content:"x".repeat(8000001)});

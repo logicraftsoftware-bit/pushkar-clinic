@@ -74,7 +74,7 @@ export async function registerPatient(request,response,{requireTitle=true}={}){
   const input=patientInput.parse(request.body),data=normalize(input),tenant=response.locals.account.tenant_id;
   if(requireTitle&&!input.address.title)return response.status(400).json({field:'Title',error:'Select a patient title'});
   const canOverride=response.locals.claims.portal==='hospital_admin';
-  if(input.duplicate_override&&!canOverride)return response.status(403).json({error:'Hospital Admin approval is required to override a possible duplicate.'});
+  if(input.duplicate_override&&!canOverride)return response.status(403).json({error:'Clinic Admin approval is required to override a possible duplicate.'});
   const id=randomUUID();
   const result=await transaction(async session=>{
     await assertBranch(response,data.branch_id,session);

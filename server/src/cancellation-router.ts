@@ -38,7 +38,7 @@ router.get('/',async(req:Req,res)=>{
 router.get('/:id/events',async(req:Req,res)=>{
   const id=z.string().uuid().parse(req.params.id),found=await pool.query(`SELECT id FROM cancellation_requests WHERE id=$1 AND tenant_id=$2 AND ($3::uuid[] IS NULL OR branch_id=ANY($3))`,[id,req.actor!.tenantId,req.actor!.branches]);
   if(!found.rowCount)throw new CancellationError(404,'Cancellation request not found.');
-  res.json((await pool.query(`SELECT e.*,coalesce(nullif(e.actor_name,''),CASE WHEN u.role='hospital_admin' THEN 'Hospital Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END) actor_name,coalesce(e.actor_role,u.role::text) actor_role,f.record_number FROM cancellation_events e JOIN users u ON u.id=e.actor_id LEFT JOIN finance_records f ON f.id=e.finance_id WHERE e.request_id=$1 AND e.tenant_id=$2 ORDER BY e.created_at,e.id`,[id,req.actor!.tenantId])).rows);
+  res.json((await pool.query(`SELECT e.*,coalesce(nullif(e.actor_name,''),CASE WHEN u.role='hospital_admin' THEN 'Clinic Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END) actor_name,coalesce(e.actor_role,u.role::text) actor_role,f.record_number FROM cancellation_events e JOIN users u ON u.id=e.actor_id LEFT JOIN finance_records f ON f.id=e.finance_id WHERE e.request_id=$1 AND e.tenant_id=$2 ORDER BY e.created_at,e.id`,[id,req.actor!.tenantId])).rows);
 });
 const amount=z.number().finite().min(0).max(99999999.99);
 router.post('/',async(req:Req,res)=>{

@@ -12,7 +12,7 @@ test('merge retires old radiology tests, preserves pathology data and patient hi
       INSERT INTO hospital_diagnostic_masters VALUES
       ('00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000010','pathology','test','CBC','{"test_type":"Legacy","amount":500,"parameter_ids":["p1"]}'),
       ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000010','radiology','test','Old X-Ray','{"amount":1000}'),
-      ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000011','radiology','test','Other Hospital X-Ray','{}'),
+      ('00000000-0000-4000-8000-000000000003','00000000-0000-4000-8000-000000000011','radiology','test','Other Clinic X-Ray','{}'),
       ('00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000010','blood','test','Blood Product','{}');
       INSERT INTO role_work_items VALUES(1,'{"tests":[{"test_id":"00000000-0000-4000-8000-000000000002","name":"Old X-Ray"}],"report":"Historical report"}');`);
     const history=(await db.query('SELECT data FROM role_work_items')).rows;

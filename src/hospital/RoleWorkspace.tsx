@@ -401,7 +401,7 @@ function LegacyRoleWorkspace({
         <div className="workspace-view-back">
           <section className="workspace-view self-registration-qr-modal">
             <header><div><h2>Patient Self Registration</h2><p>Scan to open the public registration page.</p></div><button onClick={() => setSelfRegistrationUrl("")}>×</button></header>
-            <div id="self-registration-qr"><QRCodeSVG value={selfRegistrationUrl} size={300} level="H" includeMargin /><p>This QR is linked to the current hospital branch.</p></div>
+            <div id="self-registration-qr"><QRCodeSVG value={selfRegistrationUrl} size={300} level="H" includeMargin /><p>This QR is linked to the current clinic branch.</p></div>
             <footer><button onClick={() => setSelfRegistrationUrl("")}>Close</button><button className="primary" onClick={printSelfRegistrationQr}><Printer /> Print QR Code</button></footer>
           </section>
         </div>

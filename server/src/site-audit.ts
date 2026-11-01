@@ -16,7 +16,7 @@ function verified(req:Request):Auth|null{
 }
 export async function trackSiteRequest(req:Request,_res:Response,next:NextFunction){
   try{
-    const auth=verified(req);let name=auth?.role==='hospital_admin'?'Hospital Admin':auth?.role==='super_admin'?'Super Admin':_res.locals.auditActorName||'';
+    const auth=verified(req);let name=auth?.role==='hospital_admin'?'Clinic Admin':auth?.role==='super_admin'?'Super Admin':_res.locals.auditActorName||'';
     if(auth&&!name){
       const table=auth.role==='broker'?'referral_partners':'users';
       const result=await pool.query(table==='users'?`SELECT concat_ws(' ',first_name,last_name) name FROM users WHERE id=$1 AND tenant_id=$2`:`SELECT name FROM referral_partners WHERE id=$1 AND tenant_id=$2`,[auth.sub,auth.tenantId]);name=result.rows[0]?.name||'Unknown staff';
@@ -30,7 +30,7 @@ const permissions:Record<string,string>={patients:'patient.view',clinical_appoin
 async function filters(req:Request){
   const auth=verified(req);if(!auth)throw Object.assign(Error('Session expired or invalid.'),{status:401});
   if(auth.role==='super_admin')return{auth,sql:'true',args:[] as unknown[]};
-  if(!auth.tenantId)throw Object.assign(Error('Hospital access required.'),{status:403});
+  if(!auth.tenantId)throw Object.assign(Error('Clinic access required.'),{status:403});
   if(['patient','broker'].includes(auth.role))return{auth,sql:'tenant_id=$1 AND actor_id=$2',args:[auth.tenantId,auth.sub] as unknown[]};
   const branches=await accessibleBranchIds({...auth,tenantId:auth.tenantId}),admin=auth.role==='hospital_admin'||await hasPermission(auth.sub,auth.tenantId,'audit.view');
   const allowed=admin?null:new Set((await Promise.all([...new Set(Object.values(permissions))].map(async permission=>await hasPermission(auth.sub,auth.tenantId!,permission)?permission:null))).filter(Boolean));

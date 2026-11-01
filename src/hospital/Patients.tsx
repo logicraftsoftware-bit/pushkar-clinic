@@ -306,7 +306,7 @@ export default function Patients({ token }: { token: string }) {
         <div>
           <small>Patients / Registry</small>
           <h1>Patients</h1>
-          <p>Register and manage patient health records for this hospital.</p>
+          <p>Register and manage patient health records for this clinic.</p>
         </div>
         <button data-permission="patient.create" onClick={() => setEdit({ status: "Active", sex: "unknown" })}>
           <Plus />
@@ -779,7 +779,7 @@ export function PatientForm({
             <div className="patient-charges-head">
               <div>
                 <strong>Charges</strong>
-                <span>Add one or more configured hospital charges</span>
+                <span>Add one or more configured clinic charges</span>
               </div>
               <button
                 type="button"

@@ -1,4 +1,4 @@
-﻿import type {PoolClient} from 'pg';
+import type {PoolClient} from 'pg';
 export async function setHospitalDoctorServiceFees(client:Pick<PoolClient,'query'>){
  const key='medicity-guwahati-hospital-doctor-service-fees-200-100-2026-10-29';
  await client.query('BEGIN');
@@ -15,7 +15,7 @@ export async function setHospitalDoctorServiceFees(client:Pick<PoolClient,'query
   for(const doctor of doctors){
    const professional={...doctor.professional,branch_fees:{...doctor.professional?.branch_fees,[branch.id]:{...doctor.professional?.branch_fees?.[branch.id],registration_fee:200,maintenance_fee:100}}};
    const updated=(await client.query('UPDATE staff_members SET professional=$1::jsonb,updated_at=now() WHERE id=$2 AND tenant_id=$3 RETURNING professional',[JSON.stringify(professional),doctor.id,doctor.tenant_id])).rows[0]?.professional;
-   if(Number(updated?.branch_fees?.[branch.id]?.registration_fee)!==200||Number(updated?.branch_fees?.[branch.id]?.maintenance_fee)!==100)throw Error('Hospital doctor fee verification failed');
+   if(Number(updated?.branch_fees?.[branch.id]?.registration_fee)!==200||Number(updated?.branch_fees?.[branch.id]?.maintenance_fee)!==100)throw Error('Clinic doctor fee verification failed');
   }
   const summary={branch:branch.name,doctors_updated:doctors.length,registration_fee:200,maintenance_fee:100};
   await client.query('INSERT INTO doctor_service_fee_initialisations(operation_key,backup,summary) VALUES($1,$2::jsonb,$3::jsonb)',[key,JSON.stringify({branch,doctors}),JSON.stringify(summary)]);

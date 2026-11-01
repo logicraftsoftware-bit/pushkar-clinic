@@ -1116,7 +1116,7 @@ export function LoadedConsultationWorkspace({
   }
   async function requestDischarge(){
     if(!isIpd)return;
-    if(!String(clinical.diagnosis||"").trim()||!String(clinical.hospital_course||"").trim()||!String(clinical.advice||"").trim()){setMessage("Final diagnosis, hospital course and discharge advice are mandatory.");return}
+    if(!String(clinical.diagnosis||"").trim()||!String(clinical.hospital_course||"").trim()||!String(clinical.advice||"").trim()){setMessage("Final diagnosis, clinic course and discharge advice are mandatory.");return}
     setSaving(true);setMessage("");
     try{await request(`/ipd/${appointment.id}/discharge-request`,token,{method:"POST",body:JSON.stringify(clinical)});await Promise.resolve(reload());close()}catch(error){setMessage(error instanceof Error?error.message:"Unable to request discharge")}finally{setSaving(false)}
   }
@@ -1477,7 +1477,7 @@ export function LoadedConsultationWorkspace({
         </button>}
       </header>
       <nav>
-        {(dischargeMode?["Summary","Clinical History","Diagnosis","Hospital Course","Investigations","Procedures","Treatment Given","Rx","Advice","Warning Signs","Follow Up","Pending Reports"]:[...consultTabs,...(isIpd?["Visit History"]:[])]).map((tab) => (
+        {(dischargeMode?["Summary","Clinical History","Diagnosis","Clinic Course","Investigations","Procedures","Treatment Given","Rx","Advice","Warning Signs","Follow Up","Pending Reports"]:[...consultTabs,...(isIpd?["Visit History"]:[])]).map((tab) => (
           <button
             className={active === tab ? "active" : ""}
             onClick={() => setActive(tab)}
@@ -1512,7 +1512,7 @@ export function LoadedConsultationWorkspace({
             {dischargeMode&&<><label>Discharge type<select value={clinical.discharge_type} onChange={e=>update("discharge_type",e.target.value)}>{["Normal Discharge","DAMA / LAMA","Transfer to Another Hospital","Death","Absconded","Other"].map(x=><option key={x}>{x}</option>)}</select></label><label>Condition at discharge<select value={clinical.condition_at_discharge} onChange={e=>update("condition_at_discharge",e.target.value)}>{["Stable","Improved","Unchanged","Critical","Transferred","Other"].map(x=><option key={x}>{x}</option>)}</select></label></>}
           </div>
         ) : dischargeMode && active === "Clinical History" ? <div className="dc-two">{textArea("chief_complaints","Chief complaints")}{textArea("reason_for_admission","Reason for admission / history of present illness")}{textArea("past_history","Relevant medical, surgical and family history")}{textArea("discharge_observations","Significant examination findings / discharge observations")}</div>
-        : dischargeMode && active === "Hospital Course" ? textArea("hospital_course","Consolidated hospital course and treatment response")
+        : dischargeMode && active === "Clinic Course" ? textArea("hospital_course","Consolidated clinic course and treatment response")
         : dischargeMode && active === "Investigations" ? textArea("investigation","Important laboratory and radiology results")
         : dischargeMode && active === "Procedures" ? textArea("procedures","Procedures / surgery details")
         : dischargeMode && active === "Treatment Given" ? textArea("treatment_given","Medicines, IV fluids, injections, oxygen, transfusion and therapies during stay")

@@ -31,9 +31,9 @@ test('long patient bills paginate on half sheets without losing the last charge 
   assert.match(text(pdf),/Charge 60/);assert.match(text(pdf),/Net Payable/);
 });
 test('laboratory customer and pharmacy invoices and payment receipts use half sheets',async()=>{
-  const bill={...invoice,amount:3000,tests:[{name:'Blood Test',amount:3000}],pathology_footer_content:'Hospital billing footer'};
+  const bill={...invoice,amount:3000,tests:[{name:'Blood Test',amount:3000}],pathology_footer_content:'Clinic billing footer'};
   for(const pdf of [await createLabBillingPdf(bill),await createLabBillingPdf(bill,undefined,'pharmacy'),await createLabBillingPdf(bill,{record_number:'REC-100',amount:1000,data:{payment_mode:'Cash'}})]) {
-    checkPages(pdf);assert.match(text(pdf),/Hospital billing footer/);
+    checkPages(pdf);assert.match(text(pdf),/Clinic billing footer/);
   }
   const long=await createLabBillingPdf({...bill,tests:Array.from({length:60},(_,i)=>({name:`Test ${i+1}`,amount:50}))});
   assert.ok(long.getNumberOfPages()>1);checkPages(long);assert.match(text(long),/Test 60/);assert.match(text(long),/Balance due/);

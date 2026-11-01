@@ -344,7 +344,7 @@ router.post("/", async (req: R, res) => {
   if (b.duplicate_override && !canOverride) {
     res.status(403).json({
       error:
-        "Hospital Admin approval is required to override a possible duplicate",
+        "Clinic Admin approval is required to override a possible duplicate",
     });
     return;
   }

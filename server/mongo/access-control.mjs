@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { db,transaction } from './database.mjs';
 import { permissionsFor,requirePermission,scopeFor,writeAudit } from './access.mjs';
 import { hashPassword } from './security.mjs';
-import { baseRoles,customBaseRoles,permissionCatalog,rolePortalCode,validateRoleGrant } from './role-policy.mjs';
+import { clinicRoleLabel,baseRoles,customBaseRoles,permissionCatalog,rolePortalCode,validateRoleGrant } from './role-policy.mjs';
 const router=Router(),id=z.string().uuid();
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 async function lockActor(response,permission,session) {
@@ -20,12 +20,12 @@ router.get('/me',async(_request,response)=>{
   const account=response.locals.account,permissions=await permissionsFor(account);
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
   const managed_roles=permissions.some(code=>['*','roles.manage','staff.view'].includes(code))?await db.collection('rbac_roles').find({tenant_id:account.tenant_id,is_system:false},{projection:{_id:0,id:1,name:1,code:1,is_system:1}}).sort({name:1}).toArray():[];
-  response.json({permissions:permissions.includes('*')?permissionCatalog.map(row=>row.code):permissions,roles,managed_roles});
+  response.json({permissions:permissions.includes('*')?permissionCatalog.map(row=>row.code):permissions,roles:roles.map(clinicRoleLabel),managed_roles:managed_roles.map(clinicRoleLabel)});
 });
 router.get('/permissions',requirePermission('roles.manage'),(_request,response)=>response.json(permissionCatalog));
 router.get('/roles',requirePermission('roles.manage'),async(_request,response)=>{
   const rows=await db.collection('rbac_roles').find({tenant_id:response.locals.account.tenant_id},{projection:{_id:0}}).sort({role_level:-1,name:1}).toArray();
-  response.json(rows.map(row=>({...row,description:row.description??'',role_level:row.role_level??(row.code==='HOSPITAL_ADMIN'?100:50),permissions:row.permissions?.includes('*')?permissionCatalog.map(item=>item.code):row.permissions??[]})));
+  response.json(rows.map(row=>({...clinicRoleLabel(row),description:row.description??'',role_level:row.role_level??(row.code==='HOSPITAL_ADMIN'?100:50),permissions:row.permissions?.includes('*')?permissionCatalog.map(item=>item.code):row.permissions??[]})));
 });
 const roleInput=z.object({id:id.optional(),name:z.string().trim().min(2).max(120),code:z.string().trim().min(2).max(80).transform(value=>value.toUpperCase().replace(/\s+/g,'_')).pipe(z.string().regex(/^[A-Z][A-Z0-9_]+$/)),description:z.string().max(2000).prefault(''),role_level:z.coerce.number().int().min(1).max(99).prefault(50),status:z.enum(['Active','Inactive']).prefault('Active'),base_role:z.enum(customBaseRoles).prefault('RECEPTIONIST'),permissions:z.array(z.string()).max(200).transform(values=>[...new Set(values)])});
 router.post('/roles',requirePermission('roles.manage'),async(request,response)=>{
@@ -61,7 +61,7 @@ router.get('/users',requirePermission('users.manage'),async(_request,response)=>
       row.department_id?db.collection('departments').findOne({tenant_id,id:row.department_id}):null,
       db.collection('rbac_roles').findOne({tenant_id,code:{$in:row.role_codes??[]}}),
     ]);
-    Object.assign(row,{staff:`${row.first_name??''} ${row.last_name??''}`.trim(),employee_id:staff?.employee_id??'',branch_name:branch?.name??'',department_name:department?.name??'',role_id:role?.id??null,role_name:role?.name??''});
+    Object.assign(row,{staff:`${row.first_name??''} ${row.last_name??''}`.trim(),employee_id:staff?.employee_id??'',branch_name:branch?.name??'',department_name:department?.name??'',role_id:role?.id??null,role_name:role?clinicRoleLabel(role).name:''});
   }
   response.json(rows);
 });

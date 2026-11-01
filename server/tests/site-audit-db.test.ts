@@ -14,7 +14,7 @@ test('site-wide audit records committed changes with immutable staff names, IPs 
     const client={query:(sql:string,args?:any[])=>db.query<any>(sql,args)};
     instrumentAuditClient(client);activateAuditTriggers();
     const tenant='00000000-0000-4000-8000-000000000001';
-    const context=(name:string,ip:string):AuditContext=>({actor_name:name,actor_role:name==='Hospital Admin'?'hospital_admin':'receptionist',tenant_id:tenant,ip_address:ip,request_path:'/api/v1/records',request_id:name});
+    const context=(name:string,ip:string):AuditContext=>({actor_name:name,actor_role:name==='Clinic Admin'?'hospital_admin':'receptionist',tenant_id:tenant,ip_address:ip,request_path:'/api/v1/records',request_id:name});
     await t.test('concurrent actors keep distinct names, IP addresses and creation timestamps',async()=>{
       await Promise.all([
         auditContext.run(context('Xunmoni','203.0.113.1'),()=>client.query('INSERT INTO records VALUES(1,$1,$2,now())',[tenant,'Booked'])),
@@ -25,9 +25,9 @@ test('site-wide audit records committed changes with immutable staff names, IPs 
       assert.ok(rows.every(row=>row.action==='Created'&&row.tenant_id===tenant&&row.created_at));
     });
     await t.test('updates preserve the original creator and show the admin action and changed fields',async()=>{
-      await auditContext.run(context('Hospital Admin','198.51.100.1'),()=>client.query("UPDATE records SET status='Confirmed',updated_at=now() WHERE id=1"));
+      await auditContext.run(context('Clinic Admin','198.51.100.1'),()=>client.query("UPDATE records SET status='Confirmed',updated_at=now() WHERE id=1"));
       const rows=(await client.query("SELECT * FROM site_activity_events WHERE record_id='1' ORDER BY id")).rows;
-      assert.equal(rows[0].actor_name,'Xunmoni');assert.equal(rows[1].actor_name,'Hospital Admin');
+      assert.equal(rows[0].actor_name,'Xunmoni');assert.equal(rows[1].actor_name,'Clinic Admin');
       assert.equal(rows[1].action_detail,'Confirmed');assert.deepEqual(rows[1].changed_fields,['status']);
     });
     await t.test('failed transactions and timestamp-only updates leave no audit entries',async()=>{

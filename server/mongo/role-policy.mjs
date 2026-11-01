@@ -11,3 +11,6 @@ export function validateRoleGrant(granted,permissions) {
 export function rolePortalCode(role) {
   return role.is_system&&baseRoles[role.code]?role.code:customBaseRoles.includes(role.base_role)?role.base_role:null;
 }
+
+// Display legacy administrator names without changing stored role codes.
+export const clinicRoleLabel = role => /^(hospital[ _]+admin)$/i.test(role.name ?? '') ? {...role, name:'Clinic Admin'} : role;

@@ -68,7 +68,7 @@ export function PlanForm({ editId, onBack, onSaved }: { editId?: string; onBack:
       <Field label="Trial days" required><input name="trialDays" required type="number" min="0" defaultValue={plan?.trial_days ?? 14} /></Field>
       <Field label="Plan status" required><select name="status" defaultValue={plan?.status ?? 'active'}><option value="active">Active</option><option value="inactive">Inactive</option></select></Field>
     </Section>
-    <Section icon={ShieldCheck} title="Usage limits" text="Set the maximum resources available to each subscribing hospital.">
+    <Section icon={ShieldCheck} title="Usage limits" text="Set the maximum resources available to each subscribing clinic.">
       <Field label="Maximum branches" required><input name="maxBranches" required type="number" min="1" defaultValue={plan?.max_branches ?? 1} /></Field>
       <Field label="Maximum users" required><input name="maxUsers" required type="number" min="1" defaultValue={plan?.max_users ?? 25} /></Field>
       <Field label="Maximum doctors" required><input name="maxDoctors" required type="number" min="1" defaultValue={plan?.max_doctors ?? 10} /></Field>
@@ -111,18 +111,18 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
     try {
       await adminApi(editId ? `/hospitals/${editId}` : '/hospitals', { method: editId ? 'PUT' : 'POST', body: JSON.stringify(payload) })
       onSaved()
-    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save hospital') } finally { setSaving(false) }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save clinic') } finally { setSaving(false) }
   }
-  if (editId && !hospital) return <div className="sa-loading"><LoaderCircle className="spin" />Loading hospital…</div>
+  if (editId && !hospital) return <div className="sa-loading"><LoaderCircle className="spin" />Loading clinic…</div>
   const date = hospital?.subscription_start_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
-  return <form className="entity-form" onSubmit={submit}><FormHeader title={editId ? 'Edit hospital' : 'Create hospital'} text="Provision the tenant profile, subscription, main branch and administrator." onBack={onBack} />
-    <Section icon={Building2} title="Hospital identity" text="Core registration and contact information.">
-      <div className="logo-field wide"><div className="logo-preview">{logo ? <img src={logo} alt="Hospital logo preview" /> : <Image />}</div><label><strong>Hospital logo</strong><small>PNG, JPG or WebP. Maximum 500 KB.</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => chooseLogo(e.target.files?.[0])} /></label></div>
-      <Field label="Hospital name" required><input name="name" required defaultValue={hospital?.name} /></Field>
-      <Field label="Hospital code / Tenant code" required><input name="code" required defaultValue={hospital?.code} /></Field>
-      <Field label="Hospital type" required><select name="hospitalType" defaultValue={hospital?.hospital_type ?? ''} required><option value="" disabled>Select type</option><option>Multi-speciality</option><option>General Hospital</option><option>Clinic</option><option>Diagnostic Centre</option><option>Nursing Home</option><option>Speciality Hospital</option></select></Field>
+  return <form className="entity-form" onSubmit={submit}><FormHeader title={editId ? 'Edit clinic' : 'Create clinic'} text="Provision the tenant profile, subscription, main branch and administrator." onBack={onBack} />
+    <Section icon={Building2} title="Clinic identity" text="Core registration and contact information.">
+      <div className="logo-field wide"><div className="logo-preview">{logo ? <img src={logo} alt="Clinic logo preview" /> : <Image />}</div><label><strong>Clinic logo</strong><small>PNG, JPG or WebP. Maximum 500 KB.</small><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => chooseLogo(e.target.files?.[0])} /></label></div>
+      <Field label="Clinic name" required><input name="name" required defaultValue={hospital?.name} /></Field>
+      <Field label="Clinic code / Tenant code" required><input name="code" required defaultValue={hospital?.code} /></Field>
+      <Field label="Clinic type" required><select name="hospitalType" defaultValue={hospital?.hospital_type ?? ''} required><option value="" disabled>Select type</option><option>Multi-speciality</option><option value="General Hospital">General Clinic</option><option>Clinic</option><option>Diagnostic Centre</option><option>Nursing Home</option><option value="Speciality Hospital">Speciality Clinic</option></select></Field>
       <Field label="Registration number" required><input name="registrationNumber" required defaultValue={hospital?.registration_number} /></Field>
-      <Field label="Hospital email" required><input name="email" type="email" required defaultValue={hospital?.email} /></Field>
+      <Field label="Clinic email" required><input name="email" type="email" required defaultValue={hospital?.email} /></Field>
       <Field label="Phone number" required><input name="phone" type="tel" required defaultValue={hospital?.phone} /></Field>
       <Field label="Emergency phone" required><input name="emergencyPhone" type="tel" required defaultValue={hospital?.emergency_phone} /></Field>
       <Field label="GSTIN"><input name="gstin" defaultValue={hospital?.gstin} /></Field>
@@ -140,14 +140,14 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       <Field label="Subscription start date" required><input name="subscriptionStartDate" type="date" required defaultValue={date} /></Field>
       <Field label="Billing cycle" required><select name="billingCycle" defaultValue={hospital?.billing_cycle ?? 'monthly'}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></Field>
       <Field label="Trial days" required><input name="trialDays" type="number" min="0" required defaultValue={hospital?.trial_days ?? 14} /></Field>
-      <Field label="Hospital status" required><select name="status" defaultValue={hospital?.status ?? 'trial'}><option value="active">Active</option><option value="trial">Trial</option><option value="suspended">Suspended</option><option value="inactive">Inactive</option></select></Field>
+      <Field label="Clinic status" required><select name="status" defaultValue={hospital?.status ?? 'trial'}><option value="active">Active</option><option value="trial">Trial</option><option value="suspended">Suspended</option><option value="inactive">Inactive</option></select></Field>
     </Section>
-    <Section icon={UserRound} title="Hospital administrator" text="Create the first administrator responsible for this tenant.">
+    <Section icon={UserRound} title="Clinic administrator" text="Create the first administrator responsible for this tenant.">
       <Field label="Admin name" required><input name="adminName" required defaultValue={hospital?.admin_name} /></Field>
       <Field label="Admin email" required><input name="adminEmail" type="email" required defaultValue={hospital?.admin_email} /></Field>
       <Field label="Admin phone" required><input name="adminPhone" type="tel" required defaultValue={hospital?.admin_phone} /></Field>
       <Field label={editId && hospital?.admin_id ? 'New password (optional)' : 'Password'} required={!editId || !hospital?.admin_id}><input name="password" type="password" required={!editId || !hospital?.admin_id} minLength={8} autoComplete="new-password" /></Field>
     </Section>
-    <div className="entity-actionbar">{error && <span className="entity-error">{error}</span>}<button type="button" className="sa-secondary" onClick={onBack}>Cancel</button><button className="sa-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" /> : <Save />}{editId ? 'Save hospital' : 'Create hospital'}</button></div>
+    <div className="entity-actionbar">{error && <span className="entity-error">{error}</span>}<button type="button" className="sa-secondary" onClick={onBack}>Cancel</button><button className="sa-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" /> : <Save />}{editId ? 'Save hospital' : 'Create clinic'}</button></div>
   </form>
 }

@@ -22,7 +22,7 @@ router.get('/settings',requirePermission('settings.view'),async(_request,respons
   response.json(maskSettings(settings));
 });
 router.put('/settings/:section',requirePermission('settings.manage'),async(request,response)=>{
-  if(response.locals.claims.portal!=='hospital_admin')return response.status(403).json({error:'Clinic-wide settings require Hospital Admin.'});
+  if(response.locals.claims.portal!=='hospital_admin')return response.status(403).json({error:'Clinic-wide settings require Clinic Admin.'});
   const key=z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,79}$/).refine(value=>!['constructor','prototype','__proto__'].includes(value),'Reserved setting key');
   const section=key.parse(request.params.section);
   const data=z.record(key,z.unknown()).parse(request.body);

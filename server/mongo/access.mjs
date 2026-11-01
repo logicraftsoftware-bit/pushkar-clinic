@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 export async function initializeRoles(tenantId,session) {
   for(const [code,permissions] of Object.entries(permissionTemplates)) {
-    await db.collection('rbac_roles').updateOne({tenant_id:tenantId,code},{$setOnInsert:{id:randomUUID(),tenant_id:tenantId,code,name:code.split('_').join(' '),permissions,is_system:true,status:'Active',created_at:new Date()}},{session,upsert:true});
+    await db.collection('rbac_roles').updateOne({tenant_id:tenantId,code},{$setOnInsert:{id:randomUUID(),tenant_id:tenantId,code,name:code==='HOSPITAL_ADMIN'?'Clinic Admin':code.split('_').join(' '),permissions,is_system:true,status:'Active',created_at:new Date()}},{session,upsert:true});
   }
 }
 export async function permissionsFor(account,session) {

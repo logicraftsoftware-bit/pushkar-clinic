@@ -45,7 +45,7 @@ router.put('/hospitals/:id',async(request,response)=>{
   const password_hash=body.password?await hashPassword(body.password):null;
   const result=await transaction(async session=>{
     const hospital=await db.collection('hospitals').findOne({id:tenant,deleted_at:null},{session}),plan=await db.collection('subscription_plans').findOne({id:body.planId},{session});
-    if(!hospital)throw failure('Hospital not found',404);if(!plan)throw failure('Subscription plan not found.');
+    if(!hospital)throw failure('Clinic not found',404);if(!plan)throw failure('Subscription plan not found.');
     const now=new Date(),profile={name:body.name,code:body.code.toUpperCase(),status:body.status,logo_url:body.logoUrl??null,hospital_type:body.hospitalType,registration_number:body.registrationNumber,email:body.email.toLowerCase(),phone:body.phone,emergency_phone:body.emergencyPhone,address_line:body.address,city:body.city,state:body.state,pin_code:body.pinCode,country:body.country,gstin:body.gstin,updated_at:now};
     await db.collection('hospitals').updateOne({id:tenant},{$set:profile},{session});
     const branch=await db.collection('branches').findOne({tenant_id:tenant,code:'MAIN'},{session});
@@ -66,7 +66,7 @@ router.delete('/hospitals/:id',async(request,response)=>{
   const id=uuid.parse(request.params.id);
   await transaction(async session=>{
     const result=await db.collection('hospitals').updateOne({id,deleted_at:null},{$set:{deleted_at:new Date(),status:'inactive'}},{session});
-    if(!result.matchedCount)throw failure('Hospital not found',404);
+    if(!result.matchedCount)throw failure('Clinic not found',404);
     await db.collection('sessions').deleteMany({tenant_id:id},{session});await audit(response,'hospital_archived',id,session);
   });response.status(204).end();
 });
@@ -89,7 +89,7 @@ router.put('/hospitals/:id/modules',async(request,response)=>{
   await transaction(async session=>{
     const module=await db.collection('platform_modules').findOne({id:body.moduleId},{session});if(!module)throw failure('Module not found',404);
     const result=await db.collection('hospitals').updateOne({id,deleted_at:null},body.enabled?{$addToSet:{modules:module.code}}:{$pull:{modules:module.code}},{session});
-    if(!result.matchedCount)throw failure('Hospital not found',404);await audit(response,'hospital_modules_updated',id,session);
+    if(!result.matchedCount)throw failure('Clinic not found',404);await audit(response,'hospital_modules_updated',id,session);
   });response.status(204).end();
 });
 router.get('/settings',async(_request,response)=>response.json(platformSettingsWithDefaults(await db.collection('platform_settings').find({},{projection:{_id:0}}).sort({category:1,key:1}).toArray())));

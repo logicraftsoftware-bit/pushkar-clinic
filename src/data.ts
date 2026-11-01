@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 export type Role =
-  | "Hospital Admin"
+  | "Clinic Admin"
   | "Reception"
   | "Doctor"
   | "Nurse"
@@ -30,7 +30,7 @@ export type Role =
   | "Super Admin";
 
 export const roles: Role[] = [
-  "Hospital Admin",
+  "Clinic Admin",
   "Reception",
   "Doctor",
   "Nurse",
@@ -46,7 +46,7 @@ export const roles: Role[] = [
 ];
 
 export const roleMetrics = {
-  "Hospital Admin": [
+  "Clinic Admin": [
     {
       label: "Today's patients",
       value: "428",

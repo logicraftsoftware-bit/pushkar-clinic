@@ -41,7 +41,7 @@ async function hospitalQ(path: string, t: string, o: RequestInit = {}) {
   });
   const text = response.status === 204 ? "" : await response.text();
   let body:R=null;
-  if(text) try { body=JSON.parse(text); } catch { throw new Error("Hospital profile service returned an invalid response"); }
+  if(text) try { body=JSON.parse(text); } catch { throw new Error("Clinic profile service returned an invalid response"); }
   if(!response.ok) throw new Error(body?.error??"Request failed");
   return body;
 }
@@ -107,11 +107,11 @@ function Records({ page, token }: { page: string; token: string }) {
     <section className="ao-page">
       <header>
         <div>
-          <small>Hospital Administration / {page}</small>
+          <small>Clinic Administration / {page}</small>
           <h1>{page}</h1>
           <p>
             {page === "Documents"
-              ? "Store and control hospital documents."
+              ? "Store and control clinic documents."
               : page === "Login Activity"
                 ? "Successful and failed staff authentication attempts."
                 : "Trace important actions performed inside this tenant."}
@@ -254,7 +254,7 @@ function DocumentForm({
         <header>
           <div>
             <h2>{value.id ? "Edit Document" : "Upload Document"}</h2>
-            <p>Access is controlled inside this hospital.</p>
+            <p>Access is controlled inside this clinic.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -315,7 +315,7 @@ function DocumentForm({
               name="access_level"
               defaultValue={value.access_level ?? "Hospital"}
             >
-              <option>Hospital</option>
+              <option value="Hospital">Clinic</option>
               <option>Branch</option>
               <option>Department</option>
               <option>Private</option>
@@ -360,7 +360,7 @@ const settingSections = [
   "Prefix Setting",
   "Languages",
 ];
-const attendanceRoles = ["Hospital Admin","Branch Admin","Doctor","Receptionist","Nurse","Accountant","HR Manager","Inventory Manager","Lab Manager","Pharmacy Manager","Radiologist"];
+const attendanceRoles = ["Clinic Admin","Branch Admin","Doctor","Receptionist","Nurse","Accountant","HR Manager","Inventory Manager","Lab Manager","Pharmacy Manager","Radiologist"];
 const attendanceTypes = ["Present (P)","Late (L)","Half Day (F)","Half Day Second Shift (SH)"];
 const notificationDefaults = [
   ["OPD Patient Registration","Dear {{patient_name}}, your OPD registration for {{appointment_date}} is successful. Patient ID: {{patient_id}}."],
@@ -441,9 +441,9 @@ function Settings({ token }: { token: string }) {
     <section className="ao-page settings">
       <header>
         <div>
-          <small>Hospital Administration / Settings</small>
+          <small>Clinic Administration / Settings</small>
           <h1>Settings</h1>
-          <p>Configure hospital-wide preferences, communication and system defaults.</p>
+          <p>Configure clinic-wide preferences, communication and system defaults.</p>
         </div>
       </header>
       <div className="settings-layout">
@@ -460,7 +460,7 @@ function Settings({ token }: { token: string }) {
         ))}
         </nav>
         <section className="settings-panel">
-          <header><div><small>Hospital Settings</small><h2>{tab}</h2><p>This section is ready. Its settings fields will be added next.</p></div></header>
+          <header><div><small>Clinic Settings</small><h2>{tab}</h2><p>This section is ready. Its settings fields will be added next.</p></div></header>
           {message && <div className="settings-message">{message}</div>}
           {renderContent()}
           <footer className="settings-save"><button type="button" onClick={saveSection} disabled={saving}>{saving ? "Saving..." : `Save ${tab}`}</button></footer>
@@ -473,10 +473,10 @@ function Settings({ token }: { token: string }) {
 function GeneralSettings({value,change}:{value:R;change:(v:R)=>void}) {
   const field=(key:string,label:string,required=false,type="text")=><label><span>{label}{required&&<em>*</em>}</span><input type={type} value={value[key]??""} onChange={e=>change({...value,[key]:e.target.value})}/></label>;
   return <div className="settings-form general-settings">
-    {field("hospital_name","Hospital Name",true)}{field("hospital_code","Hospital Code")}
+    {field("hospital_name","Clinic Name",true)}{field("hospital_code","Clinic Code")}
     <label className="wide"><span>Address<em>*</em></span><input value={value.address??""} onChange={e=>change({...value,address:e.target.value})}/></label>
     {field("phone","Phone",true,"tel")}{field("email","Email",true,"email")}
-    <LogoUpload label="Hospital Logo" value={value.hospital_logo} change={logo=>change({...value,hospital_logo:logo})}/><LogoUpload label="Hospital Small Logo" value={value.hospital_small_logo} change={logo=>change({...value,hospital_small_logo:logo})}/>
+    <LogoUpload label="Clinic Logo" value={value.hospital_logo} change={logo=>change({...value,hospital_logo:logo})}/><LogoUpload label="Clinic Small Logo" value={value.hospital_small_logo} change={logo=>change({...value,hospital_small_logo:logo})}/>
     <h3>Language</h3><label><span>Language<em>*</em></span><select value={value.language??"English"} onChange={e=>change({...value,language:e.target.value})}><option>English</option><option>Hindi</option><option>Bengali</option></select></label><span/>
     <h3>Date & Time</h3><label><span>Date Format<em>*</em></span><select value={value.date_format??"dd-mm-yyyy"} onChange={e=>change({...value,date_format:e.target.value})}><option>dd-mm-yyyy</option><option>mm-dd-yyyy</option><option>yyyy-mm-dd</option></select></label><label><span>Time Zone<em>*</em></span><select value={value.timezone??"Asia/Kolkata"} onChange={e=>change({...value,timezone:e.target.value})}><option value="Asia/Kolkata">(GMT+05:30) Asia, Kolkata</option><option value="UTC">UTC</option></select></label>
     <h3>Currency</h3><label><span>Currency<em>*</em></span><select value={value.currency??"INR"} onChange={e=>change({...value,currency:e.target.value})}><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option></select></label>{field("currency_symbol","Currency Symbol",true)}{field("credit_limit","Credit Limit",true,"number")}<label><span>Time Format<em>*</em></span><select value={value.time_format??"12 Hour"} onChange={e=>change({...value,time_format:e.target.value})}><option>12 Hour</option><option>24 Hour</option></select></label>

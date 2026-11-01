@@ -196,14 +196,14 @@ router.put("/documents/:id", async (req: R, res) => {
 });
 router.get("/login-activity", async (req: R, res) => {
   const r = await pool.query(
-    `SELECT l.*,CASE WHEN l.role='hospital_admin' THEN 'Hospital Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END user_name,s.employee_id employee_code,concat(s.first_name,' ',s.last_name)employee_name,b.name branch_name FROM login_activity l LEFT JOIN users u ON u.id=l.user_id LEFT JOIN staff_members s ON s.id=coalesce(l.employee_id,(SELECT id FROM staff_members WHERE user_id=l.user_id LIMIT 1)) LEFT JOIN branches b ON b.id=l.branch_id WHERE l.tenant_id=$1 ORDER BY l.login_time DESC LIMIT 500`,
+    `SELECT l.*,CASE WHEN l.role='hospital_admin' THEN 'Clinic Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END user_name,s.employee_id employee_code,concat(s.first_name,' ',s.last_name)employee_name,b.name branch_name FROM login_activity l LEFT JOIN users u ON u.id=l.user_id LEFT JOIN staff_members s ON s.id=coalesce(l.employee_id,(SELECT id FROM staff_members WHERE user_id=l.user_id LIMIT 1)) LEFT JOIN branches b ON b.id=l.branch_id WHERE l.tenant_id=$1 ORDER BY l.login_time DESC LIMIT 500`,
     [req.portalUser!.tenantId],
   );
   res.json(r.rows);
 });
 router.get("/audit", async (req: R, res) => {
   const r = await pool.query(
-    `SELECT * FROM (SELECT a.id::text,a.role,a.module,a.action,a.record_id,a.ip_address,a.device,a.created_at,CASE WHEN a.role='hospital_admin' THEN 'Hospital Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END user_name,b.name branch_name FROM hospital_audit_logs a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN branches b ON b.id=a.branch_id WHERE a.tenant_id=$1 UNION ALL SELECT 'activity-'||a.id,a.actor_role,a.module,a.action,a.record_id,a.ip_address,a.request_path,a.created_at,a.actor_name,b.name FROM site_activity_events a LEFT JOIN branches b ON b.id=a.branch_id WHERE a.tenant_id=$1) logs ORDER BY created_at DESC LIMIT 1000`,
+    `SELECT * FROM (SELECT a.id::text,a.role,a.module,a.action,a.record_id,a.ip_address,a.device,a.created_at,CASE WHEN a.role='hospital_admin' THEN 'Clinic Admin' ELSE concat_ws(' ',u.first_name,u.last_name) END user_name,b.name branch_name FROM hospital_audit_logs a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN branches b ON b.id=a.branch_id WHERE a.tenant_id=$1 UNION ALL SELECT 'activity-'||a.id,a.actor_role,a.module,a.action,a.record_id,a.ip_address,a.request_path,a.created_at,a.actor_name,b.name FROM site_activity_events a LEFT JOIN branches b ON b.id=a.branch_id WHERE a.tenant_id=$1) logs ORDER BY created_at DESC LIMIT 1000`,
     [req.portalUser!.tenantId],
   );
   res.json(r.rows);

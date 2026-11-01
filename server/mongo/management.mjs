@@ -6,7 +6,7 @@ import {assertBranch,scopeFor,requirePermission,permissionsFor,writeAudit,allowe
 import {hashPassword,publicRecord} from './security.mjs';
 import {staffSaveBody,staffAccountActive} from './staff-validation.mjs';
 import {doctorSlots} from './doctor-availability.mjs';
-import {baseRoles,rolePortalCode} from './role-policy.mjs';
+import {clinicRoleLabel,baseRoles,rolePortalCode} from './role-policy.mjs';
 const router=Router();
 const id=z.string().uuid();
 const optionalId=z.union([id,z.literal(''),z.null()]).optional().transform(value=>value||null);
@@ -64,7 +64,7 @@ router.get('/staff/list',requirePermission('staff.view'),async(request,response)
   response.json(rows);
 });
 router.get('/staff/roles',requirePermission('staff.view'),async(_request,response)=>{
-  response.json(await db.collection('rbac_roles').find({tenant_id:response.locals.account.tenant_id,status:'Active'},{projection:{_id:0}}).sort({name:1}).toArray());
+  response.json((await db.collection('rbac_roles').find({tenant_id:response.locals.account.tenant_id,status:'Active'},{projection:{_id:0}}).sort({name:1}).toArray()).map(clinicRoleLabel));
 });
 router.post('/staff/save',async(request,response)=>{
   const input=staffSaveBody.parse(request.body);
@@ -177,7 +177,7 @@ router.get('/:resource',requirePermission('hospital.manage'),async(request,respo
 async function saveMaster(request,response){
   const name=resource.parse(request.params.resource),body=schemas[name].parse(request.body),recordId=request.params.id?id.parse(request.params.id):randomUUID();
   const tenant_id=response.locals.account.tenant_id;
-  if(name==='branches'&&response.locals.claims.portal!=='hospital_admin')throw failure('Only Hospital Admin can change branch setup.',403);
+  if(name==='branches'&&response.locals.claims.portal!=='hospital_admin')throw failure('Only Clinic Admin can change branch setup.',403);
   const row=await transaction(async session=>{
     await references(response,name,body,session);
     const existing=request.params.id?await db.collection(table(name)).findOne(await masterScope(response,name,{id:recordId},session),{session}):null;

@@ -399,10 +399,10 @@ export default function FinanceInventory({
           <h1>{page}</h1>
           <p>
             {report
-              ? "Consolidated financial position for this hospital."
+              ? "Consolidated financial position for this clinic."
               : page === "Low Stock"
                 ? "Items at or below their reorder level."
-                : `Manage ${page.toLowerCase()} for this hospital.`}
+                : `Manage ${page.toLowerCase()} for this clinic.`}
           </p>
         </div>
         {!d.readonly && (
@@ -658,7 +658,7 @@ function Form({
         <header>
           <div>
             <h2>{title}</h2>
-            <p>Saved inside the current hospital workspace.</p>
+            <p>Saved inside the current clinic workspace.</p>
           </div>
           <button type="button" onClick={close}>
             <X />
@@ -721,7 +721,7 @@ const formatBillDate = (value: unknown) =>
 function invoiceMarkup(row: R) {
   const data = row.data ?? {};
   const lines = billLines(data);
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${safe(row.record_number)}</title><style>body{font:12px Arial;color:#17233b;margin:28px}.center{text-align:center}.top{display:flex;justify-content:space-between}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #777;margin:18px 0}.info div{padding:5px 10px}.info b{display:inline-block;width:110px}table{width:100%;border-collapse:collapse}th,td{padding:7px;border:1px solid #888;text-align:left}th:nth-child(n+3),td:nth-child(n+3){text-align:right}.group{font-weight:bold;background:#edf1f5}.summary{width:45%;margin:20px 0 0 auto}.summary div{display:flex;justify-content:space-between;padding:5px}.summary .payable{font-size:14px;font-weight:bold;border-top:1px solid #555}.foot{text-align:center;margin-top:35px}@media print{body{margin:12mm}}${BILL_PRINT_CSS}</style></head><body><h2 class="center">${safe(row.hospital_name || "Hospital")}</h2><p class="center"><b>Interim Patient Bill</b></p><div class="top"><b>Bill No: ${safe(row.record_number)}</b><b>Bill Date: ${safe(row.record_date)}</b></div><div class="info"><div><p><b>Patient ID</b>: ${safe(row.medical_record_number)}</p><p><b>Patient Name</b>: ${safe(row.patient_name)}</p><p><b>Ward / Bed</b>: ${safe(data.ward_name || "—")} / ${safe(data.bed_number || "—")}</p><p><b>IPD No</b>: ${safe(data.ipd_number)}</p></div><div><p><b>Admission Date</b>: ${safe(formatBillDate(data.admitted_at))}</p><p><b>Admitting Doctor</b>: ${safe(doctorWithQualification(data.doctor_name,row.doctor_qualification||data.doctor_qualification) || "—")}</p><p><b>Specialty</b>: ${safe(data.department_name || "—")}</p><p><b>Payer</b>: ${safe(data.payer || "Self")}</p></div></div><table><thead><tr><th>Service Name</th><th>Date / Time</th><th>Rate</th><th>Qty</th><th>Total (₹)</th></tr></thead><tbody>${lines.map((line) => `<tr class="${line.group ? "group" : ""}"><td>${safe(line.name)}</td><td>${line.group ? "" : safe(formatBillDate(data.admitted_at))}</td><td>${line.group ? "" : money(line.amount)}</td><td>${line.group ? "" : "1.00"}</td><td>${line.group ? money(line.amount) : money(line.amount)}</td></tr>`).join("")}</tbody></table><div class="summary"><div><b>Total</b><b>${money(row.total)}</b></div><div>Discount <span>${money(Number(data.registration_discount || 0) + Number(data.admission_discount || 0))}</span></div><div>Patient Deposit Received <span>${money(Number(data.registration_deposit || 0) + Number(data.admission_deposit || 0))}</span></div><div class="payable">Net Payable <span>${money(row.due)}</span></div></div><p class="foot">If you have any queries regarding the contents of this bill, kindly contact the Billing Department.</p></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${safe(row.record_number)}</title><style>body{font:12px Arial;color:#17233b;margin:28px}.center{text-align:center}.top{display:flex;justify-content:space-between}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #777;margin:18px 0}.info div{padding:5px 10px}.info b{display:inline-block;width:110px}table{width:100%;border-collapse:collapse}th,td{padding:7px;border:1px solid #888;text-align:left}th:nth-child(n+3),td:nth-child(n+3){text-align:right}.group{font-weight:bold;background:#edf1f5}.summary{width:45%;margin:20px 0 0 auto}.summary div{display:flex;justify-content:space-between;padding:5px}.summary .payable{font-size:14px;font-weight:bold;border-top:1px solid #555}.foot{text-align:center;margin-top:35px}@media print{body{margin:12mm}}${BILL_PRINT_CSS}</style></head><body><h2 class="center">${safe(row.hospital_name || "Clinic")}</h2><p class="center"><b>Interim Patient Bill</b></p><div class="top"><b>Bill No: ${safe(row.record_number)}</b><b>Bill Date: ${safe(row.record_date)}</b></div><div class="info"><div><p><b>Patient ID</b>: ${safe(row.medical_record_number)}</p><p><b>Patient Name</b>: ${safe(row.patient_name)}</p><p><b>Ward / Bed</b>: ${safe(data.ward_name || "—")} / ${safe(data.bed_number || "—")}</p><p><b>IPD No</b>: ${safe(data.ipd_number)}</p></div><div><p><b>Admission Date</b>: ${safe(formatBillDate(data.admitted_at))}</p><p><b>Admitting Doctor</b>: ${safe(doctorWithQualification(data.doctor_name,row.doctor_qualification||data.doctor_qualification) || "—")}</p><p><b>Specialty</b>: ${safe(data.department_name || "—")}</p><p><b>Payer</b>: ${safe(data.payer || "Self")}</p></div></div><table><thead><tr><th>Service Name</th><th>Date / Time</th><th>Rate</th><th>Qty</th><th>Total (₹)</th></tr></thead><tbody>${lines.map((line) => `<tr class="${line.group ? "group" : ""}"><td>${safe(line.name)}</td><td>${line.group ? "" : safe(formatBillDate(data.admitted_at))}</td><td>${line.group ? "" : money(line.amount)}</td><td>${line.group ? "" : "1.00"}</td><td>${line.group ? money(line.amount) : money(line.amount)}</td></tr>`).join("")}</tbody></table><div class="summary"><div><b>Total</b><b>${money(row.total)}</b></div><div>Discount <span>${money(Number(data.registration_discount || 0) + Number(data.admission_discount || 0))}</span></div><div>Patient Deposit Received <span>${money(Number(data.registration_deposit || 0) + Number(data.admission_deposit || 0))}</span></div><div class="payable">Net Payable <span>${money(row.due)}</span></div></div><p class="foot">If you have any queries regarding the contents of this bill, kindly contact the Billing Department.</p></body></html>`;
 }
 async function downloadInvoice(row:R,token?:string,copy:'customer'|'pharmacy'='customer'){
   if(row.data?.lab_order_id){await downloadLabBillingPdf(token?await loadLabFinanceBill(row.id,token):{...row,tests:row.data.tests},copy);return;}
@@ -769,7 +769,7 @@ function InvoiceBreakdownLegacy({ row, close }: { row: R; close: () => void }) {
       </header>
       <article className="fi-interim-bill">
         <div className="fi-bill-heading">
-          <h2>{row.hospital_name || "Hospital"}</h2>
+          <h2>{row.hospital_name || "Clinic"}</h2>
           <strong>Interim Bill</strong>
           <span>{new Date().toLocaleString()}</span>
         </div>

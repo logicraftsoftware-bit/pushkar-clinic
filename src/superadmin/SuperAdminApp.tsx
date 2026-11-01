@@ -76,15 +76,15 @@ import "./superadmin.css";
 
 type Page =
   | "Dashboard"
-  | "Hospitals"
+  | "Clinics"
   | "Subscriptions"
   | "Modules"
   | "Reports"
   | "Monitoring"
   | "CRM Connections"
   | "Platform Settings"
-  | "Create Hospital"
-  | "Edit Hospital"
+  | "Create Clinic"
+  | "Edit Clinic"
   | "Create Plan"
   | "Edit Plan";
 type Dashboard = {
@@ -148,7 +148,7 @@ type Event = {
 
 const nav: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Hospitals", icon: Hospital },
+  { label: "Clinics", icon: Hospital },
   { label: "CRM Connections", icon: Link2 },
   { label: "Subscriptions", icon: CreditCard },
   { label: "Modules", icon: Boxes },
@@ -188,7 +188,7 @@ function Login({ onLogin, branding }: { onLogin: () => void; branding: PlatformB
         </div>
         <div>
           <span className="eyebrow">PLATFORM COMMAND CENTRE</span>
-          <h1>Operate every hospital from one secure place.</h1>
+          <h1>Operate every clinic from one secure place.</h1>
           <p>
             Tenant lifecycle, subscriptions, modules, reporting and platform
             health—designed for confident SaaS operations.
@@ -325,7 +325,7 @@ function DashboardPage() {
   if (!data) return <Loading />;
   const metrics = [
     [
-      "Total hospitals",
+      "Total clinics",
       data.hospitals.total,
       `${data.hospitals.active} active`,
       Hospital,
@@ -393,7 +393,7 @@ function DashboardPage() {
         <Card>
           <div className="sa-cardhead">
             <div>
-              <h2>Hospital growth</h2>
+              <h2>Clinic growth</h2>
               <p>Registrations over the last six months</p>
             </div>
             <TrendingUp />
@@ -454,7 +454,7 @@ function DashboardPage() {
   );
 }
 
-function HospitalsPage({
+function ClinicsPage({
   onCreate,
   onEdit,
 }: {
@@ -501,7 +501,7 @@ function HospitalsPage({
       setModal(false);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to create hospital");
+      setError(e instanceof Error ? e.message : "Unable to create clinic");
     }
   }
   async function changeStatus(id: string, value: string) {
@@ -512,18 +512,18 @@ function HospitalsPage({
     load();
   }
   async function removeHospital(id: string, name: string) {
-    if (!confirm(`Delete hospital "${name}"? Its users will be disabled and subscription cancelled.`)) return;
+    if (!confirm(`Delete clinic "${name}"? Its users will be disabled and subscription cancelled.`)) return;
     await adminApi(`/hospitals/${id}`, { method: "DELETE" });
     load();
   }
   return (
     <>
       <PageHead
-        title="Hospitals"
+        title="Clinics"
         text="Create, search and control every tenant on the platform."
         action={
           <button className="sa-primary" onClick={onCreate}>
-            <Plus size={17} /> Create hospital
+            <Plus size={17} /> Create clinic
           </button>
         }
       />
@@ -532,7 +532,7 @@ function HospitalsPage({
           <div className="sa-search">
             <Search />
             <input
-              placeholder="Search hospital or code…"
+              placeholder="Search clinic or code…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -552,7 +552,7 @@ function HospitalsPage({
           <table className="sa-table">
             <thead>
               <tr>
-                <th>Hospital</th>
+                <th>Clinic</th>
                 <th>Plan</th>
                 <th>Branches</th>
                 <th>Users</th>
@@ -597,7 +597,7 @@ function HospitalsPage({
               ))}
             </tbody>
           </table>
-          {!rows.length && <Empty text="Create your first hospital tenant." />}
+          {!rows.length && <Empty text="Create your first clinic tenant." />}
         </div>
       </Card>
       {modal && (
@@ -605,7 +605,7 @@ function HospitalsPage({
           <form className="sa-modal" onSubmit={create}>
             <div className="modal-head">
               <div>
-                <h2>Create hospital</h2>
+                <h2>Create clinic</h2>
                 <p>Provision tenant, branch, subscription and modules.</p>
               </div>
               <button type="button" onClick={() => setModal(false)}>
@@ -615,11 +615,11 @@ function HospitalsPage({
             <div className="modal-body">
               <div className="form-grid">
                 <label>
-                  Hospital name
+                  Clinic name
                   <input
                     required
                     name="name"
-                    placeholder="e.g. CityCare Hospital"
+                    placeholder="e.g. CityCare Clinic"
                   />
                 </label>
                 <label>
@@ -698,7 +698,7 @@ function HospitalsPage({
                 Cancel
               </button>
               <button className="sa-primary">
-                <Plus /> Create hospital
+                <Plus /> Create clinic
               </button>
             </div>
           </form>
@@ -754,7 +754,7 @@ function SubscriptionsPage() {
           <table className="sa-table">
             <thead>
               <tr>
-                <th>Hospital</th>
+                <th>Clinic</th>
                 <th>Plan</th>
                 <th>Monthly value</th>
                 <th>Started</th>
@@ -848,14 +848,14 @@ function ModulesPage() {
             <code>{m.code}</code>
             <p>{m.description}</p>
             <div>
-              <span><strong>{m.enabled_hospitals}</strong> enabled hospitals</span>
+              <span><strong>{m.enabled_hospitals}</strong> enabled clinics</span>
               <button className="module-edit" onClick={() => setEditing(m)}><Edit3 /> Edit module</button>
             </div>
           </Card>
         ))}
       </div>
       {editing && <div className="sa-modalback"><form className="sa-modal module-edit-modal" onSubmit={saveModule}>
-        <div className="modal-head"><div><h2>Edit module</h2><p>Update how this capability appears across plans and hospitals.</p></div><button type="button" onClick={() => setEditing(null)}><X /></button></div>
+        <div className="modal-head"><div><h2>Edit module</h2><p>Update how this capability appears across plans and clinics.</p></div><button type="button" onClick={() => setEditing(null)}><X /></button></div>
         <div className="modal-body"><div className="form-grid">
           <label>Module name<input name="name" required defaultValue={editing.name} /></label>
           <label>Module code<input name="code" required defaultValue={editing.code} /></label>
@@ -1195,7 +1195,7 @@ function CrmConnectionsPage() {
     }
     const available = clinics.filter(clinic => !clinic.connectedTenantId || clinic.connectedTenantId === row.tenant_id);
     if (!available.length) {
-      await Swal.fire("No CRM clinic available", "All CareFlow360 clinics are already connected to ERP hospitals.", "info");
+      await Swal.fire("No CRM clinic available", "All CareFlow360 clinics are already connected to ERP clinics.", "info");
       return;
     }
     const options = Object.fromEntries(available.map(clinic => [clinic.id, `${clinic.name}${clinic.city ? ` — ${clinic.city}${clinic.state ? `, ${clinic.state}` : ""}` : ""}`]));
@@ -1219,10 +1219,10 @@ function CrmConnectionsPage() {
     await load();
   }
   return <>
-    <PageHead title="Call Centre CRM Connections" text="Map each CRM clinic to one ERP hospital tenant. Synced master and OPD data stays linked to the ERP's native workflows." />
+    <PageHead title="Call Centre CRM Connections" text="Map each CRM clinic to one ERP clinic tenant. Synced master and OPD data stays linked to the ERP's native workflows." />
     {error && <div className="form-error">{error} <button type="button" onClick={() => void load()}>Retry</button></div>}
     <Card>
-      {loading ? <Loading /> : <div className="sa-table-wrap"><table className="sa-table"><thead><tr><th>ERP hospital</th><th>CRM clinic</th><th>Status</th><th>Last sync</th><th>Imported</th><th>Action</th></tr></thead><tbody>
+      {loading ? <Loading /> : <div className="sa-table-wrap"><table className="sa-table"><thead><tr><th>ERP clinic</th><th>CRM clinic</th><th>Status</th><th>Last sync</th><th>Imported</th><th>Action</th></tr></thead><tbody>
         {rows.map(row => <tr key={row.tenant_id}>
           <td><strong>{row.hospital_name}</strong><small>{row.hospital_code}</small></td>
           <td>{row.id ? <><strong>{row.clinic_name || row.clinic_external_id}</strong><small>{row.clinic_external_id} · key {row.api_key_prefix}…</small></> : <span>Not connected</span>}</td>
@@ -1231,7 +1231,7 @@ function CrmConnectionsPage() {
           <td>{row.last_sync_summary ? Object.entries(row.last_sync_summary).map(([key,value]) => `${key}: ${value}`).join(" · ") : "—"}</td>
           <td>{!row.integration_enabled ? <span>CRM temporarily disconnected</span> : <div className="table-actions"><button onClick={() => void connect(row)} title="Connect or rotate API key"><Link2 /></button>{row.id && <button onClick={() => void toggle(row)} title={row.is_active ? "Disable connection" : "Enable connection"}>{row.is_active ? <LockKeyhole /> : <Check />}</button>}</div>}</td>
         </tr>)}
-        {!rows.length && !error && <tr><td colSpan={6}><Empty text="No ERP hospitals are available. Create a hospital first." /></td></tr>}
+        {!rows.length && !error && <tr><td colSpan={6}><Empty text="No ERP clinics are available. Create a clinic first." /></td></tr>}
       </tbody></table></div>}
     </Card>
     <Card><div className="sa-cardhead"><div><h2>ERP-safe synchronization</h2><p>Branches and departments are imported first, then doctors and schedules, patients, and finally OPD appointments. External IDs are retained for repeatable updates. CRM sync does not overwrite ERP billing, consultation, clinical notes, prescriptions, or completed workflow state.</p></div></div></Card>
@@ -1271,7 +1271,7 @@ function ReportsPage() {
           <Card key={s.status}>
             <Badge value={s.status} />
             <strong>{s.total}</strong>
-            <span>hospitals</span>
+            <span>clinics</span>
           </Card>
         ))}
       </div>
@@ -1326,7 +1326,7 @@ function ReportsPage() {
 }
 
 export default function SuperAdminApp() {
-  const superAdminPages: Page[] = ["Dashboard", "Hospitals", "CRM Connections", "Create Hospital", "Edit Hospital", "Subscriptions", "Create Plan", "Edit Plan", "Modules", "Platform Settings", "Monitoring", "Reports"];
+  const superAdminPages: Page[] = ["Dashboard", "Clinics", "CRM Connections", "Create Clinic", "Edit Clinic", "Subscriptions", "Create Plan", "Edit Plan", "Modules", "Platform Settings", "Monitoring", "Reports"];
   const { branding, setBranding } = usePlatformBranding();
   const [loggedIn, setLoggedIn] = useState(Boolean(auth.token())),
     [page, setPageState] = useState<Page>(() => pageFromPath(superAdminPages, 1) ?? "Dashboard"),
@@ -1362,15 +1362,15 @@ export default function SuperAdminApp() {
     }));
   }, []);
   useEffect(() => {
-    document.title = `${branding.name} — Hospital Operations`;
+    document.title = `${branding.name} — Clinic Operations`;
   }, [branding.name]);
   if(restoring)return <div role="status" style={{padding:24}}>Opening your signed-in workspace...</div>;
   if (!loggedIn) return <Login branding={branding} onLogin={() => { setLoggedIn(true); setPage("Dashboard"); }} />;
   let content: ReactNode;
   if (page === "Dashboard") content = <DashboardPage />;
-  else if (page === "Hospitals") content = <HospitalsPage onCreate={() => setPage("Create Hospital")} onEdit={(id) => { setEditId(id); setPage("Edit Hospital", id); }} />;
-  else if (page === "Create Hospital") content = <HospitalForm onBack={() => setPage("Hospitals")} onSaved={() => setPage("Hospitals")} />;
-  else if (page === "Edit Hospital") content = <HospitalForm editId={editId} onBack={() => setPage("Hospitals")} onSaved={() => setPage("Hospitals")} />;
+  else if (page === "Clinics") content = <ClinicsPage onCreate={() => setPage("Create Clinic")} onEdit={(id) => { setEditId(id); setPage("Edit Clinic", id); }} />;
+  else if (page === "Create Clinic") content = <HospitalForm onBack={() => setPage("Clinics")} onSaved={() => setPage("Clinics")} />;
+  else if (page === "Edit Clinic") content = <HospitalForm editId={editId} onBack={() => setPage("Clinics")} onSaved={() => setPage("Clinics")} />;
   else if (page === "Subscriptions") content = <PlanList onCreate={() => setPage("Create Plan")} onEdit={(id) => { setEditId(id); setPage("Edit Plan", id); }} />;
   else if (page === "Create Plan") content = <PlanForm onBack={() => setPage("Subscriptions")} onSaved={() => setPage("Subscriptions")} />;
   else if (page === "Edit Plan") content = <PlanForm editId={editId} onBack={() => setPage("Subscriptions")} onSaved={() => setPage("Subscriptions")} />;
@@ -1384,7 +1384,7 @@ export default function SuperAdminApp() {
     page: Page;
     icon: typeof LayoutDashboard;
   }[] = [
-    { label: "Hospitals", page: "Hospitals", icon: Hospital },
+    { label: "Clinics", page: "Clinics", icon: Hospital },
     { label: "Plans", page: "Subscriptions", icon: CreditCard },
     { label: "Dashboard", page: "Dashboard", icon: LayoutDashboard },
     { label: "Reports", page: "Reports", icon: FileBarChart },
@@ -1407,7 +1407,7 @@ export default function SuperAdminApp() {
           <Globe2 />
           <div>
             <strong>Platform workspace</strong>
-            <small>All hospitals & tenants</small>
+            <small>All clinics & tenants</small>
           </div>
         </div>
         <nav>
@@ -1416,7 +1416,7 @@ export default function SuperAdminApp() {
             <WorkspaceLink
               href={`/superadmin/${routeSlug(n.label)}`}
               sessionKey={ADMIN_SESSION_KEY}
-              className={page === n.label || (n.label === "Hospitals" && page.includes("Hospital")) || (n.label === "Subscriptions" && page.includes("Plan")) ? "active" : ""}
+              className={page === n.label || (n.label === "Clinics" && page.includes("Clinic")) || (n.label === "Subscriptions" && page.includes("Plan")) ? "active" : ""}
               key={n.label}
               onNavigate={() => {
                 setPage(n.label);
@@ -1473,7 +1473,7 @@ export default function SuperAdminApp() {
           </button>
           <div className="sa-global-search">
             <Search />
-            <input placeholder="Search hospitals, subscriptions, events…" />
+            <input placeholder="Search clinics, subscriptions, events…" />
           </div>
           <div className="sa-header-actions">
             <SiteActivity token={auth.token()||''}/>
