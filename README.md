@@ -9,3 +9,5 @@ Create new clinic users and configure this client's masters after first-owner lo
 CI validates the build, legacy compatibility tests, native workflows on disposable MongoDB, mocked providers and managed-hosting startup. [MONGODB-MIGRATION.md](MONGODB-MIGRATION.md) records coverage and verification boundaries.
 
 Build: `npm run build:hostinger`. Start: `npm start`. PostgreSQL source remains for compatibility tests, not for the native deployment's data store.
+
+Staff instructions: [Clinic work process, appointment booking and doctor queue](docs/CLINIC-WORK-PROCESS.md). A [printable version](docs/CLINIC-WORK-PROCESS.html) is also included.
