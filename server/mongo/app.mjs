@@ -211,7 +211,12 @@ app.use('/api/v1/lab-report-shares',publicReports);
 // Unknown API routes never fall through to the React page or a legacy database.
 app.use('/api', (_request, response) => response.status(404).json({code:'NOT_FOUND',error:'API route not found.'}));
 app.use((error, _request, response, _next) => {
-  if (error instanceof z.ZodError) return response.status(400).json({ error: 'Check the submitted values.', fields: error.issues.map(issue => issue.path.join('.')) });
+  if (error instanceof z.ZodError) return response.status(400).json({
+    code: 'VALIDATION_ERROR',
+    error: 'Check the submitted values.',
+    fields: error.issues.map(issue => issue.path.join('.')),
+    issues: error.issues.map(({path,message,code}) => ({field:path.join('.'),message,code})),
+  });
   if (error?.code === 11000) return response.status(409).json({ error: 'A record with these details already exists.' });
   if (error instanceof SyntaxError && 'body' in error) return response.status(400).json({ error: 'Invalid JSON.' });
   if ([400,401,402,403,404,409,422,429,501,502,503].includes(error?.status)) return response.status(error.status).json({ error: error.message, ...(error.code?{code:error.code}:{}),...error.details });

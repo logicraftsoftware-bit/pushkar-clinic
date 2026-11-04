@@ -219,7 +219,19 @@ async function req(path: string, token: string, opt: RequestInit = {}) {
     },
   });
   const d = r.status === 204 ? null : await r.json();
-  if (!r.ok) throw new Error(d?.error ?? "Request failed");
+  if (!r.ok) {
+    const label = (field: string) => {
+      const key = field.split('.').pop() ?? field;
+      return [...personal, ...employment, ...account, ...Object.values(specific).flat()]
+        .find(item => item.key === key)?.label ?? key.replace(/_/g, ' ');
+    };
+    const details = Array.isArray(d?.issues)
+      ? d.issues.map((issue: { field: string; message: string }) => `${label(issue.field)}: ${issue.message}`)
+      : Array.isArray(d?.fields)
+        ? d.fields.map((field: string) => `Check ${label(field)}`)
+        : [];
+    throw new Error([d?.error ?? "Request failed", ...details].join(' '));
+  }
   return d;
 }
 const pageType: Record<string, string | undefined> = {
