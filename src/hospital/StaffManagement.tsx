@@ -114,7 +114,7 @@ const account: Field[] = [
   { key: "username", label: "Username", required: true },
   { key: "login_email", label: "Login Email", type: "email", required: true },
   { key: "mobile", label: "Mobile", ...phoneField },
-  { key: "password", label: "Temporary Password", type: "password" },
+  { key: "password", label: "Temporary Password (minimum 12 characters)", type: "password" },
   { key: "confirm_password", label: "Confirm Password", type: "password" },
   { key: "role", label: "Role", options: staffTypes },
   { key: "panel_access", label: "Panel Access" },
