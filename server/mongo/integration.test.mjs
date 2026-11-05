@@ -217,6 +217,33 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     await db.collection('clinical_appointments').replaceOne({id:initial.id},initial);
     await db.collection('opd_queue_sessions').deleteMany({tenant_id:hospital.data.id});
   });
+  await t.test('different doctor and patient passes cannot receive each other’s queue',async()=>{
+    const auth=staffLogin.data.token,tenant_id=hospital.data.id;
+    const original=await db.collection('clinical_appointments').findOne({id:appointment.id});
+    const originalUser=await db.collection('users').findOne({id:doctor.user_id}),originalStaff=await db.collection('staff_members').findOne({id:doctor.id});
+    const userId=crypto.randomUUID(),staffId=crypto.randomUUID();let other;
+    try{
+      const {_id:userMongoId,...user}=originalUser,{_id:staffMongoId,...staff}=originalStaff;
+      await db.collection('users').insertOne({...user,id:userId,email:`queue-${userId}@example.invalid`,first_name:'Other',last_name:'Doctor'});
+      await db.collection('staff_members').insertOne({...staff,id:staffId,user_id:userId});
+      other=await request('/clinical/appointments','POST',{...appointment,doctor_id:userId,appointment_time:'10:40',consultation_fee:0,charges:[],paid_amount:0},auth);assert.equal(other.status,201,JSON.stringify(other.data));
+      assert.equal((await request('/clinical/appointments/'+other.data.id+'/check-in','PATCH',{},auth)).status,200);
+      assert.equal((await request('/doctor/appointments/'+other.data.id+'/status','PATCH',{status:'Present'},auth)).status,200);
+      const firstPass=await request('/queue/passes/'+appointment.id,'POST',{},auth);
+      const firstView=await request('/public/appointments/'+firstPass.data.path.split('/').pop());
+      const otherView=await request('/public/appointments/'+other.data.public_appointment_path.split('/').pop());
+      assert.equal(firstView.status,200);assert.equal(otherView.status,200);
+      assert.equal(firstView.data.queue.current,null);assert.equal(otherView.data.queue.current.serial,other.data.queue_serial);
+      assert.equal(otherView.data.queue.doctor_name,'Other Doctor');assert.notEqual(firstView.data.appointment.appointment_number,otherView.data.appointment.appointment_number);
+      assert.equal(firstView.data.queue.rows.some(row=>row.call_id===otherView.data.queue.current.call_id),false);
+      assert.ok(otherView.data.queue.rows.every(row=>row.patient_id===undefined&&row.patient_name===undefined&&row.id===undefined));
+    }finally{
+      await db.collection('clinical_appointments').replaceOne({id:original.id},original);
+      await db.collection('clinical_appointments').deleteMany({tenant_id,doctor_id:userId});
+      await db.collection('staff_members').deleteOne({id:staffId});await db.collection('users').deleteOne({id:userId});
+      await db.collection('opd_queue_sessions').deleteMany({tenant_id});
+    }
+  });
   await t.test('appointment pages retain filtered totals, queue dates and printable identity fields',async()=>{
     const result=await request(`/clinical/appointments?page=1&page_size=1&queue=1&date=${future}&search=Updated`,'GET',null,staffLogin.data.token);
     assert.equal(result.status,200,JSON.stringify(result.data));assert.equal(result.data.total,1);assert.equal(result.data.rows.length,1);
