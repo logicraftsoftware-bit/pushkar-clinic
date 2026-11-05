@@ -224,7 +224,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const userId=crypto.randomUUID(),staffId=crypto.randomUUID();let other;
     try{
       const {_id:userMongoId,...user}=originalUser,{_id:staffMongoId,...staff}=originalStaff;
-      await db.collection('users').insertOne({...user,id:userId,email:`queue-${userId}@example.invalid`,first_name:'Other',last_name:'Doctor'});
+      await db.collection('users').insertOne({...user,id:userId,username:`queue-${userId}`,email:`queue-${userId}@example.invalid`,first_name:'Other',last_name:'Doctor'});
       await db.collection('staff_members').insertOne({...staff,id:staffId,user_id:userId});
       other=await request('/clinical/appointments','POST',{...appointment,doctor_id:userId,appointment_time:'10:40',consultation_fee:0,charges:[],paid_amount:0},auth);assert.equal(other.status,201,JSON.stringify(other.data));
       assert.equal((await request('/clinical/appointments/'+other.data.id+'/check-in','PATCH',{},auth)).status,200);
