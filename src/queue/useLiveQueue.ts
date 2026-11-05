@@ -2,7 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 export type QueueRow=Record<string,any>;
 export const API=import.meta.env.VITE_API_URL??(import.meta.env.PROD?'':'http://localhost:4000');
 export async function queueRequest(path:string,token?:string,options:RequestInit={}){
-  const response=await fetch(API+'/api/v1'+path,{...options,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...options.headers},cache:'no-store'});
+  const response=await fetch(API+'/api/v1'+path,{signal:AbortSignal.timeout(15000),...options,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...options.headers},cache:'no-store'});
   const data=response.status===204?null:await response.json();if(!response.ok)throw new Error(data?.error||'Unable to load the queue.');return data;
 }
 // Public SSE reconnects automatically. Polling keeps screens usable behind buffering proxies.
@@ -23,9 +23,10 @@ export function usePublicQueue(path:string){
   },[path]);return {data,error,connected};
 }
 export function useStaffQueues(path:string,token:string){
-  const [data,setData]=useState<QueueRow|null>(null),[error,setError]=useState('');const busy=useRef(false);
-  const reload=useCallback(async()=>{if(busy.current)return;busy.current=true;try{setData(await queueRequest(path,token));setError('');}catch(cause){setError(cause instanceof Error?cause.message:'Queue unavailable.');}finally{busy.current=false;}},[path,token]);
-  useEffect(()=>{let active=true;busy.current=false;setData(null);void reload();const timer=setInterval(()=>{if(active)void reload();},5000);return()=>{active=false;clearInterval(timer);};},[reload]);
+  const [data,setData]=useState<QueueRow|null>(null),[error,setError]=useState('');const busy=useRef(''),latest=useRef('');
+  const key=path+'|'+token;latest.current=key;
+  const reload=useCallback(async()=>{if(busy.current===key)return;busy.current=key;try{const value=await queueRequest(path,token);if(latest.current===key){setData(value);setError('');}}catch(cause){if(latest.current===key)setError(cause instanceof Error?cause.message:'Queue unavailable.');}finally{if(busy.current===key)busy.current='';}},[path,token,key]);
+  useEffect(()=>{let active=true;setData(null);void reload();const timer=setInterval(()=>{if(active)void reload();},5000);return()=>{active=false;clearInterval(timer);};},[reload]);
   return {data,error,reload};
 }
 export const timeLabel=(value:unknown)=>value?new Date(String(value)).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'—';

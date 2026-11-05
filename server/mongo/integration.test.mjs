@@ -184,7 +184,14 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     assert.equal(view.data.queue.rows[0].id,undefined);assert.equal(view.data.queue.rows[0].patient_name,undefined);
     const settings=await request('/queue/settings/'+doctor.user_id+'?branch_id='+branch.id,'PUT',{average_consultation_minutes:7,opd_start_time:'10:00',room_chamber:'Room 7',live_queue_enabled:true,announcements:{include_patient_name:false}},auth);
     assert.equal(settings.status,200,JSON.stringify(settings.data));
-    let result=await request('/doctor/appointments/'+appointment.id+'/status','PATCH',{status:'Present'},auth);assert.equal(result.status,200,JSON.stringify(result.data));
+    const streamAbort=new AbortController(),streamTimeout=setTimeout(()=>streamAbort.abort(),15000);
+    let reader;
+    try{
+      const events=await fetch(base+publicPath+'/events',{signal:streamAbort.signal});assert.equal(events.status,200);assert.match(events.headers.get('content-type'),/text\/event-stream/);
+      reader=events.body.getReader();const first=await reader.read();assert.equal(first.done,false);assert.match(new TextDecoder().decode(first.value),/NOT STARTED/);
+      const result=await request('/doctor/appointments/'+appointment.id+'/status','PATCH',{status:'Present'},auth);assert.equal(result.status,200,JSON.stringify(result.data));
+      const next=await reader.read();assert.equal(next.done,false,'SSE must remain connected for subsequent snapshots');assert.match(new TextDecoder().decode(next.value),/In Consultation/);
+    }finally{clearTimeout(streamTimeout);streamAbort.abort();await reader?.cancel().catch(()=>{});}
     view=await request(publicPath);assert.equal(view.data.queue.status,'LIVE');assert.equal(view.data.appointment.status,'In Consultation');assert.equal(view.data.appointment.room,'Room 7');assert.ok(view.data.queue.current.call_id);
     const second=await request('/clinical/appointments','POST',{...appointment,appointment_time:'10:30',paid_amount:0},auth);assert.equal(second.status,201,JSON.stringify(second.data));
     assert.ok(second.data.queue_serial>initial.queue_serial);assert.notEqual(second.data.appointment_number,initial.appointment_number);

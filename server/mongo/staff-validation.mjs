@@ -21,6 +21,14 @@ export const staffSaveBody = z.object({
   professional: z.record(z.string(), z.unknown()),
 }).superRefine((body, context) => {
   if(body.staff_type==='Doctor'){
+    const average=body.professional.average_consultation_minutes;
+    if(average!==undefined&&average!==null&&String(average).trim()!==''){
+      const minutes=Number(average);
+      if(!Number.isInteger(minutes)||minutes<1||minutes>120)context.addIssue({code:z.ZodIssueCode.custom,path:['professional','average_consultation_minutes'],message:'Enter a consultation duration from 1 to 120 minutes'});
+      else body.professional.average_consultation_minutes=minutes;
+    }
+    const start=body.professional.opd_start_time;
+    if(start&&!(typeof start==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(start)))context.addIssue({code:z.ZodIssueCode.custom,path:['professional','opd_start_time'],message:'Enter a valid OPD start time'});
     const branchFees=body.professional.branch_fees;
     if(branchFees!==undefined){
       if(!branchFees||typeof branchFees!=='object'||Array.isArray(branchFees))context.addIssue({code:z.ZodIssueCode.custom,path:['professional','branch_fees'],message:'Invalid branch fee settings'});

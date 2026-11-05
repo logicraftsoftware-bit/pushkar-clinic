@@ -30,7 +30,7 @@ queueRouter.get('/live',async(request,response)=>{
   if(doctorId&&branchId&&!distinct.some(row=>row._id.doctor_id===doctorId&&row._id.branch_id===branchId))distinct.push({_id:{doctor_id:doctorId,branch_id:branchId}});
   const queues=[];
   for(const row of distinct.slice(0,100)){
-    await doctorScope(response,row._id.doctor_id,row._id.branch_id);
+    try{await doctorScope(response,row._id.doctor_id,row._id.branch_id);}catch(error){if(error.status===404&&!doctorId)continue;throw error;}
     const snapshot=await queueSnapshot({tenant_id:response.locals.account.tenant_id,...row._id,date,from:request.query.from?time.parse(request.query.from):undefined,to:request.query.to?time.parse(request.query.to):undefined});
     const ids=snapshot.appointments.map(item=>item.patient_id),patients=await db.collection('patients').find({tenant_id:response.locals.account.tenant_id,id:{$in:ids}},{projection:{id:1,first_name:1,last_name:1,medical_record_number:1}}).toArray();
     snapshot.appointments.forEach(item=>{const patient=patients.find(row=>row.id===item.patient_id);item.patient_name=patient?`${patient.first_name} ${patient.last_name}`:'';});
@@ -81,7 +81,7 @@ queueRouter.put('/screens/:id',requirePermission('appointment.update'),async(req
   await transaction(async session=>{const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{$set:{...body,updated_at:new Date()}},{session});if(!result.matchedCount)throw failure('Screen unavailable.',404);if(body.doctor_id&&body.room)await db.collection('staff_members').updateOne({tenant_id:response.locals.account.tenant_id,user_id:body.doctor_id},{$set:{['professional.branch_rooms.'+body.branch_id]:body.room}},{session});await writeAudit(response,'waiting_screen_updated',request.params.id,session);});response.json({saved:true});
 });
 queueRouter.post('/screens/:id/link',requirePermission('appointment.update'),async(request,response)=>{
-  screenManager(response);const token=secretToken();await transaction(async session=>{const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{$set:{token_hash:secretHash(token),updated_at:new Date()}},{session});if(!result.matchedCount)throw failure('Screen unavailable.',404);await writeAudit(response,'waiting_screen_link_rotated',request.params.id,session);});response.json({path:`/waiting/${token}`});
+  screenManager(response);const token=secretToken();await transaction(async session=>{const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{$set:{token_hash:secretHash(token),last_seen_at:null,updated_at:new Date()}},{session});if(!result.matchedCount)throw failure('Screen unavailable.',404);await writeAudit(response,'waiting_screen_link_rotated',request.params.id,session);});response.json({path:`/waiting/${token}`});
 });
 queueRouter.delete('/screens/:id',requirePermission('appointment.update'),async(request,response)=>{
   screenManager(response);await transaction(async session=>{const result=await db.collection('waiting_screens').deleteOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{session});if(!result.deletedCount)throw failure('Screen unavailable.',404);await writeAudit(response,'waiting_screen_deleted',request.params.id,session);});response.status(204).end();

@@ -101,7 +101,7 @@ router.post('/records',requirePermission('opd.create'),async(request,response)=>
     }
     if(previous)await db.collection('doctor_clinical_records').replaceOne({tenant_id,id:row.id},row,{session});else await db.collection('doctor_clinical_records').insertOne({...row},{session});
     if(!admission&&body.record_type==='consultation'){
-      const timing=data.encounter_status==='Completed'?{consultation_completed_at:now}:await beginQueueVisit(encounter,session);
+      const timing={...await beginQueueVisit(encounter,session),...(data.encounter_status==='Completed'?{consultation_completed_at:now}:{})};
       await db.collection('clinical_appointments').updateOne(filter,{$set:{...timing,status:data.encounter_status==='Completed'?'Completed':'In Consultation',updated_at:now}},{session});
     }
     await writeAudit(response,previous?'clinical_record_updated':'clinical_record_created',row.id,session,{record_type:row.record_type});return row;

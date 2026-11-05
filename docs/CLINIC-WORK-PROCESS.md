@@ -1,6 +1,8 @@
 # Pushkar Clinic ERP — Staff Work Process
 
-Updated: 4 November 2026. This guide describes the current MongoDB application. Menu availability depends on the account's role, permissions and enabled clinic modules.
+Updated: 6 November 2026. This guide describes the current MongoDB application. Menu availability depends on the account's role, permissions and enabled clinic modules.
+
+**Live OPD update:** use [Live OPD setup](LIVE-OPD-SETUP.md) for secure patient passes, separate queue serials, doctor timing and TV displays. Booking numbers are unchanged.
 
 ## 1. Daily workflow at a glance
 
@@ -71,10 +73,10 @@ The **UHID** identifies the patient across visits. Each appointment has its own 
 - Validates the selected doctor, department, branch, patient and available slot.
 - Rejects a slot that is no longer available, including a booking conflict from another user. Choose another available slot and retry.
 - Creates the appointment with status **Booked**.
-- Generates an appointment number and a token from the date, doctor initials, department and slot serial.
+- Preserves the existing booking/token reference format and allocates a separate queue serial (1, 2, 3...) per doctor, branch and date. The saved confirmation provides a secure patient appointment pass to copy/share.
 - Derives the payment status from the appointment total and amount collected; the saved result is authoritative.
 
-**Example token format:** `04112026/AS/MEDIC/003`. The final `003` is the slot serial. It is not the third patient to arrive at reception.
+**Queue serial:** 1, 2, 3... is allocated in booking order within the doctor/branch/date, separately from the unchanged booking number. Existing visits without a new serial display their legacy slot serial. This is not an arrival-order counter.
 
 Normal booking uses the doctor's configured appointment schedule. The **OPD Queue** booking path requests five-minute slots and can preselect an available time; this does not mean every consultation must last five minutes.
 
@@ -100,9 +102,9 @@ Do not collect a second payment when payment has already been recorded. Booking 
 1. Sign in through **Staff Login** using the doctor's account.
 2. Open **Doctor Dashboard**.
 3. Find the scheduled date/time session and click **Open**.
-4. The **OPD Slot Queue** lists that session's appointments in ascending slot/token serial order.
+4. The **Doctor OPD queue** shows serial, booking number, scheduled time, estimated time and status. It updates automatically. Configure **Consultation time & room** before starting OPD.
 5. Confirm with reception that the next patient has checked in and is available.
-6. Use **Notify reception** or **Call patient** if needed. These actions create internal notifications.
+6. Use **Notify reception** if needed. Present updates the live patient pass and assigned waiting screens. The call action can repeat the current patient's announcement.
 7. Click **Present** for the patient being seen. The server changes the appointment to **In Consultation**, and the consultation workspace opens.
 8. Review the patient's identity and history before entering clinical information.
 
@@ -114,17 +116,17 @@ The queue can show booked appointments alongside checked-in patients. A patient'
 
 - **Absent** changes an eligible checked-in queue encounter to **No Show** and removes it from the doctor's active list after reload.
 - A booked patient who never arrives can be marked **No Show** through the authorized appointment-status workflow.
-- Reception and the doctor must coordinate late arrivals or out-of-order selection manually. Do not assume the system automatically moves them to the end or restores an absent visit.
+- Use **Skip** to defer a checked-in patient. The appointment remains under Skipped; Return or Present makes it available again. This is separate from Absent/No Show. Reception and the doctor coordinate late arrivals.
 
 ### Current queue behaviour and limits
 
 | Question | Current behaviour |
 | --- | --- |
-| Is the queue ordered by arrival time? | No. The doctor session queue sorts by slot/token serial. |
+| Is the queue ordered by arrival time? | No. It uses the queue serial; skipped patients are held outside active waiting until returned. |
 | Does the next patient open automatically? | No. The doctor chooses a patient and clicks Present. |
-| Does the system allow only one active consultation per doctor? | There is currently no server-enforced single-active-consultation lock. Staff should follow clinic procedure. |
-| Does the list update continuously? | There is no continuous automatic refresh in the doctor queue. Actions reload data; reload/reopen the screen to see newly booked or checked-in patients if needed. |
-| Does Call patient send WhatsApp/SMS or play an announcement? | No. It creates an internal work notification; external delivery and public announcement displays are not connected. |
+| Does the system allow only one active consultation per doctor? | Complete or Skip the current visit before starting another for the same doctor/branch/day. |
+| Does the list update continuously? | Staff queues update every five seconds. Patient passes and waiting screens use SSE with polling fallback. |
+| Does Call patient send WhatsApp/SMS or play an announcement? | Present/call updates the patient pass and can speak on the assigned doctor display after audio is enabled. WhatsApp/SMS are not configured. |
 | Does selecting a token complete a visit? | No. The doctor must finish and use Complete / Sign. |
 
 ## 8. Consult and complete the visit
@@ -175,7 +177,7 @@ Assume a doctor has three booked tokens in a morning session:
 | 002 | Still Booked; patient has not arrived | Reception follows up; doctor does not start this visit yet | Remains awaiting arrival |
 | 003 | Checked In | Doctor may manually choose Present after coordinating with reception | In Consultation, then Completed |
 
-If token 002 later arrives, reception must check it in before the doctor starts it. The application does not automatically reorder it behind token 003.
+If serial 2 later arrives, reception must check it in before the doctor starts it. The application does not silently reorder it behind serial 3. Use Skip/Return when deferring a visit. Estimates update to reflect actual consultation progress.
 
 ## 12. Common problems and what staff should do
 
