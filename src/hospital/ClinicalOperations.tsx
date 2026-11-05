@@ -231,7 +231,7 @@ export default function ClinicalOperations({
       const template=appointmentSlip?await q('/print-template/opd-prescription',token):{};
       const safe=(value:unknown)=>String(value??"—").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char]!));
       const details:[string,unknown][]=[
-        ["Patient",row.patient_name],["UHID",row.medical_record_number],["Phone",row.patient_phone || row.phone],["Doctor",doctorWithQualification(row.doctor_name,row.doctor_qualification)],["Department",row.department_name],["Branch",row.branch_name],["Appointment date",formatDateOnly(row.appointment_date)],["Slot",String(row.appointment_time).slice(0,5)],["Token",row.token_number],["Visit type",row.visit_type],
+        ["Patient",row.patient_name],["UHID",row.medical_record_number],["Phone",row.patient_phone || row.phone],["Doctor",doctorWithQualification(row.doctor_name,row.doctor_qualification)],["Department",row.department_name],["Branch",row.branch_name],["Appointment date",formatDateOnly(row.appointment_date)],["Slot",String(row.appointment_time).slice(0,5)],["Serial",row.queue_serial||row.slot_serial],["Token reference",row.token_number],["Visit type",row.visit_type],
       ];
       if(appointmentSlip) details.push(["Appointment number",row.appointment_number],["Status",row.status]);
       const money=(amount:unknown)=>"INR "+Number(amount||0).toFixed(2);
@@ -1014,7 +1014,7 @@ function AppointmentForm({
             <option>Phone</option>
             <option>Walk-In</option>
           </Field>
-          <label><span>Token Number</span><input name="token_number" readOnly value={tokenPreview}/></label>
+          <label><span>Queue serial</span><input readOnly value={value.id?(value.queue_serial||value.slot_serial||"Not assigned"):"Assigned after booking"}/><small>Separate from the unchanged booking number.</small></label><label><span>Token reference</span><input name="token_number" readOnly value={tokenPreview}/></label>
           {queue?<input type="hidden" name="status" value={value.status||"Booked"}/>:<Field name="status" label="Status" value={value.status}>
             {apStatuses.map((s) => (
               <option>{s}</option>
