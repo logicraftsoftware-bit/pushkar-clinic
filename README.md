@@ -11,3 +11,5 @@ CI validates the build, legacy compatibility tests, native workflows on disposab
 Build: `npm run build:hostinger`. Start: `npm start`. PostgreSQL source remains for compatibility tests, not for the native deployment's data store.
 
 Staff instructions: [Clinic work process, appointment booking and doctor queue](docs/CLINIC-WORK-PROCESS.md). A [printable version](docs/CLINIC-WORK-PROCESS.html) is also included.
+
+Live OPD setup: [appointment passes, queue timing and TV screens](docs/LIVE-OPD-SETUP.md).

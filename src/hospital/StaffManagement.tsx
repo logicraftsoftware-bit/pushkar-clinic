@@ -151,6 +151,8 @@ const specific: Record<string, Field[]> = {
     { key: "maintenance_fee", label: "Maintenance Fee (INR)", type: "number", required:true, defaultValue:100 },
     { key: "follow_up_fee", label: "Follow-Up Fee", type: "number" },
     { key: "slot_duration", label: "Slot Duration (minutes)", type: "number" },
+    {key:"average_consultation_minutes",label:"Average Consultation Time (minutes)",type:"number"},
+    {key:"opd_start_time",label:"Scheduled OPD Start Time",type:"time"},
     {
       key: "maximum_appointments",
       label: "Maximum Appointments",

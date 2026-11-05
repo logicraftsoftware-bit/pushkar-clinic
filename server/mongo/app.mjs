@@ -1,4 +1,5 @@
 import express from 'express';
+import {queueRouter,publicQueueRouter} from './queue-router.mjs';
 import cors from 'cors';
 import helmet from 'helmet';
 import jwt from 'jsonwebtoken';
@@ -187,6 +188,8 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   await db.collection('sessions').deleteOne({ _id: response.locals.claims.jti, user_id: response.locals.account.id });
   response.status(204).end();
 });
+app.use('/api/v1/public',publicQueueRouter);
+app.use('/api/v1/queue',authenticate('careframe-portal'),queueRouter);
 app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform,crmAdmin);
 app.use('/api/v1/crm-sync',crm);
 app.use('/api/v1/ai-assistant',authenticate('careframe-portal'),aiAssistant);

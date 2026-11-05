@@ -1,6 +1,8 @@
 import React, { lazy, Suspense, Component, type ErrorInfo, type ReactNode } from "react";
 import ReactDOM from "react-dom/client";
 import {initializeTabSessions} from './tab-session';
+const PatientAppointmentPass=lazy(()=>import("./queue/PatientAppointmentPass"));
+const WaitingScreen=lazy(()=>import("./queue/WaitingScreen"));
 const SuperAdminApp = lazy(() => import("./superadmin/SuperAdminApp"));
 import PortalEntry from "./portal/PortalEntry";
 import GlobalFeedback from "./GlobalFeedback";
@@ -27,7 +29,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
       <GlobalFeedback />
       <Suspense fallback={<div role="status" style={{padding:24}}>Loading workspace...</div>}>
-      {window.location.pathname.startsWith("/self-registration/") ? <SelfRegistration /> : window.location.pathname.startsWith("/superadmin") ? <SuperAdminApp /> : <PortalEntry />}
+      {window.location.pathname.startsWith("/p/") ? <PatientAppointmentPass/> : window.location.pathname.startsWith("/waiting/") ? <WaitingScreen/> : window.location.pathname.startsWith("/self-registration/") ? <SelfRegistration /> : window.location.pathname.startsWith("/superadmin") ? <SuperAdminApp /> : <PortalEntry />}
       </Suspense>
     </AppErrorBoundary>
   </React.StrictMode>,

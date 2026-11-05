@@ -1,3 +1,4 @@
+import AppointmentPassActions from '../queue/AppointmentPassActions';
 import {doctorWithQualification} from '../../server/src/doctor-print-display';
 import {doctorAppointmentCharges} from '../../server/src/doctor-service-fees';
 import ListPagination from './ListPagination';
@@ -208,7 +209,7 @@ export default function ClinicalOperations({
   const queueDates=useMemo(()=>paged?availableDates:[...new Set(rows.filter(row=>!queueDoctorIds.length||queueDoctorIds.includes(row.doctor_id)).map(row=>String(row.appointment_date).slice(0,10)))].sort(),[paged,availableDates,rows,queueDoctorIds]);
   const queueRows=useMemo(()=>paged?shown:shown.filter(row=>row.status!=="Cancelled"&&(!queueDoctorIds.length||queueDoctorIds.includes(row.doctor_id))&&(!queueDate||String(row.appointment_date).slice(0,10)===queueDate)).sort((a,b)=>{
     const visited=(row:R)=>["Completed","No Show"].includes(row.status)?1:0;
-    return visited(a)-visited(b)||Number(a.slot_serial||String(a.token_number||"").match(/(\d+)$/)?.[1]||0)-Number(b.slot_serial||String(b.token_number||"").match(/(\d+)$/)?.[1]||0);
+    return visited(a)-visited(b)||Number(a.queue_serial||a.slot_serial||String(a.token_number||"").match(/(\d+)$/)?.[1]||0)-Number(b.queue_serial||b.slot_serial||String(b.token_number||"").match(/(\d+)$/)?.[1]||0);
   }),[paged,shown,queueDoctorIds,queueDate]);
   function notifyQueue(row:R,target:"patient"|"doctor"){
     const recipient=target==="patient"?row.patient_name:row.doctor_name||"the assigned doctor";
@@ -334,7 +335,7 @@ export default function ClinicalOperations({
   async function removeAppointment(row: R) {
     await status(row,"Cancelled");
   }
-  if(savedAppointment)return <section className="co-admission-page"><div className="co-modal co-admission-form"><header><h2>OPD Appointment Registered</h2></header><div className="co-grid"><p>{savedAppointment.patient_name} - {savedAppointment.medical_record_number}</p><p>Appointment: {savedAppointment.appointment_number}</p><p>Token: {savedAppointment.token_number}</p><p>{formatDateOnly(savedAppointment.appointment_date)} at {String(savedAppointment.appointment_time).slice(0,5)}</p>{error&&<p className="co-error">{error}</p>}<p>Print the registration slip or choose Save as PDF in the print dialog to download it.</p></div><footer><button type="button" onClick={()=>setSavedAppointment(null)}>Back to appointments</button></footer><OpdDocuments row={savedAppointment} token={token}/></div></section>;
+  if(savedAppointment)return <section className="co-admission-page"><div className="co-modal co-admission-form"><header><h2>OPD Appointment Registered</h2></header><div className="co-grid"><p>{savedAppointment.patient_name} - {savedAppointment.medical_record_number}</p><p>Appointment: {savedAppointment.appointment_number}</p><p>Serial: {savedAppointment.queue_serial||savedAppointment.slot_serial}</p><p>{formatDateOnly(savedAppointment.appointment_date)} at {String(savedAppointment.appointment_time).slice(0,5)}</p>{error&&<p className="co-error">{error}</p>}<p>Print the registration slip or choose Save as PDF in the print dialog to download it.</p></div><footer><button type="button" onClick={()=>setSavedAppointment(null)}>Back to appointments</button></footer><AppointmentPassActions appointment={savedAppointment} token={token}/><OpdDocuments row={savedAppointment} token={token}/></div></section>;
   if((edit||ipdMove)&&lookLoading)return <section className="co-page" role="status"><LoaderCircle/> Loading appointment options...</section>;
   if(appointments&&ipdMove&&!look.patients.some((patient:R)=>patient.id===ipdMove.patient_id))return <section className="co-page" role="status"><LoaderCircle/> Loading selected patient...{error&&<p role="alert">{error}<button onClick={()=>setIpdMove({...ipdMove})}>Retry</button></p>}<button onClick={()=>setIpdMove(null)}>Back</button></section>;
   if(ipdMove)return <IpdForm value={ipdMove} look={look} token={token} error={error} save={saveIpdMove} close={()=>setIpdMove(null)}/>;
@@ -483,7 +484,7 @@ function AppointmentTable({
           <th>Date & Slot</th>
           <th>Type</th>
           <th>Fee / Payment</th>
-          <th>Token</th>
+          <th>Serial</th>
           {!queue&&<th>Status</th>}
           <th>{queue?"Notify / Share":""}</th>
         </tr>
@@ -1023,7 +1024,7 @@ function AppointmentForm({
           <Field name="reason" label="Reason" value={value.reason} />
           <Field name="notes" label="Notes" value={value.notes} />
         </div>
-        <footer><button type="button" disabled={saving} onClick={close}>Cancel</button><button data-permission={value.id?"appointment.update":"appointment.create"} className="primary" type="submit" disabled={saving||!patientId||!selection.department||!doctor||!date||!appointmentTime}>{saving?"Saving...":"Save Appointment"}</button></footer>{value.id&&<OpdDocuments row={value} token={token}/>}
+        <footer><button type="button" disabled={saving} onClick={close}>Cancel</button><button data-permission={value.id?"appointment.update":"appointment.create"} className="primary" type="submit" disabled={saving||!patientId||!selection.department||!doctor||!date||!appointmentTime}>{saving?"Saving...":"Save Appointment"}</button></footer>{value.id&&<><AppointmentPassActions appointment={value} token={token}/><OpdDocuments row={value} token={token}/></>}
       </form>
     </section></div></>
   );

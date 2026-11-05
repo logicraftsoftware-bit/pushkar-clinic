@@ -64,6 +64,7 @@ const PharmacyMedicines = lazy(() => import('./hospital/HospitalManagement').the
 const StaffManagement = lazy(() => import('./hospital/StaffManagement'));
 const AccessControl = lazy(() => import('./hospital/AccessControl'));
 const Patients = lazy(() => import('./hospital/Patients'));
+const ReceptionLiveQueue=lazy(()=>import('./queue/ReceptionLiveQueue'));
 const ClinicalOperations = lazy(() => import('./hospital/ClinicalOperations'));
 const FinanceInventory = lazy(() => import('./hospital/FinanceInventory'));
 const AccountantFinance = lazy(() => import('./hospital/AccountantFinance'));
@@ -97,6 +98,8 @@ const hospitalMenu: HospitalMenuItem[] = [
   { label: "AI Assistant", icon: Bot },
   { label: "Patients", icon: Users },
   { label: "Appointments & Queue", icon: CalendarDays },
+  {label:"Live Queue",icon:ListChecks},
+  {label:"Waiting Screens",icon:ListChecks},
   {
     label: "Reception Workspace",
     icon: Users,
@@ -352,6 +355,8 @@ const roleMenus: Partial<Record<Role, HospitalMenuItem[]>> = {
     { label: "Patient Registration", icon: Users },
     { label: "OPD Appoinments", icon: CalendarDays },
     { label: "OPD Queue", icon: ListChecks },
+    {label:"Live Queue",icon:ListChecks},
+    {label:"Waiting Screens",icon:ListChecks},
     { label: "IPD Admission", icon: BedDouble },
     { label: "Discharge", icon: CheckCircle2 },
     { label: "Billing", icon: CreditCard },
@@ -534,6 +539,8 @@ const menuPermission: Record<string, string> = {
   Admissions: "menu.ipd.view",
   "OPD Appoinments": "menu.appointments.view",
   "OPD Queue": "menu.queue.view",
+  "Live Queue":"menu.queue.view",
+  "Waiting Screens":"menu.queue.view",
   "IPD Admission": "menu.ipd.view",
   Discharge: "menu.ipd.view",
   Payments: "menu.billing.view",

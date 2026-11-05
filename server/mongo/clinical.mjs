@@ -1,4 +1,5 @@
 import {Router} from 'express';
+import {assignQueueSerial,attachPass,sessionStart,beginQueueVisit} from './queue-service.mjs';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
@@ -133,10 +134,13 @@ router.post('/appointments',requirePermission('appointment.create'),async(reques
     record.appointment_number=`${await configuredPrefix(tenant,'appointment_prefix','APT',session)}-${String(counter.value).padStart(6,'0')}`;
     const initials=`${doctor.user.first_name} ${doctor.user.last_name}`.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').toUpperCase();
     record.token_number=`${body.appointment_date.split('-').reverse().join('')}/${initials}/${doctor.department.name.replace(/[^a-z0-9]/gi,'').slice(0,5).toUpperCase()}/${String(slot.serial).padStart(3,'0')}`;
+    record.queue_session_start=sessionStart(doctor.professional,body.appointment_date,body.appointment_time);
+    await assignQueueSerial(record,session);
+    const publicPath=attachPass(record);
     await db.collection('clinical_appointments').insertOne({...record},{session});
     await receipt(response,record,paid,`OPD-BOOKING-${record.id}`,session);
     await writeAudit(response,'appointment_created',record.id,session);
-    return record;
+    return {...record,public_appointment_path:publicPath};
   });response.status(201).json(result);
 });
 router.put('/appointments/:id',requirePermission('appointment.update'),async(request,response)=>{
@@ -170,6 +174,8 @@ router.put('/appointments/:id',requirePermission('appointment.update'),async(req
     if(!collected)row.payment_mode=previous.payment_mode;
     row.payment_status=paymentStatus(total,paid);
     if(moved){
+      if(previous.doctor_id!==input.doctor_id||previous.appointment_date!==input.appointment_date||previous.branch_id!==input.branch_id)await assignQueueSerial(row,session);
+      row.queue_session_start=sessionStart(doctor.professional,input.appointment_date,input.appointment_time);
       const initials=`${doctor.user.first_name} ${doctor.user.last_name}`.split(/\s+/).filter(Boolean).map(part=>part[0]).join('').toUpperCase();
       const preserve=input.slot_interval===5&&input.doctor_id===previous.doctor_id&&input.appointment_date===previous.appointment_date;
       if(preserve){row.slot_serial=previous.slot_serial;row.token_number=previous.token_number;}
@@ -216,7 +222,8 @@ router.patch('/appointments/:id/status',requirePermission('appointment.update'),
     const filter=await scopeFor(response,{id:recordId},session),row=await db.collection('clinical_appointments').findOne(filter,{session});
     if(!row)throw failure('Appointment not found',404);
     if(!(transitions[row.status]??[]).includes(input.status))throw failure('Invalid appointment status transition.',409);
-    const saved=await db.collection('clinical_appointments').findOneAndUpdate(filter,{$set:{status:input.status,updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
+    const timing=input.status==='In Consultation'?await beginQueueVisit(row,session):input.status==='Completed'?{consultation_completed_at:new Date()}:{};
+    const saved=await db.collection('clinical_appointments').findOneAndUpdate(filter,{$set:{...timing,status:input.status,updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
     await writeAudit(response,'appointment_status_changed',row.id,session,{status:input.status});return saved;
   });response.json({appointment:result,message:`Appointment status changed to ${input.status}.`});
 });

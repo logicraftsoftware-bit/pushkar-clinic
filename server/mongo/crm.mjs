@@ -1,3 +1,4 @@
+import {assignQueueSerial,attachPass,sessionStart} from './queue-service.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
@@ -91,6 +92,9 @@ router.post('/bootstrap',enabled,async(request,response)=>{
         const fee=existing?.consultation_fee??Number(doctor.professional.consultation_fee??0);cents(fee);
         const row={...existing,id,tenant_id,branch_id,patient_id,doctor_id,department_id,appointment_number:existing?.appointment_number??item.appointmentNumber,appointment_date,appointment_time,appointment_type:'OPD',visit_type:item.visitType??existing?.visit_type??'New',reason:item.reason??existing?.reason??'',source:'Call Centre CRM',slot_serial:slot?.serial??existing?.slot_serial??null,token_number:existing?.token_number??null,status,consultation_fee:fee,charges:existing?.charges??[],discount:existing?.discount??0,paid_amount:0,payment_mode:'',payment_status:paymentStatus(cents(fee),0),created_at:existing?.created_at??now,updated_at:now};
         row.payment_status=paymentStatus(appointmentTotal(row),0);
+        if(!existing||existing.doctor_id!==doctor_id||existing.branch_id!==branch_id||existing.appointment_date!==appointment_date)await assignQueueSerial(row,session);
+        if(!existing)attachPass(row);
+        row.queue_session_start=sessionStart(doctor.professional,appointment_date,appointment_time);
         await db.collection('clinical_appointments').replaceOne({tenant_id,id},row,{session,upsert:true});await saveMap('appointment',item,id);totals.appointments++;
       }
       await db.collection('call_centre_crm_connections').updateOne({id:current.id},{$set:{last_sync_at:now,last_sync_status:'Success',last_sync_summary:totals,updated_at:now}},{session});await db.collection('audit_events').insertOne({id:randomUUID(),tenant_id,actor_id:null,action:'crm_synchronized',record_id:current.id,metadata:{summary:totals},created_at:now},{session});return totals;

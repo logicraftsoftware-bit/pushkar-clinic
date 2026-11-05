@@ -1,3 +1,6 @@
+import {queueRequest,useStaffQueues,timeLabel} from '../queue/useLiveQueue';
+import DoctorQueueSettings from '../queue/DoctorQueueSettings';
+import '../queue/queue.css';
 import {doctorWithQualification} from '../../server/src/doctor-print-display';
 import {PRESCRIPTION_PRINT_CSS,prescriptionObservationsHtml} from "./prescription-paper";
 import Swal from "sweetalert2";
@@ -11,6 +14,7 @@ import {
   type FormEvent,
 } from "react";
 import {
+  RefreshCw,
   CalendarDays,
   ArrowLeft,
   Bell,
@@ -402,158 +406,31 @@ function DoctorDashboard({
   );
 }
 
-function DoctorSlotQueue({
-  slot,
-  rows,
-  token,
-  active,
-  emr,
-  close,
-  select,
-  reload,
-}: {
-  slot: Row;
-  rows: Row[];
-  token: string;
-  active: Row | null;
-  emr: Row | null;
-  close: () => void;
-  select: (row: Row | null) => void;
-  reload: () => void;
-}) {
-  const [notice, setNotice] = useState("");
-  const queue = rows
-    .filter(
-      (row) =>
-        String(row.appointment_date).slice(0, 10) === slot.date &&
-        String(row.appointment_time).slice(0, 5) >=
-          String(slot.from_time).slice(0, 5) &&
-        String(row.appointment_time).slice(0, 5) <
-          String(slot.to_time).slice(0, 5),
-    )
-    .sort(
-      (a, b) =>
-        Number(
-          a.slot_serial ||
-            String(a.token_number || "").match(/(\d+)$/)?.[1] ||
-            0,
-        ) -
-        Number(
-          b.slot_serial ||
-            String(b.token_number || "").match(/(\d+)$/)?.[1] ||
-            0,
-        ),
-    );
-  async function status(row: Row, value: "Present" | "Absent") {
-    await request(`/appointments/${row.id}/status`, token, {
-      method: "PATCH",
-      body: JSON.stringify({ status: value }),
-    });
-    await reload();
-    if (value === "Present") select({ ...row, status: value });
-    else if (active?.id === row.id) select(null);
+function DoctorSlotQueue({slot,rows,token,active,emr,close,select,reload}:{slot:Row;rows:Row[];token:string;active:Row|null;emr:Row|null;close:()=>void;select:(row:Row|null)=>void;reload:()=>void}) {
+  const [filter,setFilter]=useState('All'),[notice,setNotice]=useState(''),[busy,setBusy]=useState('');
+  const matching=rows.filter(row=>String(row.appointment_date).slice(0,10)===slot.date&&String(row.appointment_time).slice(0,5)>=String(slot.from_time).slice(0,5)&&String(row.appointment_time).slice(0,5)<String(slot.to_time).slice(0,5));
+  const branch=matching[0]?.branch_id||rows[0]?.branch_id,doctor=matching[0]?.doctor_id||rows[0]?.doctor_id;
+  const params=new URLSearchParams({date:slot.date,from:String(slot.from_time).slice(0,5),to:String(slot.to_time).slice(0,5),...(branch?{branch_id:branch}:{}),...(doctor?{doctor_id:doctor}:{})});
+  const live=useStaffQueues('/queue/live?'+params,token),queue=live.data?.queues?.find((row:Row)=>!doctor||row.doctor_id===doctor);
+  const shown=(queue?.rows||[]).filter((row:Row)=>filter==='All'||row.status===filter);
+  async function status(row:Row,value:'Present'|'Absent'|'Skip'|'Waiting'){
+    setBusy(row.id);setNotice('');try{
+      const saved=await queueRequest('/doctor/appointments/'+row.id+'/status',token,{method:'PATCH',body:JSON.stringify({status:value})});
+      await live.reload();
+      if(value==='Present')select({...rows.find(item=>item.id===row.id),...saved,patient_name:row.patient_name,doctor_name:queue.doctor_name,doctor_qualification:queue.doctor_qualification});
+      else if(active?.id===row.id)select(null);
+    }catch(error){setNotice((error as Error).message);}finally{setBusy('');}
   }
-  async function notify(row: Row, target: "reception" | "patient") {
-    await request(`/appointments/${row.id}/notify`, token, {
-      method: "POST",
-      body: JSON.stringify({ target }),
-    });
-    setNotice(
-      `${target === "patient" ? "Patient" : "Reception"} notified for token ${row.token_number || "—"}.`,
-    );
+  async function notify(row:Row,target:'patient'|'reception'){
+    try{await queueRequest('/doctor/appointments/'+row.id+'/notify',token,{method:'POST',body:JSON.stringify({target})});await live.reload();setNotice(target==='patient'?'Call sent to the live queue and assigned waiting screens.':'Reception notified.');}catch(error){setNotice((error as Error).message);}
   }
-  return (
-    <section
-      className={`doctor-queue-workspace ${active ? "with-consult" : ""}`}
-    >
-      <aside className="doctor-queue">
-        <header>
-          <button onClick={close}>
-            <ArrowLeft />
-          </button>
-          <div>
-            <small>OPD Slot Queue</small>
-            <h2>{new Date(`${slot.date}T00:00:00`).toLocaleDateString()}</h2>
-            <p>
-              {String(slot.from_time).slice(0, 5)}–
-              {String(slot.to_time).slice(0, 5)} · {queue.length}/
-              {slot.max_slots || "∞"} patients
-            </p>
-          </div>
-        </header>
-        {notice && <div className="queue-notice">{notice}</div>}
-        <div className="queue-patients">
-          {queue.map((row) => (
-            <article
-              className={`${active?.id === row.id ? "active" : ""} ${String(row.status).toLowerCase()}`}
-              key={row.id}
-            >
-              <header>
-                <div>
-                  <strong>{row.patient_name}</strong>
-                  <small>{row.medical_record_number}</small>
-                </div>
-                <b>{String(row.appointment_time).slice(0, 5)}</b>
-              </header>
-              <div className="queue-token">
-                Token{" "}
-                <strong>{row.token_number || row.appointment_number}</strong>
-              </div>
-              <footer>
-                <button
-                  className="present"
-                  onClick={() => status(row, "Present")}
-                >
-                  Present
-                </button>
-                <button
-                  className="absent"
-                  onClick={() => status(row, "Absent")}
-                >
-                  Absent
-                </button>
-                <button
-                  title="Notify reception"
-                  aria-label="Notify reception"
-                  onClick={() => notify(row, "reception")}
-                >
-                  <Bell />
-                </button>
-                <button
-                  title="Call patient"
-                  aria-label="Call patient"
-                  onClick={() => notify(row, "patient")}
-                >
-                  <BellRing />
-                </button>
-              </footer>
-            </article>
-          ))}
-        </div>
-      </aside>
-      <main>
-        {active ? (
-          <ConsultationWorkspace
-            appointment={active}
-            emr={emr}
-            token={token}
-            close={() => select(null)}
-            reload={reload}
-          />
-        ) : (
-          <div className="queue-placeholder">
-            <BellRing />
-            <h2>Select a present patient</h2>
-            <p>
-              Mark a patient Present to open the complete consultation workspace
-              here.
-            </p>
-          </div>
-        )}
-      </main>
-    </section>
-  );
+  return <section className="live-doctor-queue"><header className="live-pagehead"><div><button onClick={close}><ArrowLeft size={16}/>Sessions</button><h2>Doctor OPD queue</h2><p>{slot.date} | {String(slot.from_time).slice(0,5)} - {String(slot.to_time).slice(0,5)} | {queue?.room||'Room not assigned'}</p></div><div className="queue-actions">{doctor&&branch&&<DoctorQueueSettings doctorId={doctor} branchId={branch} token={token} onSaved={()=>void live.reload()}/>}<button onClick={()=>void live.reload()}><RefreshCw size={16}/>Refresh</button></div></header>
+    {(notice||live.error)&&<p className="queue-warning" role="status">{notice||live.error}</p>}
+    {queue?<><div className="queue-stats">{Object.entries(queue.counts).map(([label,value])=><div key={label}><span>{label.replace('_',' ')}</span><strong>{String(value)}</strong></div>)}</div><div className="live-queue-summary"><div><small>NOW SERVING ? {queue.status}</small><strong>{queue.current?.serial??'?'}</strong><p>{queue.rows.find((row:Row)=>row.id===queue.current?.id)?.patient_name||'Waiting for the doctor'}</p></div><div><small>NEXT PATIENT</small><strong>{queue.next?.serial??'?'}</strong><p>Estimated {timeLabel(queue.next?.estimated_at)} ? times may change</p></div></div><div className="live-queue-tabs">{['All','Waiting','Awaiting check-in','In Consultation','Completed','Skipped','No Show'].map(value=><button className={filter===value?'active':''} key={value} onClick={()=>setFilter(value)}>{value}</button>)}</div><div className="queue-table-wrap"><table><thead><tr><th>Serial</th><th>Patient</th><th>Booking number</th><th>Scheduled</th><th>Estimated</th><th>Status</th><th>Actions</th></tr></thead><tbody>{shown.map((row:Row)=><tr key={row.id}><td><b>{row.serial}</b></td><td>{row.patient_name}</td><td>{row.appointment_number}</td><td>{row.appointment_time}</td><td>{timeLabel(row.estimated_at)}</td><td>{row.status}</td><td><div className="queue-actions">{!['Completed','Cancelled','No Show'].includes(row.status)&&<><button disabled={Boolean(busy)||!row.checked_in} onClick={()=>status(row,'Present')}>{row.status==='In Consultation'?'View':'Present'}</button><button disabled={Boolean(busy)||!row.checked_in} onClick={()=>status(row,row.status==='Skipped'?'Waiting':'Skip')}>{row.status==='Skipped'?'Return':'Skip'}</button><button disabled={Boolean(busy)||!row.checked_in} onClick={()=>status(row,'Absent')}>Absent</button><button title="Notify reception" onClick={()=>notify(row,'reception')}><Bell size={15}/></button>{row.status==='In Consultation'&&<button title="Announce again" onClick={()=>notify(row,'patient')}><BellRing size={15}/></button>}</>}</div></td></tr>)}</tbody></table></div></>:<p className="queue-empty">{live.error||'Loading live queue?'}</p>}
+    {active&&<ConsultationWorkspace appointment={active} emr={emr} token={token} close={()=>select(null)} reload={async()=>{await live.reload();await Promise.resolve(reload());}}/>}
+  </section>;
 }
+
 function Appointments({
   rows,
   slots,

@@ -20,6 +20,12 @@ export function initializeMongo() {
     // No patients, staff, partners or sample hospital records are seeded.
     for (const [collection, keys, settings] of [
       ['super_admin_users', { username: 1 }, { unique: true }],
+      ['clinical_appointments',{public_pass_hash:1},{unique:true,partialFilterExpression:{public_pass_hash:{$type:'string'}}}],
+      ['clinical_appointments',{tenant_id:1,branch_id:1,doctor_id:1,appointment_date:1,queue_serial:1},{unique:true,partialFilterExpression:{queue_serial:{$type:'number'}}}],
+      ['waiting_screens',{id:1},{unique:true}],
+      ['waiting_screens',{token_hash:1},{unique:true}],
+      ['waiting_screens',{tenant_id:1,branch_id:1},{}],
+      ['opd_queue_sessions',{tenant_id:1,branch_id:1},{}],
       ['ai_limits',{expires_at:1},{expireAfterSeconds:0}],
       ['call_centre_crm_connections',{id:1},{unique:true}],
       ['call_centre_crm_connections',{tenant_id:1},{unique:true}],

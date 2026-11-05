@@ -1,4 +1,5 @@
 import {Router} from 'express';
+import {beginQueueVisit} from './queue-service.mjs';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
@@ -42,19 +43,22 @@ router.get('/prescription-masters',requirePermission('prescription.view'),async(
 });
 
 router.patch('/appointments/:id/status',requirePermission('appointment.update'),async(request,response)=>{
-  const status=z.enum(['Present','Absent','Waiting']).parse(request.body?.status),identity=uuid.parse(request.params.id);
+  const status=z.enum(['Present','Absent','Waiting','Skip']).parse(request.body?.status),identity=uuid.parse(request.params.id);
   const saved=await transaction(async session=>{
     const filter=await encounterScope(response,false,{id:identity},session),row=await db.collection('clinical_appointments').findOne(filter,{session});
     if(!row)throw failure('Appointment not found in your queue.',404);
     if(!['Checked In','Waiting','In Consultation','Present','Absent'].includes(row.status))throw failure('Reception must check in this appointment before a doctor changes its attendance.',409);
-    const updated=await db.collection('clinical_appointments').findOneAndUpdate(filter,{$set:{status:status==='Absent'?'No Show':status==='Present'?'In Consultation':'Waiting',updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
-    await writeAudit(response,'doctor_attendance_updated',identity,session,{status:updated.status});return updated;
+    const timing=status==='Present'?await beginQueueVisit(row,session):{queue_skipped:status==='Skip'};
+    const updated=await db.collection('clinical_appointments').findOneAndUpdate(filter,{$set:{...timing,status:status==='Absent'?'No Show':status==='Present'?'In Consultation':'Waiting',updated_at:new Date()}},{session,returnDocument:'after',projection:{_id:0}});
+    await writeAudit(response,status==='Skip'?'patient_skipped':status==='Present'?'patient_presented':'doctor_attendance_updated',identity,session,{status:updated.status});return updated;
   });response.json(saved);
 });
 router.post('/appointments/:id/notify',requirePermission('appointment.update'),async(request,response)=>{
   const target=z.enum(['reception','patient']).parse(request.body?.target),identity=uuid.parse(request.params.id);
   const result=await transaction(async session=>{
     const appointment=await db.collection('clinical_appointments').findOne(await encounterScope(response,false,{id:identity},session),{session});if(!appointment)throw failure('Appointment not found in your queue.',404);
+    if(target==='patient'&&appointment.status!=='In Consultation')throw failure('Start this patient before making a call announcement.',409);
+    if(target==='patient')await db.collection('clinical_appointments').updateOne({tenant_id:appointment.tenant_id,id:identity},{$set:{queue_call_id:randomUUID()}},{session});
     const now=new Date(),row={id:randomUUID(),tenant_id:appointment.tenant_id,branch_id:appointment.branch_id,patient_id:appointment.patient_id,created_by:response.locals.account.id,workspace:target,kind:'notification',title:`Doctor called token ${appointment.token_number||appointment.appointment_number}`,status:'Pending',priority:'High',data:{appointment_id:identity,token_number:appointment.token_number,appointment_time:appointment.appointment_time},occurred_at:now,created_at:now,updated_at:now};await db.collection('role_work_items').insertOne({...row},{session});await writeAudit(response,'doctor_queue_notification_created',row.id,session);return row;
   });response.status(201).json(result);
 });
@@ -92,7 +96,10 @@ router.post('/records',requirePermission('opd.create'),async(request,response)=>
       if(old)await db.collection('role_work_items').replaceOne({tenant_id,id:old.id},order,{session});else await db.collection('role_work_items').insertOne({...order},{session});
     }
     if(previous)await db.collection('doctor_clinical_records').replaceOne({tenant_id,id:row.id},row,{session});else await db.collection('doctor_clinical_records').insertOne({...row},{session});
-    if(!admission&&body.record_type==='consultation')await db.collection('clinical_appointments').updateOne(filter,{$set:{status:data.encounter_status==='Completed'?'Completed':'In Consultation',updated_at:now}},{session});
+    if(!admission&&body.record_type==='consultation'){
+      const timing=data.encounter_status==='Completed'?{consultation_completed_at:now}:await beginQueueVisit(encounter,session);
+      await db.collection('clinical_appointments').updateOne(filter,{$set:{...timing,status:data.encounter_status==='Completed'?'Completed':'In Consultation',updated_at:now}},{session});
+    }
     await writeAudit(response,previous?'clinical_record_updated':'clinical_record_created',row.id,session,{record_type:row.record_type});return row;
   });response.status(201).json(result);
 });
