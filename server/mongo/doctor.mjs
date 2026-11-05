@@ -1,5 +1,6 @@
 import {Router} from 'express';
 import {beginQueueVisit} from './queue-service.mjs';
+import {doctorDay} from './doctor-availability.mjs';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
@@ -25,7 +26,10 @@ router.get('/overview',requirePermission('appointment.view'),async(_request,resp
   const appointments=[],completedAppointments=[];for(const row of all){if(row.status==='Completed'){if(completedAppointments.length<200)completedAppointments.push(await enrich(row));}else if(!['Cancelled','No Show'].includes(row.status)&&appointments.length<200)appointments.push(await enrich(row));}
   const ipd=await db.collection('ipd_admissions').find(await encounterScope(response,true,{active:true})).sort({admitted_at:1}).toArray(),ipdAdmissions=[];for(const row of ipd)ipdAdmissions.push(await enrich(row));
   const staff=await db.collection('staff_members').findOne({tenant_id:response.locals.account.tenant_id,user_id:response.locals.account.id});
-  response.json({appointments,completedAppointments:completedAppointments.reverse(),ipdAdmissions,slots:staff?.professional?.appointment_schedule??[],metrics:{today:all.filter(row=>row.appointment_date===today).length,waiting:all.filter(row=>row.appointment_date===today&&['Booked','Confirmed','Checked In','Waiting','Present'].includes(row.status)).length,completed:all.filter(row=>row.appointment_date===today&&row.status==='Completed').length,patients:new Set(all.map(row=>row.patient_id)).size}});
+  const dates=[...new Set([today,...all.map(row=>row.appointment_date)])];
+  const professional=staff?.professional??{},slots=[...(professional.appointment_schedule??[])];
+  for(const date of dates){if(!slots.some(row=>String(row.appointment_date).slice(0,10)===date)){const day=doctorDay(professional.appointment_schedule??[],professional.default_schedule,date,professional.unavailable_dates??[]);if(day)slots.push(day);}}
+  response.json({appointments,completedAppointments:completedAppointments.reverse(),ipdAdmissions,slots:slots.map(row=>({...row,doctor_id:response.locals.account.id,branch_id:response.locals.account.branch_id})),metrics:{today:all.filter(row=>row.appointment_date===today).length,waiting:all.filter(row=>row.appointment_date===today&&['Booked','Confirmed','Checked In','Waiting','Present'].includes(row.status)).length,completed:all.filter(row=>row.appointment_date===today&&row.status==='Completed').length,patients:new Set(all.map(row=>row.patient_id)).size}});
 });
 router.get('/patients/:id',requirePermission('patient.view'),async(request,response)=>{
   const identity=uuid.parse(request.params.id),tenant_id=response.locals.account.tenant_id;

@@ -116,3 +116,19 @@ jobs:
           MONGODB_DB: pushkar_test_hosting
           JWT_SECRET: synthetic-ci-secret-for-disposable-tests-only
           FRONTEND_ORIGIN: https://erp.example.invalid
+
+      - name: Install browser verification tooling on the runner only
+        run: |
+          npm install --prefix /tmp/pushkar-queue-browser --no-save --ignore-scripts playwright@1.65.0
+          /tmp/pushkar-queue-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify patient pass and waiting-screen layouts with synthetic data
+        run: node scripts/queue-ui-smoke.mjs
+        env:
+          QUEUE_BROWSER_MODULE: /tmp/pushkar-queue-browser/node_modules/playwright
+      - name: Save queue UI verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: queue-ui-screenshots
+          path: artifacts/queue-ui/
+          if-no-files-found: ignore
