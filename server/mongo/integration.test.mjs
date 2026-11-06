@@ -1,6 +1,7 @@
 // GitHub runner only: never permit this suite to reset a real clinic database.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 // Generate a valid RGBA PNG, including CRCs, instead of relying on a copied image.
 function syntheticSignature() {
@@ -207,6 +208,20 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     const screen=await request('/queue/screens','POST',{name:'Synthetic TV',branch_id:branch.id,doctor_id:doctor.user_id,type:'doctor',room:'Room 7'},auth);assert.equal(screen.status,201,JSON.stringify(screen.data));
     const displayPath='/public/screens/'+screen.data.path.split('/').pop();assert.equal((await request(displayPath)).status,200);
     const listing=await request('/queue/screens','GET',null,auth);assert.equal(listing.data[0].online,true);assert.equal(listing.data[0].token_hash,undefined);
+    assert.equal(listing.data[0].path,screen.data.path);assert.equal(listing.data[0].share_link_hash,undefined);
+    const another=await request('/queue/screens','POST',{name:'Synthetic second TV',branch_id:branch.id,doctor_id:doctor.user_id,type:'doctor'},auth);assert.equal(another.status,201);
+    assert.notEqual(another.data.path,screen.data.path);
+    const legacyToken=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+    await db.collection('waiting_screens').updateOne({id:another.data.id},{$set:{token_hash:createHash('sha256').update(legacyToken).digest('hex')},$unset:{share_link_hash:''}});
+    const legacyPath='/public/screens/'+legacyToken;assert.equal((await request(legacyPath)).status,200);
+    const reloaded=await request('/queue/screens','GET',null,auth),firstScreen=reloaded.data.find(row=>row.id===screen.data.id),legacyScreen=reloaded.data.find(row=>row.id===another.data.id);
+    assert.equal(firstScreen.path,screen.data.path);assert.ok(legacyScreen.path);assert.equal(legacyScreen.token_hash,undefined);assert.equal(legacyScreen.share_link_hash,undefined);
+    const savedLegacyPath='/public/screens/'+legacyScreen.path.split('/').pop();
+    assert.equal((await request(legacyPath)).status,200,'Listing a legacy screen must not disconnect its TV');assert.equal((await request(savedLegacyPath)).status,200);
+    const replacementScreen=await request('/queue/screens/'+another.data.id+'/link','POST',{},auth);assert.equal(replacementScreen.status,200);
+    assert.equal((await request(legacyPath)).status,404);assert.equal((await request(savedLegacyPath)).status,404);assert.equal((await request(displayPath)).status,200,'Replacing one link must not affect another screen');
+    const afterReplacement=await request('/queue/screens','GET',null,auth);assert.equal(afterReplacement.data.find(row=>row.id===another.data.id).path,replacementScreen.data.path);
+    await request('/queue/screens/'+another.data.id,'DELETE',null,auth);
     const foreign='00000000-0000-4000-8000-000000000099';assert.equal((await request('/queue/screens','POST',{name:'Forbidden',branch_id:foreign,doctor_id:doctor.user_id,type:'doctor'},auth)).status,403);
     await request('/queue/screens/'+screen.data.id,'DELETE',null,auth);assert.equal((await request(displayPath)).status,404);
     const replacement=await request('/queue/passes/'+appointment.id,'POST',{},auth);assert.equal(replacement.status,201);assert.equal((await request(publicPath)).status,404);

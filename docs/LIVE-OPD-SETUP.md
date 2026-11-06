@@ -51,13 +51,13 @@ Reception/Admin have **Live Queue** and **Waiting Screens** navigation entries. 
 1. Open **Waiting Screens → Add screen**.
 2. Enter screen name, assigned branch, type and doctor (required for single-doctor/announcement views). Department screens can be filtered to a department.
 3. Enter a room where appropriate. A saved doctor-specific room is shared with that branch/doctor's patient pass and queue.
-4. Save, then open the once-displayed private link on the physical TV/browser. Bookmark it on that device.
+4. Save, then use that screen row's **Copy link** or **Open screen** controls. Each screen keeps its own link in the table after refresh and after other screens are added. Open/bookmark the link on the physical TV/browser.
 5. Click **Full screen** and **Enable announcements** on the device. Select an installed voice if desired.
 6. Check screen Online/Offline status in reception. A connected screen sends a heartbeat; after 45 seconds without one it shows Offline.
 
 Screen types: single doctor; all-doctor reception; branch/department; single-doctor announcement. All-doctor screens remain silent to prevent overlapping announcements. Patient names are not displayed or spoken by default. A single-doctor screen may include a name only when that doctor's announcement setting explicitly enables it; medical details never appear.
 
-Edit screen assignments to change the doctor/room/type, disable a screen to revoke live access, or delete its registration. The monitor action creates a replacement screen link and invalidates the old one. Secret screen tokens are not returned in the management list.
+Edit screen assignments to change the doctor/room/type, disable a screen to revoke live access, or delete its registration. **Copy link** and **Open screen** reuse its saved share link. **Replace link** is a separate confirmed action that invalidates old links for that screen only. Existing TV URLs remain valid when older screen registrations first gain persistent share links. Only authorized reception/administrators can read these links; credential seed hashes are never returned in the management list.
 
 ## Live updates and sound
 

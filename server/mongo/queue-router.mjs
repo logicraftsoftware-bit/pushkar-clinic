@@ -7,6 +7,7 @@ import {config} from './config.mjs';
 import {hospitalDay} from './finance-ledger.mjs';
 import {appointmentTotal} from './money.mjs';
 import {attachPass,queueSnapshot,safeQueue,secretHash,secretToken} from './queue-service.mjs';
+import {screenShareLink} from './screen-links.mjs';
 
 export const queueRouter=Router(),publicQueueRouter=Router();
 const uuid=z.string().uuid(),time=z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),failure=(message,status=400)=>Object.assign(new Error(message),{status});
@@ -67,21 +68,37 @@ const screenInput=z.object({name:z.string().trim().min(2).max(100),branch_id:uui
 function screenManager(response){if(!['hospital_admin','branch_admin','receptionist'].includes(response.locals.account.role))throw failure('Reception or administrator access required.',403);}
 queueRouter.get('/screens',async(_request,response)=>{
   screenManager(response);
-  const rows=await db.collection('waiting_screens').find(await scopeFor(response,{}),{projection:{_id:0,token_hash:0}}).sort({name:1}).toArray();
-  response.json(rows.map(row=>({...row,online:row.enabled&&row.last_seen_at&&Date.now()-new Date(row.last_seen_at).getTime()<45000})));
+  const rows=await db.collection('waiting_screens').find(await scopeFor(response,{}),{projection:{_id:0}}).sort({name:1}).toArray(),screens=[];
+  for(const row of rows){
+    const link=screenShareLink(row,config.JWT_SECRET);
+    if(row.share_link_hash!==link.hash){
+      // Upgrade legacy screens without invalidating their existing TV URLs.
+      const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:row.id,token_hash:row.token_hash}),{$set:{share_link_hash:link.hash}});
+      if(!result.matchedCount)continue;
+    }
+    const {token_hash,share_link_hash,...safe}=row;
+    screens.push({...safe,path:link.path,online:Boolean(row.enabled&&row.last_seen_at&&Date.now()-new Date(row.last_seen_at).getTime()<45000)});
+  }
+  response.json(screens);
 });
 queueRouter.post('/screens',requirePermission('appointment.update'),async(request,response)=>{
   screenManager(response);const body=screenInput.parse(request.body);await assertBranch(response,body.branch_id);if(body.doctor_id)await doctorScope(response,body.doctor_id,body.branch_id);
   const token=secretToken(),row={...body,id:randomUUID(),tenant_id:response.locals.account.tenant_id,token_hash:secretHash(token),created_at:new Date(),updated_at:new Date()};
+  const link=screenShareLink(row,config.JWT_SECRET);row.share_link_hash=link.hash;
   await transaction(async session=>{if(await db.collection('waiting_screens').countDocuments({tenant_id:row.tenant_id},{session})>=100)throw failure('A clinic can register up to 100 screens.');await db.collection('waiting_screens').insertOne({...row},{session});if(body.doctor_id&&body.room)await db.collection('staff_members').updateOne({tenant_id:row.tenant_id,user_id:body.doctor_id},{$set:{['professional.branch_rooms.'+body.branch_id]:body.room}},{session});await writeAudit(response,'waiting_screen_registered',row.id,session);});
-  const {_id,token_hash,...safe}=row;response.status(201).json({...safe,path:`/waiting/${token}`});
+  const {_id,token_hash,share_link_hash,...safe}=row;response.status(201).json({...safe,path:link.path});
 });
 queueRouter.put('/screens/:id',requirePermission('appointment.update'),async(request,response)=>{
   screenManager(response);const body=screenInput.parse(request.body);await assertBranch(response,body.branch_id);if(body.doctor_id)await doctorScope(response,body.doctor_id,body.branch_id);
   await transaction(async session=>{const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{$set:{...body,updated_at:new Date()}},{session});if(!result.matchedCount)throw failure('Screen unavailable.',404);if(body.doctor_id&&body.room)await db.collection('staff_members').updateOne({tenant_id:response.locals.account.tenant_id,user_id:body.doctor_id},{$set:{['professional.branch_rooms.'+body.branch_id]:body.room}},{session});await writeAudit(response,'waiting_screen_updated',request.params.id,session);});response.json({saved:true});
 });
 queueRouter.post('/screens/:id/link',requirePermission('appointment.update'),async(request,response)=>{
-  screenManager(response);const token=secretToken();await transaction(async session=>{const result=await db.collection('waiting_screens').updateOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{$set:{token_hash:secretHash(token),last_seen_at:null,updated_at:new Date()}},{session});if(!result.matchedCount)throw failure('Screen unavailable.',404);await writeAudit(response,'waiting_screen_link_rotated',request.params.id,session);});response.json({path:`/waiting/${token}`});
+  screenManager(response);const token=secretToken();const path=await transaction(async session=>{
+    const filter=await scopeFor(response,{id:uuid.parse(request.params.id)},session),row=await db.collection('waiting_screens').findOne(filter,{session});if(!row)throw failure('Screen unavailable.',404);
+    const hash=secretHash(token),link=screenShareLink({...row,token_hash:hash},config.JWT_SECRET);
+    await db.collection('waiting_screens').updateOne(filter,{$set:{token_hash:hash,share_link_hash:link.hash,last_seen_at:null,updated_at:new Date()}},{session});
+    await writeAudit(response,'waiting_screen_link_rotated',request.params.id,session);return link.path;
+  });response.json({path});
 });
 queueRouter.delete('/screens/:id',requirePermission('appointment.update'),async(request,response)=>{
   screenManager(response);await transaction(async session=>{const result=await db.collection('waiting_screens').deleteOne(await scopeFor(response,{id:uuid.parse(request.params.id)},session),{session});if(!result.deletedCount)throw failure('Screen unavailable.',404);await writeAudit(response,'waiting_screen_deleted',request.params.id,session);});response.status(204).end();
@@ -114,7 +131,7 @@ async function passSnapshot(token){
 }
 async function displaySnapshot(token){
   if(!validToken(token))throw failure('This screen link is invalid or disabled.',404);
-  const screen=await db.collection('waiting_screens').findOne({token_hash:secretHash(token),enabled:true});
+  const hash=secretHash(token),screen=await db.collection('waiting_screens').findOne({$or:[{token_hash:hash},{share_link_hash:hash}],enabled:true});
   if(!screen)throw failure('This screen link is invalid or disabled.',404);
   if(!screen.last_seen_at||Date.now()-new Date(screen.last_seen_at).getTime()>20000)await db.collection('waiting_screens').updateOne({id:screen.id,enabled:true},{$set:{last_seen_at:new Date()}});
   const clinic=await db.collection('hospitals').findOne({id:screen.tenant_id,deleted_at:null});if(!clinic)throw failure('Clinic unavailable.',404);

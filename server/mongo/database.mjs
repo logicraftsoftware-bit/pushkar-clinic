@@ -24,6 +24,7 @@ export function initializeMongo() {
       ['clinical_appointments',{tenant_id:1,branch_id:1,doctor_id:1,appointment_date:1,queue_serial:1},{unique:true,partialFilterExpression:{queue_serial:{$type:'number'}}}],
       ['waiting_screens',{id:1},{unique:true}],
       ['waiting_screens',{token_hash:1},{unique:true}],
+      ['waiting_screens',{share_link_hash:1},{unique:true,partialFilterExpression:{share_link_hash:{$type:'string'}}}],
       ['waiting_screens',{tenant_id:1,branch_id:1},{}],
       ['opd_queue_sessions',{tenant_id:1,branch_id:1},{}],
       ['ai_limits',{expires_at:1},{expireAfterSeconds:0}],
