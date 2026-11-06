@@ -82,6 +82,7 @@ try{
   await staffPage.getByRole('button',{name:'Add screen',exact:true}).click();
   await staffPage.getByRole('dialog',{name:'Waiting screen assignment'}).waitFor();
   await staffPage.getByLabel('Screen name',{exact:true}).fill('Reception TV');
+  await staffPage.getByLabel('Branch',{exact:true}).selectOption(branchId);
   await staffPage.getByLabel('Doctor',{exact:true}).selectOption(doctorId);
   await staffPage.getByRole('button',{name:'Save screen',exact:true}).click();
   await staffPage.getByRole('link',{name:'Open screen',exact:true}).waitFor();
