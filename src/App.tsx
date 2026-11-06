@@ -1311,12 +1311,21 @@ function HospitalApp({
           {role === "Doctor" && page === "Food & Dietary" && session?.token && (
             <DietaryManagement token={session.token} />
           )}
+          {["Live Queue", "Waiting Screens"].includes(page) &&
+            session?.token && (
+              <ReceptionLiveQueue
+                token={session.token}
+                screensOnly={page === "Waiting Screens"}
+              />
+            )}
           {role !== "Doctor" &&
             dedicatedRoles.has(role) &&
             page !== "Dashboard" &&
             roleMenus[role]?.some((item) => item.label === page) &&
             session?.token &&
             page !== "AI Assistant" &&
+            page !== "Live Queue" &&
+            page !== "Waiting Screens" &&
             page !== "Documents" &&
             role !== "Nurse" &&
             role !== "Accountant" &&
@@ -1546,6 +1555,8 @@ function HospitalApp({
             )}
           {!dedicatedRoles.has(role) &&
             page !== "Dashboard" &&
+            page !== "Live Queue" &&
+            page !== "Waiting Screens" &&
             page !== "Reports & Analytics" &&
             !adminRoleWorkspacePages.has(page) &&
             ![

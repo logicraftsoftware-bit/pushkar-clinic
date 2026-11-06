@@ -60,6 +60,36 @@ try{
   display={...display,screen:{name:'Reception TV',type:'reception'}};
   await heading('Live OPD status — all doctors');await screenshot('reception-tv-1920');
   assert.equal(await page.getByRole('button',{name:'Enable announcements',exact:true}).count(),0);
+  const staffContext=await browser.newContext({viewport:{width:1440,height:1000}});
+  const branchId='00000000-0000-4000-8000-000000000001',doctorId='00000000-0000-4000-8000-000000000002';
+  await staffContext.addInitScript(({branchId})=>sessionStorage.setItem('careframe_portal_session',JSON.stringify({token:'synthetic-browser-token',user:{id:'synthetic-reception',name:'Test Reception',email:'reception@example.invalid',phone:'0000000000',role:'receptionist',portal:'receptionist'},hospital:{id:'synthetic-clinic',name:'Synthetic Clinic',code:'TEST',branchId,branchName:'Synthetic Branch',status:'active'},modules:['opd']})),{branchId});
+  let registered=[];
+  await staffContext.route('**/api/v1/**',async route=>{
+    const path=new URL(route.request().url()).pathname;let value={};
+    if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
+    else if(path.endsWith('/access-control/me'))value={permissions:['menu.queue.view','menu.dashboard.view','menu.appointments.view','appointment.view','appointment.update'],roles:[],managed_roles:[]};
+    else if(path.endsWith('/clinical/lookups'))value={branches:[{id:branchId,name:'Synthetic Branch'}],departments:[],doctors:[{id:doctorId,name:'Dr. Test Clinician',branch_id:branchId,branch_ids:[branchId]}]};
+    else if(path.endsWith('/queue/live'))value={queues:[]};
+    else if(path.endsWith('/queue/screens')){
+      if(route.request().method()==='POST'){const body=route.request().postDataJSON();value={...body,id:'synthetic-screen',path:'/waiting/'+'C'.repeat(43)};registered=[value];}
+      else value=registered;
+    }
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)});
+  });
+  const staffPage=await staffContext.newPage();staffPage.on('pageerror',error=>errors.push(error.message));
+  await staffPage.goto(origin+'/app/reception/waiting-screens');
+  await staffPage.getByRole('heading',{name:'Waiting screen management',exact:true}).waitFor();
+  await staffPage.getByRole('button',{name:'Add screen',exact:true}).click();
+  await staffPage.getByRole('dialog',{name:'Waiting screen assignment'}).waitFor();
+  await staffPage.getByLabel('Screen name',{exact:true}).fill('Reception TV');
+  await staffPage.getByLabel('Doctor',{exact:true}).selectOption(doctorId);
+  await staffPage.getByRole('button',{name:'Save screen',exact:true}).click();
+  await staffPage.getByRole('link',{name:'Open screen',exact:true}).waitFor();
+  await staffPage.screenshot({path:'artifacts/queue-ui/reception-add-screen.png',fullPage:true});
+  await staffPage.goto(origin+'/app/reception/live-queue');
+  await staffPage.getByRole('heading',{name:'Live doctor queues',exact:true}).waitFor();
+  assert.equal(await staffPage.getByText('No records found.',{exact:true}).count(),0);
+  await staffContext.close();
   assert.deepEqual(errors,[],'Browser runtime errors');
-  console.log('PASS: mobile appointment states, automatic stream updates, TV layouts and audio controls.');
+  console.log('PASS: patient states, live streams, TV/audio controls and signed-in reception screen registration.');
 }finally{await browser?.close();preview.closeAllConnections();await new Promise(resolve=>preview.close(resolve));}
