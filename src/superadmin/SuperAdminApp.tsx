@@ -1176,7 +1176,7 @@ function ReportsPage() {
     <>
       <PageHead
         title="SaaS Reports"
-        text="Platform registrations, subscription revenue, plan health and expiry risk."
+        text="Platform registrations, current contract MRR, plan health and expiry risk."
         action={
           <button className="sa-secondary">
             <FileBarChart />

@@ -233,7 +233,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     await db.collection('clinical_appointments').replaceOne({id:initial.id},initial);
     await db.collection('opd_queue_sessions').deleteMany({tenant_id:hospital.data.id});
   });
-  await t.test('different doctor and patient passes cannot receive each otherÃ¢â‚¬â„¢s queue',async()=>{
+  await t.test('different doctor and patient passes cannot receive each otherÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s queue',async()=>{
     const auth=staffLogin.data.token,tenant_id=hospital.data.id;
     const original=await db.collection('clinical_appointments').findOne({id:appointment.id});
     const originalUser=await db.collection('users').findOne({id:doctor.user_id}),originalStaff=await db.collection('staff_members').findOne({id:doctor.id});
@@ -834,6 +834,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
 });
 
 test('manual subscriptions enforce expiry, all-device logout, renewal history and purchased limits',async t=>{
+  await db.collection('login_limits').deleteMany({}); // Independent synthetic login scenario.
   const owner=(await request('/admin/auth/login','POST',{username:'test-owner',password})).data.token;
   const modules=(await request('/admin/modules','GET',null,owner)).data;
   const plan=(await request('/admin/plans','POST',{name:'Subscription Policy Test',code:'policy',monthlyPrice:100,yearlyPrice:1000,trialDays:3,maxBranches:1,maxUsers:1,maxDoctors:1,storageLimitGb:1,aiUsageLimit:0,moduleIds:[],status:'active'},owner)).data;
@@ -851,10 +852,22 @@ test('manual subscriptions enforce expiry, all-device logout, renewal history an
     const {enforceCount}=await import('./subscription-access.mjs'),{transaction}=await import('./database.mjs');
     for(const kind of ['branches','users'])await assert.rejects(transaction(session=>enforceCount(tenant,kind,session)),error=>error.code==='PLAN_LIMIT_REACHED');
   });
+  await t.test('unlicensed overview permissions and zero AI allowance cannot be bypassed',async()=>{
+    const permissions=await request('/access-control/me','GET',null,first.data.token);assert.equal(permissions.status,200);assert.equal(permissions.data.permissions.includes('appointment.view'),false);
+    const {aiLimit}=await import('./clinical-ai.mjs');await assert.rejects(aiLimit({locals:{account:{tenant_id:tenant,id:'synthetic-ai'}}}),error=>error.code==='PLAN_LIMIT_REACHED');
+  });
+  await t.test('upload storage guard rejects growth above the plan allowance',async()=>{
+    const {enforceStorage}=await import('./subscription-access.mjs'),{transaction}=await import('./database.mjs');
+    await db.collection('subscription_plans').updateOne({id:plan.id},{$set:{storage_limit_gb:0}});
+    try{await assert.rejects(transaction(session=>enforceStorage(tenant,session,100)),error=>error.code==='PLAN_LIMIT_REACHED');}
+    finally{await db.collection('subscription_plans').updateOne({id:plan.id},{$set:{storage_limit_gb:1}});}
+  });
   const old=await db.collection('subscriptions').findOne({tenant_id:tenant});
   const assign={tenantId:tenant,planId:plan.id,billingCycle:'monthly',months:1,trialDays:3,amount:100,note:'Manual approval test',mode:'renew'};
   await t.test('renew extends remaining time and preserves old record',async()=>{
-    const result=await request('/admin/subscriptions','POST',assign,owner);assert.equal(result.status,201,JSON.stringify(result.data));assert.ok(new Date(result.data.expires_at)>new Date(old.expires_at));assert.equal((await db.collection('subscriptions').findOne({id:old.id})).status,'superseded');
+    const requestId='00000000-0000-4000-8000-000000000099';
+    const result=await request('/admin/subscriptions','POST',{...assign,requestId},owner);assert.equal(result.status,201,JSON.stringify(result.data));assert.ok(new Date(result.data.expires_at)>new Date(old.expires_at));assert.equal((await db.collection('subscriptions').findOne({id:old.id})).status,'superseded');
+    const repeated=await request('/admin/subscriptions','POST',{...assign,requestId},owner);assert.equal(repeated.data.id,result.data.id);
     const list=(await request('/admin/subscriptions','GET',null,owner)).data.filter(r=>r.tenant_id===tenant);assert.equal(list.filter(r=>r.is_current).length,1);
   });
   await t.test('profile editing cannot alter subscription terms',async()=>{

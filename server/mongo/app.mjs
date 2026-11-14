@@ -117,6 +117,7 @@ function authenticate(audience) {
       if (!activeAccount(account, hospital)) return response.status(401).json({ error: 'Account access revoked.' });
       if (account.force_password_change && !['/api/v1/auth/change-password','/api/v1/auth/logout'].includes(request.path)) return response.status(403).json({ code: 'PASSWORD_CHANGE_REQUIRED', error: 'Change your temporary password before continuing.' });
     }
+    if(!admin&&account.role==='patient')await requireModule(account.tenant_id,'patient_portal');
     if(!admin){const module=moduleForRoute(request.originalUrl.split('?')[0]);if(module&&module!=='ai')await requireModule(account.tenant_id,module);}
     response.locals.account = account;
     response.locals.claims = claims;

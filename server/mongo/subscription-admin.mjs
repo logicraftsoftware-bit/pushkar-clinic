@@ -9,7 +9,7 @@ const router=Router(),uuid=z.string().uuid();
 const fail=message=>Object.assign(Error(message),{status:409});
 async function event(account,tenant,action,details,session){await db.collection('platform_events').insertOne({id:randomUUID(),tenant_id:tenant,actor_id:account.id,source:'subscriptions',severity:'info',event_type:action,message:action.replaceAll('_',' '),details,created_at:new Date()},{session});}
 router.get('/subscriptions',async(_request,response)=>{
-  const rows=await db.collection('subscriptions').find({},{projection:{_id:0}}).sort({created_at:-1}).toArray(),seen=new Set(),result=[];
+  const rows=await db.collection('subscriptions').find({},{projection:{_id:0}}).sort({created_at:-1,_id:-1}).toArray(),seen=new Set(),result=[];
   for(const row of rows){const hospital=await db.collection('hospitals').findOne({id:row.tenant_id,deleted_at:null});if(!hospital)continue;const current=!seen.has(row.tenant_id);seen.add(row.tenant_id);result.push({...subscriptionSummary(row),is_current:current,hospital_name:hospital.name});}
   response.json(result);
 });
@@ -25,9 +25,11 @@ router.post('/subscriptions',async(request,response)=>{
     if(body.mode==='renew'&&live&&previous.billing_cycle!==body.billingCycle)throw fail('Use Replace now to change the billing cycle.');
     // Capacity decreases are rejected, rather than disabling existing users or deleting data.
     for(const [collection,limit,filter] of [['branches',plan.max_branches,{}],['users',plan.max_users,{}],['staff_members',plan.max_doctors,{staff_type:'Doctor'}]]){
-      if(await db.collection(collection).countDocuments({tenant_id:hospital.id,deleted_at:null,...filter},{session})>limit)throw fail('This plan is below the clinicâ€™s existing branch, user or doctor count. Choose a larger plan.');
+      if(await db.collection(collection).countDocuments({tenant_id:hospital.id,deleted_at:null,...filter},{session})>limit)throw fail('This plan is below the clinicÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s existing branch, user or doctor count. Choose a larger plan.');
     }
     if(body.billingCycle==='trial'&&body.amount!==0)throw fail('Trial subscriptions must have a zero contract price.');
+    const doctorUsers=await db.collection('users').find({tenant_id:hospital.id,deleted_at:null,role:'doctor'},{session,projection:{id:1}}).toArray(),doctorStaff=await db.collection('staff_members').find({tenant_id:hospital.id,deleted_at:null,staff_type:'Doctor'},{session,projection:{id:1,user_id:1}}).toArray();
+    if(new Set([...doctorUsers.map(r=>r.id),...doctorStaff.map(r=>r.user_id??r.id)]).size>plan.max_doctors)throw fail('This plan is below the existing doctor count. Choose a larger plan.');
     const starts_at=body.mode==='renew'&&live?new Date(previous.starts_at):now;
     const base=body.mode==='renew'&&live?new Date(previous.expires_at):now;
     const expires_at=body.billingCycle==='trial'?trialEnd(base.toISOString().slice(0,10),body.trialDays):calendarMonthsEnd(base.toISOString().slice(0,10),body.months*(body.billingCycle==='yearly'?12:1));

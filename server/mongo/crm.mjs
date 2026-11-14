@@ -1,4 +1,4 @@
-import {subscriptionAccess,enforceCount} from './subscription-access.mjs';
+import {subscriptionAccess,enforceCount,requireModule} from './subscription-access.mjs';
 import {assignQueueSerial,attachPass,sessionStart} from './queue-service.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
@@ -47,6 +47,7 @@ router.post('/bootstrap',enabled,async(request,response)=>{
     const summary=await transaction(async session=>{
       const current=await db.collection('call_centre_crm_connections').findOneAndUpdate({id:connection.id,api_key_hash,is_active:true},{$inc:{sync_version:1}},{session,returnDocument:'after'});if(!current)throw failure('CRM connection changed. Authenticate again.',401);
       const tenant_id=current.tenant_id;await subscriptionAccess(tenant_id,{session,revoke:false});const hospital=await db.collection('hospitals').findOne({id:tenant_id},{session});if(!activeAccount({is_active:true},hospital))throw failure('Clinic account is inactive.',403);
+      if(body.appointments.length)await requireModule(tenant_id,'opd');
       const totals={branches:0,departments:0,doctors:0,patients:0,appointments:0},now=new Date();
       const mapped=async(type,external)=>db.collection('call_centre_crm_mappings').findOne({tenant_id,connection_id:current.id,entity_type:type,external_id:external},{session});
       const required=async(type,external)=>{const mapping=external?await mapped(type,external):null;if(!mapping)throw failure(`CRM ${type} mapping is missing.`);return mapping.erp_id;};

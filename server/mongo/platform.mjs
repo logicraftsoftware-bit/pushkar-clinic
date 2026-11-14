@@ -38,7 +38,6 @@ router.put('/hospitals/:id',async(request,response)=>{
       await db.collection('users').updateOne({tenant_id:tenant,id:administrator.id},{$set:{first_name:names.shift(),last_name:names.join(' '),email:body.adminEmail.toLowerCase(),phone:body.adminPhone,...(password_hash?{password_hash,force_password_change:true}:{}),updated_at:now},$inc:{session_version:1}},{session});
       await db.collection('sessions').deleteMany({user_id:administrator.id},{session});
     }
-    const subscription=await db.collection('subscriptions').findOne({tenant_id:tenant},{session,sort:{created_at:-1}});
     // Commercial terms are changed only by the audited subscription endpoints.
     if(!['active','trial'].includes(body.status))await db.collection('sessions').deleteMany({tenant_id:tenant},{session});
     await audit(response,'hospital_updated',tenant,session);return {id:tenant};

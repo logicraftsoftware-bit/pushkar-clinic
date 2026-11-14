@@ -2,7 +2,7 @@ import {Router} from 'express';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
-import {permissionsFor,scopeFor,assertBranch,writeAudit} from './access.mjs';
+import {effectivePermissionsFor as permissionsFor,scopeFor,assertBranch,writeAudit} from './access.mjs';
 const router=Router();
 const fail=(message,status=403)=>Object.assign(new Error(message),{status});
 const noteTypes={notifications:{workspace:'reception',permission:'menu.notifications.view'},'device integration':{workspace:'laboratory',permission:'lab.result.verify'},recruitment:{workspace:'hr',permission:'hr.manage'}};

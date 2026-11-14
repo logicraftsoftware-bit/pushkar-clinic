@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { db,transaction } from './database.mjs';
-import { permissionsFor,requirePermission,scopeFor,writeAudit } from './access.mjs';
+import { permissionsFor,effectivePermissionsFor,requirePermission,scopeFor,writeAudit } from './access.mjs';
 import { hashPassword } from './security.mjs';
 import { clinicRoleLabel,baseRoles,customBaseRoles,permissionCatalog,rolePortalCode,validateRoleGrant } from './role-policy.mjs';
 const router=Router(),id=z.string().uuid();
@@ -18,7 +18,7 @@ async function lockActor(response,permission,session) {
 }
 router.get('/me',async(_request,response)=>{
   if(response.locals.account.role==='broker')return response.json({permissions:['menu.dashboard.view','menu.reports.view','menu.billing.view'],roles:[],managed_roles:[]});
-  const account=response.locals.account,permissions=await permissionsFor(account);
+  const account=response.locals.account,permissions=await effectivePermissionsFor(account);
   const roles=await db.collection('rbac_roles').find({tenant_id:account.tenant_id,code:{$in:account.role_codes??[]},status:'Active'},{projection:{_id:0}}).toArray();
   const managed_roles=permissions.some(code=>['*','roles.manage','staff.view'].includes(code))?await db.collection('rbac_roles').find({tenant_id:account.tenant_id,is_system:false},{projection:{_id:0,id:1,name:1,code:1,is_system:1}}).sort({name:1}).toArray():[];
   response.json({permissions:permissions.includes('*')?permissionCatalog.map(row=>row.code):permissions,roles:roles.map(clinicRoleLabel),managed_roles:managed_roles.map(clinicRoleLabel)});
@@ -83,7 +83,7 @@ router.put('/users/:id',requirePermission('users.manage'),async(request,response
       const portal=role&&rolePortalCode(role);
       if(!portal||portal==='HOSPITAL_ADMIN')throw failure('Select an active staff role in this clinic.');
       validateRoleGrant(granted,role.permissions??[]);
-      if(baseRoles[portal]==='doctor'&&user.role!=='doctor')await enforceCount(tenant_id,'doctors',session);
+      if(baseRoles[portal]==='doctor'&&user.role!=='doctor')await enforceCount(tenant_id,'doctors',session,user.id);
       Object.assign(changes,{role_codes:[role.code],portal_code:portal,role:baseRoles[portal]});
     }
     if((changes.role??user.role)==='patient'){

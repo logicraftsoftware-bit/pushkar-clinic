@@ -81,7 +81,7 @@ router.post('/staff/save',async(request,response)=>{
   const result=await transaction(async session=>{
     const existing=input.id?await db.collection('staff_members').findOne(await scopeFor(response,{id:input.id},session),{session}):null;
     if(input.id&&!existing)throw failure('Staff record not found',404);
-    if(input.staff_type==='Doctor'&&existing?.staff_type!=='Doctor')await enforceCount(tenant_id,'doctors',session);
+    if(input.staff_type==='Doctor'&&existing?.staff_type!=='Doctor')await enforceCount(tenant_id,'doctors',session,existing?.user_id);
     for(const branch of new Set(input.branch_ids))await assertBranch(response,branch,session);
     if(input.department_id){
       const department=await db.collection('departments').findOne({tenant_id,id:input.department_id,branch_id:{$in:input.branch_ids},is_active:true},{session});

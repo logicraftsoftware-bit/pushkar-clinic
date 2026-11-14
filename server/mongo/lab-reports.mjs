@@ -1,3 +1,4 @@
+import {subscriptionAccess} from './subscription-access.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {randomBytes,createHash,randomUUID} from 'node:crypto';
@@ -58,6 +59,7 @@ publicReports.get('/:token',async(request,response)=>{
   const shared=await transaction(async session=>{
     const share=await db.collection('report_shares').findOne({token_hash:tokenHash(request.params.token),expires_at:{$gt:new Date()}},{session});
     if(!share)return null;
+    await subscriptionAccess(share.tenant_id,{session,revoke:false});
     const row=await db.collection('role_work_items').findOne({tenant_id:share.tenant_id,id:share.order_id,workspace:'laboratory'},{session});
     const hospital=await db.collection('hospitals').findOne({id:share.tenant_id,deleted_at:null,status:{$in:['active','trial']}},{session});
     const branch=row?await db.collection('branches').findOne({tenant_id:share.tenant_id,id:row.branch_id,is_active:true},{session}):null;
