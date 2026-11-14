@@ -90,6 +90,17 @@ jobs:
           CRM_INTEGRATION_ENABLED: 'true'
           CRM_API_BASE_URL: https://crm.example.invalid/api
           GROQ_API_KEY: synthetic-provider-key-used-only-with-mocked-fetch
+      - name: Verify patient mobile APIs with isolated synthetic data
+        run: npm --prefix server run test:patient-app
+        env:
+          ENV_FILE: /dev/null
+          NODE_ENV: test
+          PATIENT_APP_INTEGRATION_TEST: 'true'
+          PATIENT_APP_OTP_MODE: development
+          MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
+          MONGODB_DB: pushkar_test_patient_ci
+          JWT_SECRET: synthetic-ci-secret-for-disposable-tests-only
+          FRONTEND_ORIGIN: https://patient.example.invalid
       - name: Report MongoDB integration failure
         if: failure()
         run: |

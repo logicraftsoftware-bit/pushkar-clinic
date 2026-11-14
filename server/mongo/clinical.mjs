@@ -36,10 +36,12 @@ export async function doctorFor(response,branch,department,doctorId,session){
   if(!dept||!user||!staff||(!assignment&&user.branch_id!==branch)||selectedDepartment!==department)throw failure('Select an active doctor assigned to this branch and department.');
   return {user,staff,department:dept,professional:{...professional,...branchFees}};
 }
-export async function slotsFor(doctor,dayString,interval,exclude,session){
+export async function slotsFor(doctor,dayString,interval,exclude,session,excludeHold){
   const professional=doctor.professional,day=doctorDay(professional.appointment_schedule??[],professional.appointment_default_schedule,dayString,professional.appointment_unavailable_dates??[]);
   if(!day)return [];
   const bookings=await db.collection('clinical_appointments').find({tenant_id:doctor.user.tenant_id,doctor_id:doctor.user.id,appointment_date:dayString,...(exclude?{id:{$ne:exclude}}:{}),status:{$nin:['Cancelled','No Show']}},{session}).toArray();
+  const holds=await db.collection('mobile_booking_holds').find({tenant_id:doctor.user.tenant_id,doctor_id:doctor.user.id,appointment_date:dayString,state:'Active',expires_at:{$gt:new Date()},...(excludeHold?{id:{$ne:excludeHold}}:{})},{session,projection:{appointment_time:1,slot_serial:1}}).toArray();
+  bookings.push(...holds);
   const maximum=Number(day.max_slots||professional.maximum_appointments||0);
   if(maximum&&bookings.length>=maximum)return [];
   const source=interval===5?fiveMinuteDoctorSlots(day):doctorSlots(day,Number(professional.slot_duration)||20,Number(professional.maximum_appointments)||0);

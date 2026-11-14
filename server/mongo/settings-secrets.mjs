@@ -1,4 +1,4 @@
-const secretKey=/^(password|api_key|api_secret|secret|token|client_secret|private_key|access_key|access_token)$/i;
+const secretKey=/^(password|api_key|api_secret|secret|webhook_secret|token|client_secret|private_key|access_key|access_token)$/i;
 export const secretMask='********';
 export function maskSettings(value,key='') {
   if(secretKey.test(key)&&typeof value==='string'&&value)return secretMask;

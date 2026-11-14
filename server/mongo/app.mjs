@@ -51,6 +51,8 @@ import dietary from './dietary.mjs';
 import referrals from './referrals.mjs';
 import selfRegistration,{registrationLinks} from './self-registration.mjs';
 import { hasActiveRole } from './access.mjs';
+import patientApp,{patientAppAdmin,paymentWebhookRouter} from './patient-app/index.mjs';
+import {runPatientAppJobs} from './patient-app/jobs.mjs';
 
 const expirySweep=setInterval(()=>{void initializeMongo().then(revokeExpiredSubscriptions).catch(()=>{});},60000);expirySweep.unref();
 const app = express();
@@ -58,7 +60,7 @@ app.disable('x-powered-by');
 app.set('trust proxy',config.TRUST_PROXY_HOPS);
 app.use(helmet());
 app.use(cors({ origin: config.FRONTEND_ORIGIN, credentials: true }));
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '20mb',verify:(request,_response,buffer)=>{if(request.originalUrl.startsWith('/api/v1/webhooks/payments/'))request.rawBody=Buffer.from(buffer);} }));
 app.use((request,response,next)=>withinJsonBudget(request.body)?next():response.status(413).json({error:'Request is too large or deeply nested. Submit fewer records.'}));
 app.use((_request, response, next) => { response.set('Cache-Control', 'no-store'); next(); });
 app.use(async (_request, response, next) => {
@@ -195,6 +197,9 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   await db.collection('sessions').deleteOne({ _id: response.locals.claims.jti, user_id: response.locals.account.id });
   response.status(204).end();
 });
+app.use('/api/v1/patient-app',patientApp);
+app.use('/api/v1/patient-app-admin',authenticate('careframe-portal'),patientAppAdmin);
+app.use('/api/v1/webhooks/payments',paymentWebhookRouter);
 app.use('/api/v1/public',publicQueueRouter);
 app.get('/api/v1/subscription',authenticate('careframe-portal'),async(_request,response)=>{const row=await subscriptionAccess(response.locals.account.tenant_id);response.json({status:row.status,expires_at:row.expires_at,days_remaining:row.days_remaining,renewal_warning:row.renewal_warning,plan_code:row.plan_code});});
 app.use('/api/v1/queue',authenticate('careframe-portal'),queueRouter);
@@ -236,3 +241,7 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: 'Request failed. Check the server configuration.' });
 });
 export default app;
+if(config.NODE_ENV!=='test'){
+  let patientJobsRunning=false;
+  const patientJobs=setInterval(async()=>{if(patientJobsRunning)return;patientJobsRunning=true;try{await initializeMongo();await runPatientAppJobs();}catch{console.error('Patient app notification job could not complete.');}finally{patientJobsRunning=false;}},60000);patientJobs.unref();
+}

@@ -1,0 +1,5179 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pushkar Clinic Patient App API",
+    "version": "1.0.0",
+    "description": "Patient APIs for all 24 mobile screens. Patient and staff JWT audiences are separate. All clinical access requires an explicit profile-to-clinic link. Providers are disabled until configured."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "PatientBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Patient access_token from OTP verification; staff tokens are not accepted."
+      },
+      "StaffBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Existing clinic staff login token, with per-route role, permission, module and branch checks."
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/patient-app/auth/otp/request": {
+      "post": {
+        "summary": "Request a patient login OTP",
+        "operationId": "post__api_v1_patient_app_auth_otp_request",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 25
+                  },
+                  "language": {
+                    "default": "en",
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "hi",
+                      "bn"
+                    ]
+                  }
+                },
+                "required": [
+                  "phone"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/auth/otp/verify": {
+      "post": {
+        "summary": "Verify OTP and create a patient session",
+        "operationId": "post__api_v1_patient_app_auth_otp_verify",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/auth/refresh": {
+      "post": {
+        "summary": "Rotate patient refresh and access tokens",
+        "operationId": "post__api_v1_patient_app_auth_refresh",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "refresh_token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  }
+                },
+                "required": [
+                  "refresh_token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/payments/razorpay/{clinicId}": {
+      "post": {
+        "summary": "Receive a signed Razorpay payment webhook",
+        "operationId": "post__api_v1_webhooks_payments_razorpay__clinicId",
+        "tags": [
+          "Payment webhook"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "clinicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Razorpay-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/settings": {
+      "get": {
+        "summary": "Get patient app publishing and booking settings",
+        "operationId": "get__api_v1_patient_app_admin_settings",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Publish clinic information and configure patient app policies",
+        "operationId": "patch__api_v1_patient_app_admin_settings",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "pay_at_clinic": {
+                    "type": "boolean"
+                  },
+                  "manual_check_in": {
+                    "type": "boolean"
+                  },
+                  "booking_fee": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 99999,
+                    "multipleOf": 0.01
+                  },
+                  "lab_reports_require_payment": {
+                    "type": "boolean"
+                  },
+                  "public_profile": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "Clinic",
+                          "Hospital",
+                          "Diagnostic"
+                        ]
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "photos": {
+                        "maxItems": 12,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^https:\\/\\/"
+                        }
+                      },
+                      "phone": {
+                        "type": "string",
+                        "maxLength": 30
+                      },
+                      "address": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "latitude": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "longitude": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "opening_hours": {
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "day": {
+                              "type": "string",
+                              "enum": [
+                                "Mon",
+                                "Tue",
+                                "Wed",
+                                "Thu",
+                                "Fri",
+                                "Sat",
+                                "Sun"
+                              ]
+                            },
+                            "opens": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            "closes": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            }
+                          },
+                          "required": [
+                            "day",
+                            "opens",
+                            "closes"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "facilities": {
+                        "maxItems": 30,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "services": {
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "announcements": {
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/link-codes": {
+      "post": {
+        "summary": "Issue a one-time phone-bound link to existing patient records",
+        "operationId": "post__api_v1_patient_app_admin_link_codes",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "patient_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 25
+                  },
+                  "consent_confirmed": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "patient_id",
+                  "phone",
+                  "consent_confirmed"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/check-in-codes": {
+      "post": {
+        "summary": "Generate a short-lived clinic arrival QR payload",
+        "operationId": "post__api_v1_patient_app_admin_check_in_codes",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "branch_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "branch_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/validate-pass": {
+      "post": {
+        "summary": "Validate an appointment QR within staff branch access",
+        "operationId": "post__api_v1_patient_app_admin_validate_pass",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "qr_payload": {
+                    "type": "string",
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "qr_payload"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/releases": {
+      "post": {
+        "summary": "Release a completed consultation or approved laboratory report to linked patients",
+        "operationId": "post__api_v1_patient_app_admin_releases",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "consultation",
+                      "lab"
+                    ]
+                  },
+                  "source_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "kind",
+                  "source_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/releases/{kind}/{id}": {
+      "delete": {
+        "summary": "Revoke a patient app document release",
+        "operationId": "delete__api_v1_patient_app_admin_releases__kind__id",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/uploads/{id}/download": {
+      "get": {
+        "summary": "Download a patient-consented appointment attachment within staff scope",
+        "operationId": "get__api_v1_patient_app_admin_uploads__id_download",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/reviews": {
+      "get": {
+        "summary": "List clinic feedback awaiting moderation",
+        "operationId": "get__api_v1_patient_app_admin_reviews",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/reviews/{id}": {
+      "patch": {
+        "summary": "Publish or reject clinic patient feedback",
+        "operationId": "patch__api_v1_patient_app_admin_reviews__id",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Published",
+                      "Rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/support-tickets": {
+      "get": {
+        "summary": "List support requests addressed to this clinic",
+        "operationId": "get__api_v1_patient_app_admin_support_tickets",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app-admin/support-tickets/{id}": {
+      "patch": {
+        "summary": "Reply to a clinic support request",
+        "operationId": "patch__api_v1_patient_app_admin_support_tickets__id",
+        "tags": [
+          "Clinic administration"
+        ],
+        "security": [
+          {
+            "StaffBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Open",
+                      "In Progress",
+                      "Resolved"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "status",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/config": {
+      "get": {
+        "summary": "Get patient app branding and integration capabilities",
+        "operationId": "get__api_v1_patient_app_config",
+        "tags": [
+          "config"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/clinics": {
+      "get": {
+        "summary": "Search published clinics",
+        "operationId": "get__api_v1_patient_app_clinics",
+        "tags": [
+          "clinics"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/clinics/{id}": {
+      "get": {
+        "summary": "Get a published clinic and active branches",
+        "operationId": "get__api_v1_patient_app_clinics__id",
+        "tags": [
+          "clinics"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/specialties": {
+      "get": {
+        "summary": "List specialties at published clinics",
+        "operationId": "get__api_v1_patient_app_specialties",
+        "tags": [
+          "specialties"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/doctors": {
+      "get": {
+        "summary": "Search doctors at published clinics",
+        "operationId": "get__api_v1_patient_app_doctors",
+        "tags": [
+          "doctors"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/clinics/{clinicId}/doctors": {
+      "get": {
+        "summary": "List clinic doctors",
+        "operationId": "get__api_v1_patient_app_clinics__clinicId_doctors",
+        "tags": [
+          "clinics"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "clinicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/doctors/{id}": {
+      "get": {
+        "summary": "Get a doctor public profile",
+        "operationId": "get__api_v1_patient_app_doctors__id",
+        "tags": [
+          "doctors"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/doctors/{id}/reviews": {
+      "get": {
+        "summary": "List moderated doctor reviews",
+        "operationId": "get__api_v1_patient_app_doctors__id_reviews",
+        "tags": [
+          "doctors"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Submit feedback for a completed owned appointment for moderation",
+        "operationId": "post__api_v1_patient_app_doctors__id_reviews",
+        "tags": [
+          "doctors"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "appointment_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "appointment_id",
+                  "rating",
+                  "comment"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/doctors/{id}/availability": {
+      "get": {
+        "summary": "Get bookable doctor slots including temporary holds",
+        "operationId": "get__api_v1_patient_app_doctors__id_availability",
+        "tags": [
+          "doctors"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/me": {
+      "get": {
+        "summary": "Get the current patient account and profile",
+        "operationId": "get__api_v1_patient_app_me",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update the self patient profile",
+        "operationId": "patch__api_v1_patient_app_me",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[\\p{L}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "date_of_birth": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sex": {
+                    "default": "Other",
+                    "type": "string",
+                    "enum": [
+                      "Male",
+                      "Female",
+                      "Other"
+                    ]
+                  },
+                  "address": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "city": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "state": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "pin": {
+                        "default": "",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\d{6}$"
+                          },
+                          {
+                            "type": "string",
+                            "const": ""
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "emergency_contact": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "phone": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 25
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "photo_upload_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/family-members": {
+      "get": {
+        "summary": "List active patient and family profiles",
+        "operationId": "get__api_v1_patient_app_family_members",
+        "tags": [
+          "family-members"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add an authorized family profile",
+        "operationId": "post__api_v1_patient_app_family_members",
+        "tags": [
+          "family-members"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[\\p{L}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "date_of_birth": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sex": {
+                    "default": "Other",
+                    "type": "string",
+                    "enum": [
+                      "Male",
+                      "Female",
+                      "Other"
+                    ]
+                  },
+                  "address": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "city": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "state": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "pin": {
+                        "default": "",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\d{6}$"
+                          },
+                          {
+                            "type": "string",
+                            "const": ""
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "emergency_contact": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "phone": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 25
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "relationship": {
+                    "type": "string",
+                    "enum": [
+                      "Spouse",
+                      "Child",
+                      "Parent",
+                      "Sibling",
+                      "Other"
+                    ]
+                  },
+                  "consent": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "name",
+                  "relationship",
+                  "consent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/family-members/{id}": {
+      "patch": {
+        "summary": "Edit an authorized family profile",
+        "operationId": "patch__api_v1_patient_app_family_members__id",
+        "tags": [
+          "family-members"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[\\p{L}][\\p{L}\\p{M} .'-]*$"
+                  },
+                  "date_of_birth": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sex": {
+                    "default": "Other",
+                    "type": "string",
+                    "enum": [
+                      "Male",
+                      "Female",
+                      "Other"
+                    ]
+                  },
+                  "address": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "line": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "city": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "state": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "pin": {
+                        "default": "",
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\d{6}$"
+                          },
+                          {
+                            "type": "string",
+                            "const": ""
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "emergency_contact": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "phone": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 25
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "photo_upload_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "relationship": {
+                    "type": "string",
+                    "enum": [
+                      "Spouse",
+                      "Child",
+                      "Parent",
+                      "Sibling",
+                      "Other"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unlink a family profile without deleting clinic records",
+        "operationId": "delete__api_v1_patient_app_family_members__id",
+        "tags": [
+          "family-members"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/clinic-links": {
+      "get": {
+        "summary": "List reception-approved clinic record links",
+        "operationId": "get__api_v1_patient_app_clinic_links",
+        "tags": [
+          "clinic-links"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Redeem a reception-issued record-link code",
+        "operationId": "post__api_v1_patient_app_clinic_links",
+        "tags": [
+          "clinic-links"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{32}$"
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/booking-holds": {
+      "post": {
+        "summary": "Temporarily reserve a doctor slot",
+        "operationId": "post__api_v1_patient_app_booking_holds",
+        "tags": [
+          "booking-holds"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "symptoms": {
+                    "default": [],
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "visit_type": {
+                    "default": "New",
+                    "type": "string",
+                    "enum": [
+                      "New",
+                      "Follow-up"
+                    ]
+                  },
+                  "upload_ids": {
+                    "default": [],
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "clinic_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "branch_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "doctor_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "appointment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "clinic_id",
+                  "branch_id",
+                  "doctor_id",
+                  "appointment_date",
+                  "appointment_time"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/booking-holds/{id}": {
+      "patch": {
+        "summary": "Update visit information on a live booking hold",
+        "operationId": "patch__api_v1_patient_app_booking_holds__id",
+        "tags": [
+          "booking-holds"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "symptoms": {
+                    "default": [],
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "visit_type": {
+                    "default": "New",
+                    "type": "string",
+                    "enum": [
+                      "New",
+                      "Follow-up"
+                    ]
+                  },
+                  "upload_ids": {
+                    "default": [],
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Release a temporary slot reservation",
+        "operationId": "delete__api_v1_patient_app_booking_holds__id",
+        "tags": [
+          "booking-holds"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/booking-quotes": {
+      "post": {
+        "summary": "Calculate and freeze server-side appointment charges",
+        "operationId": "post__api_v1_patient_app_booking_quotes",
+        "tags": [
+          "booking-quotes"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "hold_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "hold_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments": {
+      "post": {
+        "summary": "Confirm an appointment using a quote and verified payment or clinic payment",
+        "operationId": "post__api_v1_patient_app_appointments",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "quote_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "payment_order_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "pay_at_clinic": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "quote_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "get": {
+        "summary": "List patient appointments by profile and status",
+        "operationId": "get__api_v1_patient_app_appointments",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}": {
+      "get": {
+        "summary": "Get an appointment and its available actions",
+        "operationId": "get__api_v1_patient_app_appointments__id",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/reschedule": {
+      "post": {
+        "summary": "Move an unstarted appointment to another slot with the same doctor",
+        "operationId": "post__api_v1_patient_app_appointments__id_reschedule",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "appointment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "appointment_time": {
+                    "type": "string",
+                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  }
+                },
+                "required": [
+                  "appointment_date",
+                  "appointment_time",
+                  "updated_at"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/cancel": {
+      "post": {
+        "summary": "Cancel an unpaid booking or submit a paid cancellation for clinic review",
+        "operationId": "post__api_v1_patient_app_appointments__id_cancel",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/check-in": {
+      "post": {
+        "summary": "Validate clinic arrival and mark a fully paid patient checked in",
+        "operationId": "post__api_v1_patient_app_appointments__id_check_in",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "clinic_qr": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/queue": {
+      "get": {
+        "summary": "Get a private live queue snapshot",
+        "operationId": "get__api_v1_patient_app_appointments__id_queue",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/events": {
+      "get": {
+        "summary": "Subscribe to authenticated live queue events",
+        "operationId": "get__api_v1_patient_app_appointments__id_events",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/appointments/{id}/pass": {
+      "get": {
+        "summary": "Get a signed appointment pass or download its PDF",
+        "operationId": "get__api_v1_patient_app_appointments__id_pass",
+        "tags": [
+          "appointments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/payment-orders": {
+      "post": {
+        "summary": "Create an online checkout order using the clinic gateway",
+        "operationId": "post__api_v1_patient_app_payment_orders",
+        "tags": [
+          "payment-orders"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "quote_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "quote_id"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/payments/{id}/verify": {
+      "post": {
+        "summary": "Verify a captured checkout and finalize the booking",
+        "operationId": "post__api_v1_patient_app_payments__id_verify",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "payment_id": {
+                    "type": "string",
+                    "pattern": "^pay_[a-z0-9]+$"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "payment_id",
+                  "signature"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/payments/{id}": {
+      "get": {
+        "summary": "Get a patient payment or receipt status",
+        "operationId": "get__api_v1_patient_app_payments__id",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/payments/{id}/sync": {
+      "post": {
+        "summary": "Recover payment status from the gateway if the mobile checkout callback was interrupted",
+        "operationId": "post__api_v1_patient_app_payments__id_sync",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/payments": {
+      "get": {
+        "summary": "List patient receipts and pending online orders",
+        "operationId": "get__api_v1_patient_app_payments",
+        "tags": [
+          "payments"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/uploads": {
+      "post": {
+        "summary": "Upload a private patient file (PDF, JPEG, PNG, WebP; maximum 3 MB)",
+        "operationId": "post__api_v1_patient_app_uploads",
+        "tags": [
+          "uploads"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "filename": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "mime": {
+                    "type": "string",
+                    "enum": [
+                      "application/pdf",
+                      "image/jpeg",
+                      "image/png",
+                      "image/webp"
+                    ]
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 4194304
+                  },
+                  "share_with_clinic": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "filename",
+                  "mime",
+                  "content_base64"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/uploads/{id}/download": {
+      "get": {
+        "summary": "Download an account-owned private upload",
+        "operationId": "get__api_v1_patient_app_uploads__id_download",
+        "tags": [
+          "uploads"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/records": {
+      "post": {
+        "summary": "Add an uploaded document to personal medical records",
+        "operationId": "post__api_v1_patient_app_records",
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "upload_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "record_date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "upload_id",
+                  "title",
+                  "record_date"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "get": {
+        "summary": "List personal uploads and current clinic-released records",
+        "operationId": "get__api_v1_patient_app_records",
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/records/{id}/download": {
+      "get": {
+        "summary": "Download an authorized current record or laboratory report",
+        "operationId": "get__api_v1_patient_app_records__id_download",
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/visits/{id}": {
+      "get": {
+        "summary": "View a current clinic-released consultation summary",
+        "operationId": "get__api_v1_patient_app_visits__id",
+        "tags": [
+          "visits"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/prescriptions/{id}": {
+      "get": {
+        "summary": "View a current clinic-released prescription",
+        "operationId": "get__api_v1_patient_app_prescriptions__id",
+        "tags": [
+          "prescriptions"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/lab-tests": {
+      "get": {
+        "summary": "List patient-bookable tests and branch prices",
+        "operationId": "get__api_v1_patient_app_lab_tests",
+        "tags": [
+          "lab-tests"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/lab-bookings": {
+      "post": {
+        "summary": "Request clinic confirmation for patient-bookable laboratory tests",
+        "operationId": "post__api_v1_patient_app_lab_bookings",
+        "tags": [
+          "lab-bookings"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "clinic_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "branch_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "test_ids": {
+                    "minItems": 1,
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "requested_date": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "profile_id",
+                  "clinic_id",
+                  "branch_id",
+                  "test_ids"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/lab-orders": {
+      "get": {
+        "summary": "List patient laboratory requests and progress",
+        "operationId": "get__api_v1_patient_app_lab_orders",
+        "tags": [
+          "lab-orders"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/lab-orders/{id}": {
+      "get": {
+        "summary": "View an authorized laboratory order and any released report",
+        "operationId": "get__api_v1_patient_app_lab_orders__id",
+        "tags": [
+          "lab-orders"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/home": {
+      "get": {
+        "summary": "Get the selected patient home overview",
+        "operationId": "get__api_v1_patient_app_home",
+        "tags": [
+          "home"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/invoices": {
+      "get": {
+        "summary": "List clinic invoices and OPD appointment bills",
+        "operationId": "get__api_v1_patient_app_invoices",
+        "tags": [
+          "invoices"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/invoices/{id}": {
+      "get": {
+        "summary": "View a patient invoice or appointment bill",
+        "operationId": "get__api_v1_patient_app_invoices__id",
+        "tags": [
+          "invoices"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/invoices/{id}/download": {
+      "get": {
+        "summary": "Download a patient invoice PDF",
+        "operationId": "get__api_v1_patient_app_invoices__id_download",
+        "tags": [
+          "invoices"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/refunds/{id}": {
+      "get": {
+        "summary": "Get the clinic-reviewed cancellation and refund status",
+        "operationId": "get__api_v1_patient_app_refunds__id",
+        "tags": [
+          "refunds"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/notifications": {
+      "get": {
+        "summary": "List the account notification inbox",
+        "operationId": "get__api_v1_patient_app_notifications",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/notifications/{id}": {
+      "patch": {
+        "summary": "Mark an account notification read or unread",
+        "operationId": "patch__api_v1_patient_app_notifications__id",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "read"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/notifications/read-all": {
+      "post": {
+        "summary": "Mark all current notifications as read",
+        "operationId": "post__api_v1_patient_app_notifications_read_all",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/me/preferences": {
+      "get": {
+        "summary": "Get notification and language preferences",
+        "operationId": "get__api_v1_patient_app_me_preferences",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update notification and language preferences",
+        "operationId": "patch__api_v1_patient_app_me_preferences",
+        "tags": [
+          "me"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "hi",
+                      "bn"
+                    ]
+                  },
+                  "push_enabled": {
+                    "type": "boolean"
+                  },
+                  "appointment_reminders": {
+                    "type": "boolean"
+                  },
+                  "queue_alerts": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/devices": {
+      "post": {
+        "summary": "Register this session device for push notifications",
+        "operationId": "post__api_v1_patient_app_devices",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4096
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "android",
+                      "ios"
+                    ]
+                  },
+                  "device_name": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "token",
+                  "platform"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/devices/{id}": {
+      "delete": {
+        "summary": "Remove an account-owned push device registration",
+        "operationId": "delete__api_v1_patient_app_devices__id",
+        "tags": [
+          "devices"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/favorites": {
+      "get": {
+        "summary": "List saved clinics and doctors",
+        "operationId": "get__api_v1_patient_app_favorites",
+        "tags": [
+          "favorites"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/favorites/{kind}/{id}": {
+      "put": {
+        "summary": "Save a public clinic or doctor",
+        "operationId": "put__api_v1_patient_app_favorites__kind__id",
+        "tags": [
+          "favorites"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove an account-owned saved clinic or doctor",
+        "operationId": "delete__api_v1_patient_app_favorites__kind__id",
+        "tags": [
+          "favorites"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/help": {
+      "get": {
+        "summary": "Get patient help topics",
+        "operationId": "get__api_v1_patient_app_help",
+        "tags": [
+          "help"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/support-tickets": {
+      "post": {
+        "summary": "Create a patient support request",
+        "operationId": "post__api_v1_patient_app_support_tickets",
+        "tags": [
+          "support-tickets"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000
+                  },
+                  "profile_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "clinic_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "subject",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      },
+      "get": {
+        "summary": "List account support requests",
+        "operationId": "get__api_v1_patient_app_support_tickets",
+        "tags": [
+          "support-tickets"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/support-tickets/{id}": {
+      "get": {
+        "summary": "Read an account-owned support conversation",
+        "operationId": "get__api_v1_patient_app_support_tickets__id",
+        "tags": [
+          "support-tickets"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/account-deletion-requests": {
+      "post": {
+        "summary": "Request account deletion and immediately revoke mobile sessions",
+        "operationId": "post__api_v1_patient_app_account_deletion_requests",
+        "tags": [
+          "account-deletion-requests"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/patient-app/auth/logout": {
+      "post": {
+        "summary": "Revoke the current patient session",
+        "operationId": "post__api_v1_patient_app_auth_logout",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "PatientBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success; some creation routes return 201 or 202 and deletion routes return 204. See the API guide."
+          },
+          "400": {
+            "description": "Validation failed"
+          },
+          "401": {
+            "description": "Invalid or revoked session/signature"
+          },
+          "403": {
+            "description": "Access is not allowed"
+          },
+          "404": {
+            "description": "Resource unavailable or not owned"
+          },
+          "409": {
+            "description": "Expired hold, stale data, idempotency conflict or workflow restriction"
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          },
+          "503": {
+            "description": "Provider not configured or unavailable"
+          }
+        }
+      }
+    }
+  }
+}

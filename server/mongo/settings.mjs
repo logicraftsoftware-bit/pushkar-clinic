@@ -3,6 +3,8 @@ import {z} from 'zod';
 import {db,transaction} from './database.mjs';
 import {requirePermission,scopeFor,writeAudit} from './access.mjs';
 import {maskSettings,preserveSettingsSecrets} from './settings-secrets.mjs';
+import {patientAppSettingsInput} from './patient-app/settings-schema.mjs';
+import {requireModule} from './subscription-access.mjs';
 export async function operationalSettings(tenantId,session){
   const rows=await db.collection('hospital_settings').find({tenant_id:tenantId,section:{$in:['GeneralSetting','PaymentMethods','PrefixSetting']}},{session}).toArray();
   const section=name=>Object.fromEntries(rows.filter(row=>row.section===name).map(row=>[row.key,row.value]));
@@ -26,6 +28,11 @@ router.put('/settings/:section',requirePermission('settings.manage'),async(reque
   const key=z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,79}$/).refine(value=>!['constructor','prototype','__proto__'].includes(value),'Reserved setting key');
   const section=key.parse(request.params.section);
   const data=z.record(key,z.unknown()).parse(request.body);
+  if(section==='PatientApp'){
+    if(response.locals.account.role!=='hospital_admin')return response.status(403).json({error:'Clinic-wide publishing requires Clinic Admin.'});
+    patientAppSettingsInput.parse(data);
+    if(data.enabled===true)await requireModule(response.locals.account.tenant_id,'patient_portal');
+  }
   if(Object.keys(data).length>100||JSON.stringify(data).length>100000) return response.status(400).json({error:'Settings payload is too large.'});
   if(section==='PrefixSetting')for(const [key,value] of Object.entries(data))data[key]=z.string().regex(/^[A-Za-z0-9_-]{1,20}$/).parse(value);
   if(section==='Security'&&'minimum_password_length' in data)data.minimum_password_length=z.coerce.number().int().min(12).max(200).parse(data.minimum_password_length);

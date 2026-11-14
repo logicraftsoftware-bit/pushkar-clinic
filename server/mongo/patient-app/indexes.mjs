@@ -1,0 +1,90 @@
+export async function initializePatientAppIndexes(db) {
+  const indexes = [
+    ['mobile_accounts', { id: 1 }, { unique: true }],
+    ['mobile_accounts', { phone: 1 }, { unique: true }],
+    ['mobile_profiles', { id: 1 }, { unique: true }],
+    ['mobile_profiles', { account_id: 1, active: 1 }, {}],
+    [
+      'mobile_clinic_links',
+      { account_id: 1, profile_id: 1, tenant_id: 1 },
+      { unique: true },
+    ],
+    [
+      'mobile_clinic_links',
+      { account_id: 1, tenant_id: 1, patient_id: 1 },
+      { unique: true },
+    ],
+    ['mobile_clinic_links', { tenant_id: 1, patient_id: 1, active: 1 }, {}],
+    ['mobile_otps', { id: 1 }, { unique: true }],
+    ['mobile_otps', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    ['mobile_limits', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    ['mobile_otp_cooldowns', { next_at: 1 }, { expireAfterSeconds: 86400 }],
+    ['mobile_sessions', { id: 1 }, { unique: true }],
+    ['mobile_sessions', { refresh_hash: 1 }, { unique: true }],
+    ['mobile_sessions', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    ['mobile_booking_holds', { id: 1 }, { unique: true }],
+    [
+      'mobile_booking_holds',
+      { tenant_id: 1, doctor_id: 1, appointment_date: 1, appointment_time: 1 },
+      { unique: true, partialFilterExpression: { state: 'Active' } },
+    ],
+    ['mobile_booking_holds', { purge_at: 1 }, { expireAfterSeconds: 0 }],
+    ['mobile_booking_quotes', { id: 1 }, { unique: true }],
+    ['mobile_booking_quotes', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    [
+      'mobile_requests',
+      { account_id: 1, operation: 1, key: 1 },
+      { unique: true },
+    ],
+    ['mobile_payment_orders', { id: 1 }, { unique: true }],
+    ['mobile_payment_orders', { account_id: 1, key: 1 }, { unique: true }],
+    ['mobile_payment_orders', { hold_id: 1 }, { unique: true }],
+    [
+      'mobile_payment_orders',
+      { provider_order_id: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { provider_order_id: { $type: 'string' } },
+      },
+    ],
+    [
+      'mobile_payment_orders',
+      { provider_payment_id: 1 },
+      {
+        unique: true,
+        partialFilterExpression: { provider_payment_id: { $type: 'string' } },
+      },
+    ],
+    ['mobile_uploads', { id: 1 }, { unique: true }],
+    ['mobile_records', { id: 1 }, { unique: true }],
+    ['mobile_link_codes', { hash: 1 }, { unique: true }],
+    ['mobile_link_codes', { expires_at: 1 }, { expireAfterSeconds: 0 }],
+    [
+      'mobile_record_releases',
+      { tenant_id: 1, kind: 1, source_id: 1 },
+      { unique: true },
+    ],
+    ['mobile_record_releases', { id: 1 }, { unique: true }],
+    ['mobile_devices', { token_hash: 1 }, { unique: true }],
+    ['mobile_devices', { id: 1 }, { unique: true }],
+    ['mobile_notifications', { dedupe: 1 }, { unique: true }],
+    ['mobile_notifications', { account_id: 1, created_at: -1 }, {}],
+    ['mobile_push_outbox', { notification_id: 1 }, { unique: true }],
+    [
+      'mobile_favorites',
+      { account_id: 1, kind: 1, resource_id: 1 },
+      { unique: true },
+    ],
+    ['mobile_reviews', { appointment_id: 1 }, { unique: true }],
+    ['mobile_lab_bookings', { id: 1 }, { unique: true }],
+    ['mobile_support_tickets', { id: 1 }, { unique: true }],
+    [
+      'mobile_webhook_events',
+      { tenant_id: 1, event_hash: 1 },
+      { unique: true },
+    ],
+    ['mobile_refund_events', { provider_refund_id: 1 }, { unique: true }],
+  ];
+  for (const [collection, keys, options] of indexes)
+    await db.collection(collection).createIndex(keys, options);
+}

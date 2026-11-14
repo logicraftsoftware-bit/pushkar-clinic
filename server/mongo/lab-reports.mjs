@@ -11,7 +11,7 @@ const router=Router(),uuid=z.string().uuid(),failure=message=>Object.assign(new 
 const tokenHash=token=>createHash('sha256').update(token).digest('hex');
 function ready(row){return row?.data?.collected_at&&['Completed','Partially Completed'].includes(row.data.result_status)&&savedPrintableKeys(row.data).length&&!['Cancelled','Rejected','Refunded'].includes(row.status)&&!row.data.cancellation_request_id;}
 function paid(bill){return bill?.status==='Paid'&&Number(bill.due)===0&&Number.isFinite(Number(bill.total))&&Number(bill.paid)>=Number(bill.total);}
-async function releaseRecord(response,id,session){
+export async function releaseRecord(response,id,session){
   const account=response.locals.account,permission=account.role==='receptionist'?'billing.view':'lab.order.view',permissions=await permissionsFor(account,session);
   if(!permissions.includes('*')&&!permissions.includes(permission))throw Object.assign(new Error('Laboratory report access is required.'),{status:403});
   const row=await db.collection('role_work_items').findOne(await scopeFor(response,{id,workspace:'laboratory'},session),{session});

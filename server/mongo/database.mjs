@@ -2,6 +2,7 @@ import { MongoClient } from 'mongodb';
 import { randomUUID } from 'node:crypto';
 import { config } from './config.mjs';
 import { tenantFilter } from './security.mjs';
+import {initializePatientAppIndexes} from './patient-app/indexes.mjs';
 
 export const client = new MongoClient(config.MONGODB_URI, {
   maxPoolSize: 20, minPoolSize: 0, serverSelectionTimeoutMS: 10000,
@@ -145,6 +146,7 @@ export function initializeMongo() {
       ['sessions', { expires_at: 1 }, { expireAfterSeconds: 0 }],
       ['login_limits', { expires_at: 1 }, { expireAfterSeconds: 0 }],
     ]) {stage=`indexes:${collection}`;await db.collection(collection).createIndex(keys, settings);}
+    stage='patient-app-indexes';await initializePatientAppIndexes(db);
     // Product capabilities only; no clinic, account, pricing or patient data.
     stage='system-modules';for (const [code,name] of [['opd','OPD & Appointments'],['ipd','IPD & Bed Management'],['laboratory','Laboratory'],['radiology','Radiology'],['pharmacy','Pharmacy'],['billing','Billing & Finance'],['hr','HR & Payroll'],['patient_portal','Patient Portal']]) {
       await db.collection('platform_modules').updateOne({code},{$setOnInsert:{id:randomUUID(),code,name,is_active:true,created_at:new Date()}},{upsert:true});

@@ -17,9 +17,19 @@ const parsed = z.object({
   GROQ_VISION_MODEL:z.string().min(1).prefault('qwen/qwen3.8-27b'),
   CRM_INTEGRATION_ENABLED:z.enum(['true','false']).prefault('false'),
   CRM_API_BASE_URL:z.string().url().regex(/^https:\/\//).optional(),
+  PATIENT_APP_OTP_MODE:z.enum(['disabled','development','webhook']).prefault('disabled'),
+  PATIENT_APP_SMS_WEBHOOK_URL:z.string().url().regex(/^https:\/\//).optional(),
+  PATIENT_APP_SMS_WEBHOOK_SECRET:z.string().min(32).optional(),
+  PATIENT_APP_PUSH_WEBHOOK_URL:z.string().url().regex(/^https:\/\//).optional(),
+  PATIENT_APP_PUSH_WEBHOOK_SECRET:z.string().min(32).optional(),
   BOOTSTRAP_ADMIN_USERNAME:z.string().trim().min(3).max(100).optional(),
   BOOTSTRAP_ADMIN_PASSWORD:z.string().min(12).max(200).optional(),
   BOOTSTRAP_ADMIN_NAME:z.string().trim().min(2).max(160).prefault('Clinic Owner'),
-}).superRefine((value,context)=>{if(Boolean(value.BOOTSTRAP_ADMIN_USERNAME)!==Boolean(value.BOOTSTRAP_ADMIN_PASSWORD))context.addIssue({code:'custom',path:['BOOTSTRAP_ADMIN_USERNAME'],message:'Both private bootstrap fields are required.'});}).safeParse({ ...process.env, API_PORT: process.env.PORT ?? process.env.API_PORT });
+}).superRefine((value,context)=>{
+  if(Boolean(value.BOOTSTRAP_ADMIN_USERNAME)!==Boolean(value.BOOTSTRAP_ADMIN_PASSWORD))context.addIssue({code:'custom',path:['BOOTSTRAP_ADMIN_USERNAME'],message:'Both private bootstrap fields are required.'});
+  if(value.NODE_ENV==='production'&&value.PATIENT_APP_OTP_MODE==='development')context.addIssue({code:'custom',path:['PATIENT_APP_OTP_MODE'],message:'Development OTPs are prohibited in production.'});
+  if(value.PATIENT_APP_OTP_MODE==='webhook'&&(!value.PATIENT_APP_SMS_WEBHOOK_URL||!value.PATIENT_APP_SMS_WEBHOOK_SECRET))context.addIssue({code:'custom',path:['PATIENT_APP_SMS_WEBHOOK_URL'],message:'Configure the SMS webhook and secret.'});
+  if(Boolean(value.PATIENT_APP_PUSH_WEBHOOK_URL)!==Boolean(value.PATIENT_APP_PUSH_WEBHOOK_SECRET))context.addIssue({code:'custom',path:['PATIENT_APP_PUSH_WEBHOOK_URL'],message:'Configure both push webhook settings.'});
+}).safeParse({ ...process.env, API_PORT: process.env.PORT ?? process.env.API_PORT });
 if (!parsed.success) throw new Error(`Invalid backend environment: ${[...new Set(parsed.error.issues.map(issue => issue.path.join('.')))].join(', ')}`);
 export const config = parsed.data;
