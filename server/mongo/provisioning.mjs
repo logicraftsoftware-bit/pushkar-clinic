@@ -86,6 +86,7 @@ router.get('/hospitals/:id', async (request,response) => {
 });
 router.post('/hospitals', async (request,response) => {
   const body=hospitalInput.extend({password:z.string().min(12).max(200)}).parse(request.body);
+  if(body.status==='trial'&&body.trialDays<1)throw Object.assign(Error('A trial must have at least one day.'),{status:400});
   const password_hash=await hashPassword(body.password);
   const id=randomUUID(),branchId=randomUUID(),userId=randomUUID(),now=new Date();
   const hospital=await transaction(async session=>{

@@ -49,7 +49,7 @@ try{
   pass={...pass,queue:{...queue,status:'LIVE',current:rows[0],next:rows[1]}};
   await heading('Live OPD queue');await screenshot('patient-waiting-mobile');
   pass={...pass,appointment:{...appointment,status:'In Consultation'},queue:{...queue,status:'LIVE',current:{...rows[2],status:'In Consultation',call_id:'synthetic-call-3'}}};
-  await heading('It’s your turn!');await screenshot('patient-your-turn-mobile');
+  await heading('Itâ€™s your turn!');await screenshot('patient-your-turn-mobile');
   pass={...pass,appointment:{...appointment,status:'Completed'}};
   await heading('Consultation completed');await screenshot('patient-completed-mobile');
   await page.setViewportSize({width:1920,height:1080});
@@ -58,7 +58,7 @@ try{
   await page.getByRole('button',{name:'Enable announcements',exact:true}).click();
   await page.getByRole('button',{name:'Sound on',exact:true}).waitFor();
   display={...display,screen:{name:'Reception TV',type:'reception'}};
-  await heading('Live OPD status — all doctors');await screenshot('reception-tv-1920');
+  await heading('Live OPD status â€” all doctors');await screenshot('reception-tv-1920');
   assert.equal(await page.getByRole('button',{name:'Enable announcements',exact:true}).count(),0);
   const staffContext=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
   const branchId='00000000-0000-4000-8000-000000000001',doctorId='00000000-0000-4000-8000-000000000002';
@@ -67,6 +67,7 @@ try{
   await staffContext.route('**/api/v1/**',async route=>{
     const path=new URL(route.request().url()).pathname;let value={};
     if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
+    else if(path.endsWith('/subscription'))value={status:'active',renewal_warning:true,days_remaining:3,expires_at:'2026-11-17T00:00:00Z'};
     else if(path.endsWith('/access-control/me'))value={permissions:['menu.queue.view','menu.dashboard.view','menu.appointments.view','appointment.view','appointment.update'],roles:[],managed_roles:[]};
     else if(path.endsWith('/clinical/lookups'))value={branches:[{id:branchId,name:'Synthetic Branch'}],departments:[],doctors:[{id:doctorId,name:'Dr. Test Clinician',branch_id:branchId,branch_ids:[branchId]}]};
     else if(path.endsWith('/queue/live'))value={queues:[]};
@@ -79,6 +80,7 @@ try{
   const staffPage=await staffContext.newPage();staffPage.on('pageerror',error=>errors.push(error.message));
   await staffPage.goto(origin+'/app/reception/waiting-screens');
   await staffPage.getByRole('heading',{name:'Waiting screen management',exact:true}).waitFor();
+  await staffPage.getByText(/Your clinic subscription ends in 3 days/).waitFor();
   await staffPage.getByRole('button',{name:'Add screen',exact:true}).click();
   await staffPage.getByRole('dialog',{name:'Waiting screen assignment'}).waitFor();
   await staffPage.getByLabel('Screen name',{exact:true}).fill('Reception TV');
@@ -105,6 +107,34 @@ try{
   await staffPage.goto(origin+'/app/reception/live-queue');
   await staffPage.getByRole('heading',{name:'Live doctor queues',exact:true}).waitFor();
   assert.equal(await staffPage.getByText('No records found.',{exact:true}).count(),0);
+  const ownerContext=await browser.newContext({viewport:{width:1440,height:1000}});
+  await ownerContext.addInitScript(()=>sessionStorage.setItem('careframe_superadmin_token','synthetic-owner-token'));
+  let assignment;
+  await ownerContext.route('**/api/v1/**',async route=>{
+    const path=new URL(route.request().url()).pathname;let value={};
+    if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
+    else if(path.endsWith('/admin/plans'))value=[{id:doctorId,name:'Clinic Standard',status:'active',monthly_price:500,yearly_price:5000}];
+    else if(path.endsWith('/admin/hospitals'))value={data:[{id:branchId,name:'Synthetic Clinic'}]};
+    else if(path.endsWith('/admin/subscriptions')){
+      if(route.request().method()==='POST'){assignment=route.request().postDataJSON();value={id:'new'};}
+      else value=[{id:'current',tenant_id:branchId,hospital_name:'Synthetic Clinic',plan_code:'standard',status:'active',starts_at:'2026-11-01',expires_at:'2026-11-17',billing_cycle:'monthly',monthly_amount:500,monthly_value:500,days_remaining:3,is_current:true}];
+    }
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)});
+  });
+  const ownerPage=await ownerContext.newPage();ownerPage.on('pageerror',error=>errors.push(error.message));
+  await ownerPage.goto(origin+'/superadmin/subscriptions');
+  await ownerPage.getByRole('heading',{name:'Subscriptions',exact:true}).waitFor();
+  await ownerPage.getByText('Renew in 3 days',{exact:true}).waitFor();
+  await ownerPage.getByRole('button',{name:'Assign / renew subscription',exact:true}).click();
+  await ownerPage.getByLabel('Clinic',{exact:true}).selectOption(branchId);
+  await ownerPage.getByLabel('Active plan',{exact:true}).selectOption(doctorId);
+  await ownerPage.getByLabel('Agreed price per cycle (?)',{exact:true}).fill('500');
+  await ownerPage.getByLabel('Approval / renewal reference',{exact:true}).fill('Synthetic approval');
+  await ownerPage.getByRole('button',{name:'Save manual subscription',exact:true}).click();
+  await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});
+  assert.equal(assignment.tenantId,branchId);assert.equal(assignment.mode,'renew');assert.equal(assignment.amount,500);
+  await ownerPage.screenshot({path:'artifacts/queue-ui/subscription-management.png',fullPage:true});
+  await ownerContext.close();
   await staffContext.close();
   assert.deepEqual(errors,[],'Browser runtime errors');
   console.log('PASS: patient states, live streams, TV/audio controls and signed-in reception screen registration.');

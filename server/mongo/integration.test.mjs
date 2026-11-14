@@ -233,7 +233,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     await db.collection('clinical_appointments').replaceOne({id:initial.id},initial);
     await db.collection('opd_queue_sessions').deleteMany({tenant_id:hospital.data.id});
   });
-  await t.test('different doctor and patient passes cannot receive each otherâ€™s queue',async()=>{
+  await t.test('different doctor and patient passes cannot receive each otherÃ¢â‚¬â„¢s queue',async()=>{
     const auth=staffLogin.data.token,tenant_id=hospital.data.id;
     const original=await db.collection('clinical_appointments').findOne({id:appointment.id});
     const originalUser=await db.collection('users').findOne({id:doctor.user_id}),originalStaff=await db.collection('staff_members').findOne({id:doctor.id});
@@ -843,7 +843,7 @@ test('manual subscriptions enforce expiry, all-device logout, renewal history an
   const tenant=clinic.data.id;
   await db.collection('users').updateMany({tenant_id:tenant},{$set:{force_password_change:false}});
   const signin=async()=>request('/auth/login','POST',{identifier:body.adminEmail,password,portal:'hospital_admin'});
-  const first=await signin(),second=await signin();assert.equal(first.status,200);assert.equal(second.status,200);
+  let first=await signin(),second=await signin();assert.equal(first.status,200);assert.equal(second.status,200);
   await t.test('API module guard applies even to clinic administrators',async()=>{
     const result=await request('/queue/live','GET',null,first.data.token);assert.equal(result.status,403);assert.equal(result.data.code,'MODULE_NOT_INCLUDED');
   });
@@ -863,6 +863,7 @@ test('manual subscriptions enforce expiry, all-device logout, renewal history an
     assert.deepEqual((await db.collection('subscriptions').findOne({id:before.id})).expires_at,before.expires_at);
   });
   await t.test('expiry rejects old tokens, removes every device session and denies new login',async()=>{
+    first=await signin();second=await signin();assert.equal(first.status,200);assert.equal(second.status,200);
     await db.collection('subscriptions').updateMany({tenant_id:tenant,status:'active'},{$set:{expires_at:new Date(Date.now()-1)}});
     const result=await request('/access-control/me','GET',null,first.data.token);assert.equal(result.status,401);assert.equal(result.data.code,'SUBSCRIPTION_INACTIVE');
     assert.equal(await db.collection('sessions').countDocuments({tenant_id:tenant}),0);
