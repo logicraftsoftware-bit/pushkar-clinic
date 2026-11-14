@@ -63,3 +63,5 @@
 @media(max-width:700px){.app .donut-wrap{flex-direction:column}.app .donut-wrap .department-list{width:100%}}
 
 .sa-app aside nav a,.sa-mobile-footer a{text-decoration:none;font:inherit;cursor:pointer}
+
+.subscription-form{padding:24px;margin:0 0 24px;max-width:none}.subscription-form>p{color:#617087;line-height:1.6;margin:10px 0 22px;max-width:850px}.subscription-form .form-grid>label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600;color:#455168}.subscription-form .form-grid{margin-bottom:24px}.subscription-form textarea{min-height:84px}.subscription-form>.sa-secondary{margin-left:12px}

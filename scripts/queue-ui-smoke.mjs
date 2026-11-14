@@ -130,6 +130,7 @@ try{
   await ownerPage.getByLabel('Active plan',{exact:true}).selectOption(doctorId);
   await ownerPage.getByLabel(/Agreed price per cycle/).fill('500');
   await ownerPage.getByLabel('Approval / renewal reference',{exact:true}).fill('Synthetic approval');
+  await ownerPage.screenshot({path:'artifacts/queue-ui/subscription-renewal-form.png',fullPage:true});
   await ownerPage.getByRole('button',{name:'Save manual subscription',exact:true}).click();
   await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});
   assert.equal(assignment.tenantId,branchId);assert.equal(assignment.mode,'renew');assert.equal(assignment.amount,500);
