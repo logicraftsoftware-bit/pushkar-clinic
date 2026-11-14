@@ -1,3 +1,4 @@
+import {currentSubscriptions} from './subscription-access.mjs';
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -26,10 +27,11 @@ router.get('/modules', async (_request,response) => {
   response.json(rows);
 });
 router.get('/plans', async (_request,response) => {
+  const subscriptions=await currentSubscriptions();
   const plans = await db.collection('subscription_plans').find({archived:{$ne:true}}, { projection:{_id:0} }).sort({created_at:-1}).toArray();
   for (const plan of plans) {
     plan.modules = await db.collection('platform_modules').find({id:{$in:plan.module_ids ?? []}}, {projection:{_id:0}}).toArray();
-    plan.hospital_count = await db.collection('subscriptions').countDocuments({plan_id:plan.id,status:{$in:['active','trial']}});
+    plan.hospital_count = subscriptions.filter(row=>row.plan_id===plan.id&&['active','trial'].includes(row.status)).length;
   }
   response.json(plans);
 });
