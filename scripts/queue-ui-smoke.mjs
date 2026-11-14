@@ -49,7 +49,7 @@ try{
   pass={...pass,queue:{...queue,status:'LIVE',current:rows[0],next:rows[1]}};
   await heading('Live OPD queue');await screenshot('patient-waiting-mobile');
   pass={...pass,appointment:{...appointment,status:'In Consultation'},queue:{...queue,status:'LIVE',current:{...rows[2],status:'In Consultation',call_id:'synthetic-call-3'}}};
-  await heading('Itâ€™s your turn!');await screenshot('patient-your-turn-mobile');
+  await heading('It’s your turn!');await screenshot('patient-your-turn-mobile');
   pass={...pass,appointment:{...appointment,status:'Completed'}};
   await heading('Consultation completed');await screenshot('patient-completed-mobile');
   await page.setViewportSize({width:1920,height:1080});
@@ -58,7 +58,7 @@ try{
   await page.getByRole('button',{name:'Enable announcements',exact:true}).click();
   await page.getByRole('button',{name:'Sound on',exact:true}).waitFor();
   display={...display,screen:{name:'Reception TV',type:'reception'}};
-  await heading('Live OPD status â€” all doctors');await screenshot('reception-tv-1920');
+  await heading('Live OPD status — all doctors');await screenshot('reception-tv-1920');
   assert.equal(await page.getByRole('button',{name:'Enable announcements',exact:true}).count(),0);
   const staffContext=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});
   const branchId='00000000-0000-4000-8000-000000000001',doctorId='00000000-0000-4000-8000-000000000002';
@@ -128,7 +128,7 @@ try{
   await ownerPage.getByRole('button',{name:'Assign / renew subscription',exact:true}).click();
   await ownerPage.getByLabel('Clinic',{exact:true}).selectOption(branchId);
   await ownerPage.getByLabel('Active plan',{exact:true}).selectOption(doctorId);
-  await ownerPage.getByLabel('Agreed price per cycle (?)',{exact:true}).fill('500');
+  await ownerPage.getByLabel(/Agreed price per cycle/).fill('500');
   await ownerPage.getByLabel('Approval / renewal reference',{exact:true}).fill('Synthetic approval');
   await ownerPage.getByRole('button',{name:'Save manual subscription',exact:true}).click();
   await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});

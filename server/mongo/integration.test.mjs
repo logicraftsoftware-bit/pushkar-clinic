@@ -233,7 +233,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     await db.collection('clinical_appointments').replaceOne({id:initial.id},initial);
     await db.collection('opd_queue_sessions').deleteMany({tenant_id:hospital.data.id});
   });
-  await t.test('different doctor and patient passes cannot receive each otherÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢s queue',async()=>{
+  await t.test('different doctor and patient passes cannot receive each other’s queue',async()=>{
     const auth=staffLogin.data.token,tenant_id=hospital.data.id;
     const original=await db.collection('clinical_appointments').findOne({id:appointment.id});
     const originalUser=await db.collection('users').findOne({id:doctor.user_id}),originalStaff=await db.collection('staff_members').findOne({id:doctor.id});

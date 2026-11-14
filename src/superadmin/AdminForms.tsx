@@ -57,14 +57,14 @@ export function PlanForm({ editId, onBack, onSaved }: { editId?: string; onBack:
       onSaved()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save plan') } finally { setSaving(false) }
   }
-  if (editId && !plan) return <div className="sa-loading"><LoaderCircle className="spin" />Loading subscription planâ€¦</div>
+  if (editId && !plan) return <div className="sa-loading"><LoaderCircle className="spin" />Loading subscription plan…</div>
   return <form className="entity-form" onSubmit={submit}><FormHeader title={editId ? 'Edit subscription plan' : 'Create subscription plan'} text="Define commercial limits, included capabilities and availability." onBack={onBack} />
     <Section icon={CreditCard} title="Plan information" text="Name, pricing and customer-facing details.">
       <Field label="Plan name" required><input name="name" required defaultValue={plan?.name} placeholder="Professional" /></Field>
       <Field label="Plan code" required><input name="code" required defaultValue={plan?.code} placeholder="professional" /></Field>
-      <Field label="Description" wide><textarea name="description" rows={3} defaultValue={plan?.description} placeholder="Describe who this plan is designed forâ€¦" /></Field>
-      <Field label="Monthly price (â‚¹)" required><input name="monthlyPrice" required type="number" min="0" step=".01" defaultValue={plan?.monthly_price ?? 0} /></Field>
-      <Field label="Yearly price (â‚¹)" required><input name="yearlyPrice" required type="number" min="0" step=".01" defaultValue={plan?.yearly_price ?? 0} /></Field>
+      <Field label="Description" wide><textarea name="description" rows={3} defaultValue={plan?.description} placeholder="Describe who this plan is designed for…" /></Field>
+      <Field label="Monthly price (₹)" required><input name="monthlyPrice" required type="number" min="0" step=".01" defaultValue={plan?.monthly_price ?? 0} /></Field>
+      <Field label="Yearly price (₹)" required><input name="yearlyPrice" required type="number" min="0" step=".01" defaultValue={plan?.yearly_price ?? 0} /></Field>
       <Field label="Trial days" required><input name="trialDays" required type="number" min="0" defaultValue={plan?.trial_days ?? 14} /></Field>
       <Field label="Plan status" required><select name="status" defaultValue={plan?.status ?? 'active'}><option value="active">Active</option><option value="inactive">Inactive</option></select></Field>
     </Section>
@@ -113,7 +113,7 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       onSaved()
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save clinic') } finally { setSaving(false) }
   }
-  if (editId && !hospital) return <div className="sa-loading"><LoaderCircle className="spin" />Loading clinicâ€¦</div>
+  if (editId && !hospital) return <div className="sa-loading"><LoaderCircle className="spin" />Loading clinic…</div>
   const date = hospital?.subscription_start_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)
   return <form className="entity-form" onSubmit={submit}><FormHeader title={editId ? 'Edit clinic' : 'Create clinic'} text="Provision the tenant profile, subscription, main branch and administrator." onBack={onBack} />
     <Section icon={Building2} title="Clinic identity" text="Core registration and contact information.">
@@ -136,7 +136,7 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       <Field label="Main branch name" wide required><input name="branchName" required defaultValue={hospital?.branch_name} /></Field>
     </Section>
     <Section icon={CreditCard} title="Subscription" text="Assign commercial terms and initial tenant status.">
-      <p>{editId?'Subscription changes are managed separately under Subscriptions.':'Select the starting subscription for this clinic.'}</p>{editId?<p>Current plan: {plans.find(p=>p.id===hospital?.plan_id)?.name??'Assigned plan'} ? {hospital?.billing_cycle}. Open Subscriptions to renew or replace.</p>:<><Field label="Subscription plan" required><select name="planId" required defaultValue={hospital?.plan_id ?? ''}><option value="" disabled>Select a plan</option>{plans.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></Field>
+      <p>{editId?'Subscription changes are managed separately under Subscriptions.':'Select the starting subscription for this clinic.'}</p>{editId?<p>Current plan: {plans.find(p=>p.id===hospital?.plan_id)?.name??'Assigned plan'} | {hospital?.billing_cycle}. Open Subscriptions to renew or replace.</p>:<><Field label="Subscription plan" required><select name="planId" required defaultValue={hospital?.plan_id ?? ''}><option value="" disabled>Select a plan</option>{plans.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></Field>
       <Field label="Subscription start date" required><input name="subscriptionStartDate" type="date" required defaultValue={date} /></Field>
       <Field label="Billing cycle" required><select name="billingCycle" defaultValue={hospital?.billing_cycle ?? 'monthly'}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></Field>
       <Field label="Trial days" required><input name="trialDays" type="number" min="0" required defaultValue={hospital?.trial_days ?? 14} /></Field>

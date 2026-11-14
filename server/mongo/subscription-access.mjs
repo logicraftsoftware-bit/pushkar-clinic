@@ -47,6 +47,7 @@ export async function revokeExpiredSubscriptions(){
   for(const row of await currentSubscriptions())if(!['active','trial'].includes(row.status))await db.collection('sessions').deleteMany({tenant_id:row.tenant_id});
 }
 export function moduleForPermission(code){
+  if(code.startsWith('menu.'))return {appointments:'opd',queue:'opd',consultation:'opd',diagnosis:'opd',prescriptions:'opd','voice-documentation':'opd',ipd:'ipd','lab-orders':'laboratory',samples:'laboratory',results:'laboratory',verification:'laboratory',devices:'laboratory',pos:'pharmacy',batches:'pharmacy',forecasting:'pharmacy',billing:'billing',hr:'hr'}[code.split('.')[1]];
   const prefix=code.split('.')[0];
   return {appointment:'opd',opd:'opd',prescription:'opd',ipd:'ipd',lab:'laboratory',radiology:'radiology',pharmacy:'pharmacy',billing:'billing',insurance:'billing',hr:'hr'}[prefix];
 }

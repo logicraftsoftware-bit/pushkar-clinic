@@ -17,6 +17,7 @@ router.post('/subscriptions',async(request,response)=>{
   const body=z.object({requestId:uuid.optional(),tenantId:uuid,planId:uuid,billingCycle:z.enum(['monthly','yearly','trial']),months:z.coerce.number().int().min(1).max(60).prefault(1),trialDays:z.coerce.number().int().min(1).max(365).prefault(14),amount:z.coerce.number().finite().nonnegative().max(99999999).multipleOf(.01),note:z.string().trim().min(3).max(1000),mode:z.enum(['renew','replace']).prefault('renew')}).parse(request.body);
   const row=await transaction(async session=>{
     await db.collection('workflow_locks').updateOne({_id:`${body.tenantId}:subscription`},{$inc:{version:1}},{session,upsert:true});
+    await db.collection('workflow_locks').updateOne({_id:`${body.tenantId}:subscription-capacity`},{$inc:{version:1}},{session,upsert:true});
     if(body.requestId){const saved=await db.collection('subscriptions').findOne({tenant_id:body.tenantId,request_id:body.requestId},{session});if(saved)return subscriptionSummary(saved);}
     const hospital=await db.collection('hospitals').findOne({id:body.tenantId,deleted_at:null},{session}),plan=await db.collection('subscription_plans').findOne({id:body.planId,status:'active',archived:{$ne:true}},{session});
     if(!hospital||!plan)throw fail('Select an existing clinic and active plan.');
@@ -25,7 +26,7 @@ router.post('/subscriptions',async(request,response)=>{
     if(body.mode==='renew'&&live&&previous.billing_cycle!==body.billingCycle)throw fail('Use Replace now to change the billing cycle.');
     // Capacity decreases are rejected, rather than disabling existing users or deleting data.
     for(const [collection,limit,filter] of [['branches',plan.max_branches,{}],['users',plan.max_users,{}],['staff_members',plan.max_doctors,{staff_type:'Doctor'}]]){
-      if(await db.collection(collection).countDocuments({tenant_id:hospital.id,deleted_at:null,...filter},{session})>limit)throw fail('This plan is below the clinicÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s existing branch, user or doctor count. Choose a larger plan.');
+      if(await db.collection(collection).countDocuments({tenant_id:hospital.id,deleted_at:null,...filter},{session})>limit)throw fail('This plan is below the clinic’s existing branch, user or doctor count. Choose a larger plan.');
     }
     if(body.billingCycle==='trial'&&body.amount!==0)throw fail('Trial subscriptions must have a zero contract price.');
     const doctorUsers=await db.collection('users').find({tenant_id:hospital.id,deleted_at:null,role:'doctor'},{session,projection:{id:1}}).toArray(),doctorStaff=await db.collection('staff_members').find({tenant_id:hospital.id,deleted_at:null,staff_type:'Doctor'},{session,projection:{id:1,user_id:1}}).toArray();
