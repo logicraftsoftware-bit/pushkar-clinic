@@ -1,3 +1,4 @@
+import {subscriptionAccess} from './subscription-access.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
@@ -120,6 +121,7 @@ async function passSnapshot(token){
   const row=await db.collection('clinical_appointments').findOne({public_pass_hash:secretHash(token),public_pass_revoked:{$ne:true},public_pass_expires_at:{$gt:new Date()}});
   if(!row)throw failure('This appointment link is invalid or has expired.',404);
   const [patient,clinic]=await Promise.all([db.collection('patients').findOne({tenant_id:row.tenant_id,id:row.patient_id,deleted_at:null}),db.collection('hospitals').findOne({id:row.tenant_id,deleted_at:null})]);
+  await subscriptionAccess(row.tenant_id);
   if(!patient||!clinic)throw failure('This appointment is unavailable.',404);
   const staff=await db.collection('staff_members').findOne({tenant_id:row.tenant_id,user_id:row.doctor_id});
   const snapshot=await queueSnapshot({tenant_id:row.tenant_id,branch_id:row.branch_id,doctor_id:row.doctor_id,date:row.appointment_date});
@@ -133,6 +135,7 @@ async function displaySnapshot(token){
   if(!validToken(token))throw failure('This screen link is invalid or disabled.',404);
   const hash=secretHash(token),screen=await db.collection('waiting_screens').findOne({$or:[{token_hash:hash},{share_link_hash:hash}],enabled:true});
   if(!screen)throw failure('This screen link is invalid or disabled.',404);
+  await subscriptionAccess(screen.tenant_id);
   if(!screen.last_seen_at||Date.now()-new Date(screen.last_seen_at).getTime()>20000)await db.collection('waiting_screens').updateOne({id:screen.id,enabled:true},{$set:{last_seen_at:new Date()}});
   const clinic=await db.collection('hospitals').findOne({id:screen.tenant_id,deleted_at:null});if(!clinic)throw failure('Clinic unavailable.',404);
   const date=hospitalDay(),filter={tenant_id:screen.tenant_id,branch_id:screen.branch_id,appointment_date:date,...(screen.doctor_id?{doctor_id:screen.doctor_id}:{}),...(screen.department_id?{department_id:screen.department_id}:{})};

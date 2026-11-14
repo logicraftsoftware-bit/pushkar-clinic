@@ -1,3 +1,4 @@
+import {currentSubscriptions} from './subscription-access.mjs';
 import {Router} from 'express';
 import {platformSettingsWithDefaults} from './platform-settings.mjs';
 import {z} from 'zod';
@@ -5,7 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {db,transaction} from './database.mjs';
 import {hashPassword,publicRecord} from './security.mjs';
 import {hospitalInput} from './provisioning-schema.mjs';
-import {subscriptionEnd,calendarMonthsEnd} from './subscription-date.mjs';
+import {subscriptionSummary} from './subscription-policy.mjs';
 const router=Router(),uuid=z.string().uuid();
 const failure=(message,status=400)=>Object.assign(new Error(message),{status});
 async function audit(response,action,tenant,session){
@@ -13,31 +14,12 @@ async function audit(response,action,tenant,session){
 }
 router.get('/dashboard',async(_request,response)=>{
   const hospitals=await db.collection('hospitals').find({deleted_at:null},{projection:{status:1}}).toArray();
-  const subscriptions=await db.collection('subscriptions').find({}).toArray(),now=Date.now();
+  const subscriptions=await currentSubscriptions(),now=Date.now();
   const counts={total:hospitals.length,active:0,trial:0,suspended:0};for(const row of hospitals)if(row.status in counts)counts[row.status]++;
   const growth=await db.collection('hospitals').aggregate([{$match:{deleted_at:null,created_at:{$gte:new Date(now-183*86400000)}}},{$group:{_id:{$dateToString:{date:'$created_at',format:'%Y-%m',timezone:'Asia/Kolkata'}},total:{$sum:1}}},{$sort:{_id:1}},{$project:{_id:0,month:'$_id',total:1}}]).toArray();
-  const plans=await db.collection('subscriptions').aggregate([{$group:{_id:'$plan_code',value:{$sum:1}}},{$project:{_id:0,name:'$_id',value:1}}]).toArray();
-  response.json({hospitals:counts,subscriptions:{active:subscriptions.filter(row=>row.status==='active').length,expiring:subscriptions.filter(row=>new Date(row.expires_at).getTime()>=now&&new Date(row.expires_at).getTime()<=now+30*86400000).length,monthly_revenue:subscriptions.filter(row=>row.status==='active').reduce((sum,row)=>sum+Number(row.monthly_amount??0),0)},
+  const plans=Object.entries(subscriptions.filter(r=>['active','trial'].includes(r.status)).reduce((result,row)=>({...result,[row.plan_code]:(result[row.plan_code]??0)+1}),{})).map(([name,value])=>({name,value}));
+  response.json({hospitals:counts,subscriptions:{active:subscriptions.filter(row=>row.status==='active').length,expiring:subscriptions.filter(row=>new Date(row.expires_at).getTime()>=now&&new Date(row.expires_at).getTime()<=now+30*86400000).length,monthly_revenue:subscriptions.filter(row=>row.status==='active').reduce((sum,row)=>sum+Number(row.monthly_value??0),0)},
     users:{total:await db.collection('users').countDocuments({})},modules:{active:await db.collection('platform_modules').countDocuments({is_active:true})},growth,planDistribution:plans,activity:await db.collection('platform_events').find({},{projection:{_id:0}}).sort({created_at:-1}).limit(8).toArray(),generatedAt:new Date().toISOString()});
-});
-router.get('/subscriptions',async(_request,response)=>{
-  const rows=await db.collection('subscriptions').find({},{projection:{_id:0}}).sort({expires_at:1}).toArray();
-  for(const row of rows)row.hospital_name=(await db.collection('hospitals').findOne({id:row.tenant_id}))?.name??'';
-  response.json(rows);
-});
-router.post('/subscriptions',async(request,response)=>{
-  const body=z.object({tenantId:uuid,planCode:z.string().min(2).max(40),monthlyAmount:z.coerce.number().finite().nonnegative().max(99999999.99).multipleOf(0.01),months:z.coerce.number().int().min(1).max(60)}).parse(request.body);
-  const row=await transaction(async session=>{
-    const hospital=await db.collection('hospitals').findOne({id:body.tenantId,deleted_at:null},{session}),plan=await db.collection('subscription_plans').findOne({code:body.planCode.toLowerCase(),status:'active'},{session});
-    if(!hospital||!plan)throw failure('Select an existing clinic and active plan.');
-    const starts_at=new Date(),expires_at=calendarMonthsEnd(starts_at.toISOString().slice(0,10),body.months);
-    expires_at.setUTCHours(starts_at.getUTCHours(),starts_at.getUTCMinutes(),starts_at.getUTCSeconds(),starts_at.getUTCMilliseconds());
-    const record={id:randomUUID(),tenant_id:hospital.id,plan_id:plan.id,plan_code:plan.code,status:'active',starts_at,expires_at,monthly_amount:body.monthlyAmount,billing_cycle:'monthly',created_at:starts_at};
-    await db.collection('subscriptions').insertOne({...record},{session});
-    const modules=await db.collection('platform_modules').find({id:{$in:plan.module_ids??[]},is_active:true},{session}).toArray();
-    await db.collection('hospitals').updateOne({id:hospital.id},{$set:{status:'active',modules:modules.map(row=>row.code),updated_at:new Date()}},{session});
-    await audit(response,'subscription_created',hospital.id,session);return record;
-  });response.status(201).json(row);
 });
 router.put('/hospitals/:id',async(request,response)=>{
   const body=hospitalInput.parse(request.body),tenant=uuid.parse(request.params.id);
@@ -57,7 +39,7 @@ router.put('/hospitals/:id',async(request,response)=>{
       await db.collection('sessions').deleteMany({user_id:administrator.id},{session});
     }
     const subscription=await db.collection('subscriptions').findOne({tenant_id:tenant},{session,sort:{created_at:-1}});
-    if(subscription)await db.collection('subscriptions').updateOne({id:subscription.id,tenant_id:tenant},{$set:{plan_id:plan.id,plan_code:plan.code,starts_at:new Date(body.subscriptionStartDate+'T00:00:00Z'),expires_at:subscriptionEnd(body.subscriptionStartDate,body.billingCycle),monthly_amount:body.billingCycle==='monthly'?plan.monthly_price:plan.yearly_price,billing_cycle:body.billingCycle,trial_days:body.trialDays,updated_at:now}},{session});
+    // Commercial terms are changed only by the audited subscription endpoints.
     if(!['active','trial'].includes(body.status))await db.collection('sessions').deleteMany({tenant_id:tenant},{session});
     await audit(response,'hospital_updated',tenant,session);return {id:tenant};
   });response.json(result);
@@ -105,9 +87,9 @@ router.get('/monitoring',async(_request,response)=>{
 });
 router.get('/reports',async(_request,response)=>{
   const registrations=await db.collection('hospitals').aggregate([{$group:{_id:{$dateToString:{date:'$created_at',format:'%Y-%m',timezone:'Asia/Kolkata'}},hospitals:{$sum:1}}},{$sort:{_id:1}},{$project:{_id:0,period:'$_id',hospitals:1}}]).toArray();
-  const revenue=await db.collection('subscriptions').aggregate([{$group:{_id:{$dateToString:{date:'$starts_at',format:'%Y-%m',timezone:'Asia/Kolkata'}},revenue:{$sum:'$monthly_amount'}}},{$sort:{_id:1}},{$project:{_id:0,period:'$_id',revenue:1}}]).toArray();
+  const current=await currentSubscriptions(),revenue=[{period:new Date().toISOString().slice(0,7),revenue:current.reduce((sum,row)=>sum+row.monthly_value,0)}];
   const statuses=await db.collection('hospitals').aggregate([{$match:{deleted_at:null}},{$group:{_id:'$status',total:{$sum:1}}},{$project:{_id:0,status:'$_id',total:1}}]).toArray();
-  const expiring=await db.collection('subscriptions').find({expires_at:{$gte:new Date(),$lte:new Date(Date.now()+60*86400000)}},{projection:{_id:0}}).toArray();
+  const expiring=current.filter(row=>['active','trial'].includes(row.status)&&row.days_remaining<=60);
   for(const row of expiring){row.hospital=(await db.collection('hospitals').findOne({id:row.tenant_id}))?.name??'';row.days_remaining=Math.floor((new Date(row.expires_at).getTime()-Date.now())/86400000);}
   response.json({registrations,revenue,statuses,expiring});
 });

@@ -1,3 +1,4 @@
+import {requireModule,moduleForPermission} from './subscription-access.mjs';
 import { db } from './database.mjs';
 import { permissionTemplates } from './permission-templates.mjs';
 import { randomUUID } from 'node:crypto';
@@ -17,6 +18,7 @@ export async function hasActiveRole(account,session) {
 }
 export function requirePermission(code) {
   return async (_request,response,next)=>{
+    const module=moduleForPermission(code);if(module)await requireModule(response.locals.account.tenant_id,module);
     const permissions=await permissionsFor(response.locals.account);
     if(!permissions.includes('*')&&!permissions.includes(code))return response.status(403).json({error:`Permission required: ${code}`});
     next();

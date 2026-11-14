@@ -9,6 +9,8 @@ import { config } from './config.mjs';
 import { db, initializeMongo, transaction } from './database.mjs';
 import { activeAccount, hashPassword, verifyPassword, authorizedPortal } from './security.mjs';
 import provisioning from './provisioning.mjs';
+import subscriptionAdmin from './subscription-admin.mjs';
+import {subscriptionAccess,requireModule,moduleForRoute,revokeExpiredSubscriptions} from './subscription-access.mjs';
 import patients from './patients.mjs';
 import management from './management.mjs';
 import clinical from './clinical.mjs';
@@ -50,6 +52,7 @@ import referrals from './referrals.mjs';
 import selfRegistration,{registrationLinks} from './self-registration.mjs';
 import { hasActiveRole } from './access.mjs';
 
+const expirySweep=setInterval(()=>{void initializeMongo().then(revokeExpiredSubscriptions).catch(()=>{});},60000);expirySweep.unref();
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy',config.TRUST_PROXY_HOPS);
@@ -110,9 +113,11 @@ function authenticate(audience) {
       const branch = await db.collection('branches').findOne({ id: account.branch_id, tenant_id: account.tenant_id, is_active: true });
       if (!branch) return response.status(401).json({ error: 'Branch access revoked.' });
       const hospital = await db.collection('hospitals').findOne({ id: account.tenant_id });
+      await subscriptionAccess(account.tenant_id);
       if (!activeAccount(account, hospital)) return response.status(401).json({ error: 'Account access revoked.' });
       if (account.force_password_change && !['/api/v1/auth/change-password','/api/v1/auth/logout'].includes(request.path)) return response.status(403).json({ code: 'PASSWORD_CHANGE_REQUIRED', error: 'Change your temporary password before continuing.' });
     }
+    if(!admin){const module=moduleForRoute(request.originalUrl.split('?')[0]);if(module&&module!=='ai')await requireModule(account.tenant_id,module);}
     response.locals.account = account;
     response.locals.claims = claims;
     next();
@@ -155,6 +160,7 @@ app.post('/api/v1/auth/login', rateLimit, async (request, response) => {
   const branch = account ? await db.collection('branches').findOne({ id: account.branch_id, tenant_id: account.tenant_id, is_active: true }) : null;
   const portal = authorizedPortal(account, body.portal);
   if (!account || !branch || !activeAccount(account, hospital) || !portal || !await hasActiveRole(account) || !await verifyPassword(body.password, account.password_hash)) return response.status(401).json({ error: 'Invalid login details, role, or hospital access.' });
+  await subscriptionAccess(account.tenant_id);
   const token = await issueSession(account, 'careframe-portal', { tenantId: account.tenant_id, branchId: account.branch_id, role: account.role, portal });
   const activityId = randomUUID();
   await db.collection('login_activity').insertOne({ id: activityId, tenant_id: account.tenant_id, user_id: account.id, role: account.role, branch_id: account.branch_id, login_status: 'Success', login_time: new Date() });
@@ -189,8 +195,9 @@ app.post('/api/v1/admin/auth/logout', authenticate('careframe-superadmin'), asyn
   response.status(204).end();
 });
 app.use('/api/v1/public',publicQueueRouter);
+app.get('/api/v1/subscription',authenticate('careframe-portal'),async(_request,response)=>{const row=await subscriptionAccess(response.locals.account.tenant_id);response.json({status:row.status,expires_at:row.expires_at,days_remaining:row.days_remaining,renewal_warning:row.renewal_warning,plan_code:row.plan_code});});
 app.use('/api/v1/queue',authenticate('careframe-portal'),queueRouter);
-app.use('/api/v1/admin', authenticate('careframe-superadmin'), provisioning,platform,crmAdmin);
+app.use('/api/v1/admin', authenticate('careframe-superadmin'), subscriptionAdmin,provisioning,platform,crmAdmin);
 app.use('/api/v1/crm-sync',crm);
 app.use('/api/v1/ai-assistant',authenticate('careframe-portal'),aiAssistant);
 app.use('/api/v1/access-control',authenticate(['careframe-portal','careframe-broker']),accessControl);

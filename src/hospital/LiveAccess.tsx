@@ -3,6 +3,7 @@ type Access={ready:boolean;permissions:Set<string>|null;roles:Array<{id:string;n
 const Context=createContext<Access>({ready:true,permissions:null,roles:[],managedRoles:[],error:''});
 export const useLiveAccess=()=>useContext(Context);
 export function LiveAccessProvider({token,children}:{token?:string;children:ReactNode}){
+  const [subscription,setSubscription]=useState<{renewal_warning:boolean;days_remaining:number;expires_at:string;status:string}|null>(null);
   const [access,setAccess]=useState<Access>({ready:!token,permissions:token?new Set():null,roles:[],managedRoles:[],error:''});
   useEffect(()=>{
     if(!token)return;
@@ -15,6 +16,8 @@ export function LiveAccessProvider({token,children}:{token?:string;children:Reac
         const response=await fetch(`${base}/api/v1/access-control/me`,{headers:{Authorization:`Bearer ${token}`},signal:controller.signal});
         const data=await response.json();
         if(!response.ok){if(data.code==='PASSWORD_CHANGE_REQUIRED')window.dispatchEvent(new Event('password-change-required'));if(response.status===401)window.dispatchEvent(new CustomEvent('session-invalid',{detail:data.error}));throw Error(data.error||'Unable to check your current access.');}
+        const subscriptionResponse=await fetch(`${base}/api/v1/subscription`,{headers:{Authorization:`Bearer ${token}`},signal:controller.signal});
+        if(subscriptionResponse.ok&&!stopped)setSubscription(await subscriptionResponse.json());
         if(!stopped)setAccess(old=>{const codes=[...data.permissions].sort(),names=data.roles??[],managedRoles=data.managed_roles??[];if(old.ready&&[...old.permissions??[]].sort().join('|')===codes.join('|')&&JSON.stringify(old.roles)===JSON.stringify(names)&&JSON.stringify(old.managedRoles)===JSON.stringify(managedRoles)&&!old.error)return old;return{ready:true,permissions:new Set(codes),roles:names,managedRoles,error:''};});
       }catch(error){if(!stopped)setAccess(old=>({...old,error:error instanceof Error?error.message:'Unable to check access.'}));}
       finally{pending=false;if(again&&!stopped){again=false;void refresh();}}
@@ -54,5 +57,5 @@ export function LiveAccessProvider({token,children}:{token?:string;children:Reac
   },[access.permissions]);
   const controlled=['patient.create','patient.update','patient.delete','appointment.create','appointment.update','appointment.cancel','ipd.create','ipd.update','billing.create','billing.update','billing.refund','inventory.manage','roles.manage','users.manage','documents.manage','lab.result.create'];
   const hidden=access.permissions===null?'':controlled.filter(code=>!access.permissions!.has(code)).map(code=>`button[data-permission="${code}"],[data-permission="${code}"] button[type="submit"]{display:none!important}`).join('');
-  return <Context.Provider value={access}><style>{hidden}</style>{children}</Context.Provider>;
+  return <Context.Provider value={access}><style>{hidden}</style>{subscription?.renewal_warning&&<div role="status" style={{padding:"12px 24px",background:"#fff2cc",color:"#633b00",borderBottom:"1px solid #e6c66b"}}>Your clinic {subscription.status==='trial'?'trial':'subscription'} ends in {subscription.days_remaining} days ({new Date(subscription.expires_at).toLocaleString('en-IN')}). Contact your clinic administrator to arrange manual renewal. All accounts will be signed out at expiry.</div>}{children}</Context.Provider>;
 }

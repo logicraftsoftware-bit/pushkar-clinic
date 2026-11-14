@@ -46,6 +46,7 @@ after(async()=>{
   await db.dropDatabase();
   await client.close();
 });
+
 test('native MongoDB authentication and atomic clinic provisioning', async t => {
   await t.test('validation rejects oversized invalid arrays before accumulating element errors',async()=>{
     assert.equal((await request('/auth/login','POST',{payload:Array(2001).fill(null)})).status,413);
@@ -62,7 +63,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
   });
   const modules=await request('/admin/modules','GET',null,token);
   assert.equal(modules.status,200);assert.equal(modules.data.length,8);
-  const plan=await request('/admin/plans','POST',{name:'Synthetic Plan',code:'synthetic',description:'Test only',monthlyPrice:100,yearlyPrice:1000,trialDays:14,maxBranches:2,maxUsers:10,maxDoctors:5,storageLimitGb:1,aiUsageLimit:0,moduleIds:modules.data.map(row=>row.id),status:'active'},token);
+  const plan=await request('/admin/plans','POST',{name:'Synthetic Plan',code:'synthetic',description:'Test only',monthlyPrice:100,yearlyPrice:1000,trialDays:14,maxBranches:200,maxUsers:200,maxDoctors:200,storageLimitGb:1,aiUsageLimit:500,moduleIds:modules.data.map(row=>row.id),status:'active'},token);
   assert.equal(plan.status,201,JSON.stringify(plan.data));
   const input={name:'Synthetic Clinic',code:'SYNTHETIC',hospitalType:'Clinic',registrationNumber:'TEST-ONLY',email:'clinic@example.invalid',phone:'9999999999',emergencyPhone:'9999999999',address:'Synthetic Road',city:'Test City',state:'Test State',pinCode:'100001',country:'India',branchName:'Main',planId:plan.data.id,subscriptionStartDate:'2026-10-31',billingCycle:'monthly',trialDays:14,status:'active',adminName:'Synthetic Admin',adminEmail:'admin@example.invalid',adminPhone:'9999999998',password};
   const hospital=await request('/admin/hospitals','POST',input,token);
@@ -232,7 +233,7 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
     await db.collection('clinical_appointments').replaceOne({id:initial.id},initial);
     await db.collection('opd_queue_sessions').deleteMany({tenant_id:hospital.data.id});
   });
-  await t.test('different doctor and patient passes cannot receive each other’s queue',async()=>{
+  await t.test('different doctor and patient passes cannot receive each otherâ€™s queue',async()=>{
     const auth=staffLogin.data.token,tenant_id=hospital.data.id;
     const original=await db.collection('clinical_appointments').findOne({id:appointment.id});
     const originalUser=await db.collection('users').findOne({id:doctor.user_id}),originalStaff=await db.collection('staff_members').findOne({id:doctor.id});
@@ -829,5 +830,54 @@ test('native MongoDB authentication and atomic clinic provisioning', async t => 
   });
   await t.test('unknown API routes return JSON errors rather than a page or synthetic success',async()=>{
     const result=await request('/pharmacy/not-converted');assert.equal(result.status,404);assert.equal(result.data.code,'NOT_FOUND');
+  });
+});
+
+test('manual subscriptions enforce expiry, all-device logout, renewal history and purchased limits',async t=>{
+  const owner=(await request('/admin/auth/login','POST',{username:'test-owner',password})).data.token;
+  const modules=(await request('/admin/modules','GET',null,owner)).data;
+  const plan=(await request('/admin/plans','POST',{name:'Subscription Policy Test',code:'policy',monthlyPrice:100,yearlyPrice:1000,trialDays:3,maxBranches:1,maxUsers:1,maxDoctors:1,storageLimitGb:1,aiUsageLimit:0,moduleIds:[],status:'active'},owner)).data;
+  const today=new Date().toISOString().slice(0,10);
+  const body={name:'Subscription Test Clinic',code:'POLICY',hospitalType:'Clinic',registrationNumber:'TEST',email:'policy@example.invalid',phone:'8888888888',emergencyPhone:'8888888888',address:'Test road',city:'Test city',state:'Test state',pinCode:'100001',country:'India',branchName:'Main',planId:plan.id,subscriptionStartDate:today,billingCycle:'monthly',trialDays:3,status:'active',adminName:'Policy Admin',adminEmail:'policy-admin@example.invalid',adminPhone:'8888888887',password};
+  const clinic=await request('/admin/hospitals','POST',body,owner);assert.equal(clinic.status,201,JSON.stringify(clinic.data));
+  const tenant=clinic.data.id;
+  await db.collection('users').updateMany({tenant_id:tenant},{$set:{force_password_change:false}});
+  const signin=async()=>request('/auth/login','POST',{identifier:body.adminEmail,password,portal:'hospital_admin'});
+  const first=await signin(),second=await signin();assert.equal(first.status,200);assert.equal(second.status,200);
+  await t.test('API module guard applies even to clinic administrators',async()=>{
+    const result=await request('/queue/live','GET',null,first.data.token);assert.equal(result.status,403);assert.equal(result.data.code,'MODULE_NOT_INCLUDED');
+  });
+  await t.test('capacity checks are shared transactional gates',async()=>{
+    const {enforceCount}=await import('./subscription-access.mjs'),{transaction}=await import('./database.mjs');
+    for(const kind of ['branches','users'])await assert.rejects(transaction(session=>enforceCount(tenant,kind,session)),error=>error.code==='PLAN_LIMIT_REACHED');
+  });
+  const old=await db.collection('subscriptions').findOne({tenant_id:tenant});
+  const assign={tenantId:tenant,planId:plan.id,billingCycle:'monthly',months:1,trialDays:3,amount:100,note:'Manual approval test',mode:'renew'};
+  await t.test('renew extends remaining time and preserves old record',async()=>{
+    const result=await request('/admin/subscriptions','POST',assign,owner);assert.equal(result.status,201,JSON.stringify(result.data));assert.ok(new Date(result.data.expires_at)>new Date(old.expires_at));assert.equal((await db.collection('subscriptions').findOne({id:old.id})).status,'superseded');
+    const list=(await request('/admin/subscriptions','GET',null,owner)).data.filter(r=>r.tenant_id===tenant);assert.equal(list.filter(r=>r.is_current).length,1);
+  });
+  await t.test('profile editing cannot alter subscription terms',async()=>{
+    const before=await db.collection('subscriptions').findOne({tenant_id:tenant,status:'active'});
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'PUT',{...body,subscriptionStartDate:'2020-01-01'},owner)).status,200);
+    assert.deepEqual((await db.collection('subscriptions').findOne({id:before.id})).expires_at,before.expires_at);
+  });
+  await t.test('expiry rejects old tokens, removes every device session and denies new login',async()=>{
+    await db.collection('subscriptions').updateMany({tenant_id:tenant,status:'active'},{$set:{expires_at:new Date(Date.now()-1)}});
+    const result=await request('/access-control/me','GET',null,first.data.token);assert.equal(result.status,401);assert.equal(result.data.code,'SUBSCRIPTION_INACTIVE');
+    assert.equal(await db.collection('sessions').countDocuments({tenant_id:tenant}),0);
+    assert.equal((await request('/access-control/me','GET',null,second.data.token)).status,401);
+    assert.equal((await signin()).status,401);
+  });
+  await t.test('manual reactivation restores login but never restores revoked tokens',async()=>{
+    assert.equal((await request('/admin/subscriptions','POST',assign,owner)).status,201);
+    assert.equal((await signin()).status,200);
+    assert.equal((await request('/access-control/me','GET',null,first.data.token)).status,401);
+  });
+  await t.test('cancel revokes all access immediately and trial uses actual day count',async()=>{
+    const trial=await request('/admin/subscriptions','POST',{...assign,billingCycle:'trial',mode:'replace',amount:0},owner);assert.equal(trial.status,201,JSON.stringify(trial.data));assert.ok(Math.abs(new Date(trial.data.expires_at)-Date.now()-3*86400000)<5000);
+    const signed=await signin();assert.equal(signed.status,200);
+    assert.equal((await request(`/admin/subscriptions/${trial.data.id}/cancel`,'POST',{note:'Testing cancellation'},owner)).status,204);
+    assert.equal((await request('/access-control/me','GET',null,signed.data.token)).status,401);
   });
 });

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db, transaction } from './database.mjs';
 import { hashPassword, publicRecord } from './security.mjs';
 import { planInput, hospitalInput } from './provisioning-schema.mjs';
+import {trialEnd,subscriptionSummary} from './subscription-policy.mjs';
 import { subscriptionEnd } from './subscription-date.mjs';
 import { initializeRoles } from './access.mjs';
 import {escapeSearch} from './search.mjs';
@@ -71,7 +72,7 @@ router.get('/hospitals', async (request,response) => {
     row.user_count=await db.collection('users').countDocuments({tenant_id:row.id});
     row.branches=row.branch_count;row.users=row.user_count;
     const subscription=await db.collection('subscriptions').findOne({tenant_id:row.id},{sort:{created_at:-1}});
-    row.plan_code=subscription?.plan_code??null;row.subscription_status=subscription?.status??null;row.expires_at=subscription?.expires_at??null;
+    row.plan_code=subscription?.plan_code??null;row.subscription_status=subscriptionSummary(subscription).status;row.expires_at=subscription?subscriptionSummary(subscription).expires_at:null;
   }
   response.json({data:rows,page,limit,total:await db.collection('hospitals').countDocuments(filter)});
 });
@@ -81,7 +82,7 @@ router.get('/hospitals/:id', async (request,response) => {
   if(!row)return response.status(404).json({error:'Clinic not found'});
   const branches=await db.collection('branches').find({tenant_id:id},{projection:{_id:0}}).sort({created_at:1}).toArray();
   const subscription=await db.collection('subscriptions').findOne({tenant_id:id},{sort:{created_at:-1}}),administrator=await db.collection('users').findOne({tenant_id:id,role_codes:'HOSPITAL_ADMIN'});
-  response.json({...row,branches,branch_id:branches[0]?.id??null,branch_name:branches[0]?.name??'',subscription_id:subscription?.id??null,plan_id:subscription?.plan_id??null,subscription_start_date:subscription?.starts_at??null,billing_cycle:subscription?.billing_cycle??'monthly',trial_days:subscription?.trial_days??0,subscription_status:subscription?.status??null,admin_id:administrator?.id??null,admin_name:administrator?`${administrator.first_name} ${administrator.last_name}`:'',admin_email:administrator?.email??'',admin_phone:administrator?.phone??''});
+  response.json({...row,branches,branch_id:branches[0]?.id??null,branch_name:branches[0]?.name??'',subscription_id:subscription?.id??null,plan_id:subscription?.plan_id??null,subscription_start_date:subscription?.starts_at??null,billing_cycle:subscription?.billing_cycle==='trial'?'monthly':subscription?.billing_cycle??'monthly',trial_days:subscription?.trial_days??0,subscription_status:subscription?.status??null,admin_id:administrator?.id??null,admin_name:administrator?`${administrator.first_name} ${administrator.last_name}`:'',admin_email:administrator?.email??'',admin_phone:administrator?.phone??''});
 });
 router.post('/hospitals', async (request,response) => {
   const body=hospitalInput.extend({password:z.string().min(12).max(200)}).parse(request.body);
@@ -103,7 +104,7 @@ router.post('/hospitals', async (request,response) => {
     await db.collection('users').insertOne({id:userId,tenant_id:id,branch_id:branchId,email:body.adminEmail.toLowerCase(),phone:body.adminPhone,
       password_hash,first_name:names.shift(),last_name:names.join(' '),role:'hospital_admin',role_codes:['HOSPITAL_ADMIN'],
       is_active:true,session_version:0,force_password_change:true,created_at:now,updated_at:now},{session});
-    const starts=new Date(`${body.subscriptionStartDate}T00:00:00Z`),expires=subscriptionEnd(body.subscriptionStartDate,body.billingCycle);
+    const starts=new Date(`${body.subscriptionStartDate}T00:00:00Z`),expires=body.status==='trial'?trialEnd(body.subscriptionStartDate,body.trialDays):subscriptionEnd(body.subscriptionStartDate,body.billingCycle);
     await db.collection('subscriptions').insertOne({id:randomUUID(),tenant_id:id,plan_id:plan.id,plan_code:plan.code,
       status:body.status==='trial'?'trial':'active',starts_at:starts,expires_at:expires,monthly_amount:body.billingCycle==='monthly'?plan.monthly_price:plan.yearly_price,
       billing_cycle:body.billingCycle,trial_days:body.trialDays,created_at:now},{session});

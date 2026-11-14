@@ -136,7 +136,7 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       <Field label="Main branch name" wide required><input name="branchName" required defaultValue={hospital?.branch_name} /></Field>
     </Section>
     <Section icon={CreditCard} title="Subscription" text="Assign commercial terms and initial tenant status.">
-      <Field label="Subscription plan" required><select name="planId" required defaultValue={hospital?.plan_id ?? ''}><option value="" disabled>Select a plan</option>{plans.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></Field>
+      <p>{editId?'Subscription changes are managed separately under Subscriptions.':'Select the starting subscription for this clinic.'}</p><Field label="Subscription plan" required><select name="planId" required defaultValue={hospital?.plan_id ?? ''}><option value="" disabled>Select a plan</option>{plans.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></Field>
       <Field label="Subscription start date" required><input name="subscriptionStartDate" type="date" required defaultValue={date} /></Field>
       <Field label="Billing cycle" required><select name="billingCycle" defaultValue={hospital?.billing_cycle ?? 'monthly'}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></Field>
       <Field label="Trial days" required><input name="trialDays" type="number" min="0" required defaultValue={hospital?.trial_days ?? 14} /></Field>

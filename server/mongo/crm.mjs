@@ -1,3 +1,4 @@
+import {subscriptionAccess,enforceCount} from './subscription-access.mjs';
 import {assignQueueSerial,attachPass,sessionStart} from './queue-service.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
@@ -45,7 +46,7 @@ router.post('/bootstrap',enabled,async(request,response)=>{
   try{
     const summary=await transaction(async session=>{
       const current=await db.collection('call_centre_crm_connections').findOneAndUpdate({id:connection.id,api_key_hash,is_active:true},{$inc:{sync_version:1}},{session,returnDocument:'after'});if(!current)throw failure('CRM connection changed. Authenticate again.',401);
-      const tenant_id=current.tenant_id,hospital=await db.collection('hospitals').findOne({id:tenant_id},{session});if(!activeAccount({is_active:true},hospital))throw failure('Clinic account is inactive.',403);
+      const tenant_id=current.tenant_id;await subscriptionAccess(tenant_id,{session,revoke:false});const hospital=await db.collection('hospitals').findOne({id:tenant_id},{session});if(!activeAccount({is_active:true},hospital))throw failure('Clinic account is inactive.',403);
       const totals={branches:0,departments:0,doctors:0,patients:0,appointments:0},now=new Date();
       const mapped=async(type,external)=>db.collection('call_centre_crm_mappings').findOne({tenant_id,connection_id:current.id,entity_type:type,external_id:external},{session});
       const required=async(type,external)=>{const mapping=external?await mapped(type,external):null;if(!mapping)throw failure(`CRM ${type} mapping is missing.`);return mapping.erp_id;};
@@ -54,6 +55,7 @@ router.post('/bootstrap',enabled,async(request,response)=>{
       for(const item of body.branches){
         const old=await mapped('branch',item.externalId);if(unchanged(old,item)){totals.branches++;continue;}
         const existing=old?await db.collection('branches').findOne({tenant_id,id:old.erp_id},{session}):null;if(old&&!existing)throw failure('Mapped branch no longer exists.',409);
+        if(!existing)await enforceCount(tenant_id,'branches',session);
         const id=existing?.id??randomUUID(),row={...existing,id,tenant_id,name:item.name,code:item.code,phone:item.phone??existing?.phone??'',address:item.address??existing?.address??{},is_active:item.active??true,created_at:existing?.created_at??now,updated_at:now};await db.collection('branches').replaceOne({tenant_id,id},row,{session,upsert:true});await saveMap('branch',item,id);totals.branches++;
       }
       for(const item of body.departments){
@@ -65,6 +67,7 @@ router.post('/bootstrap',enabled,async(request,response)=>{
         const old=await mapped('doctor',item.externalId);if(unchanged(old,item)){totals.doctors++;continue;}
         const branch_id=await required('branch',item.branchExternalId),department_id=await required('department',item.departmentExternalId),id=old?.erp_id??randomUUID(),existing=old?await db.collection('users').findOne({tenant_id,id,role:'doctor'},{session}):null;if(old&&!existing)throw failure('Mapped doctor no longer exists.',409);
         if(!await db.collection('departments').findOne({tenant_id,id:department_id,branch_id,is_active:true},{session}))throw failure('Doctor department must belong to the mapped branch.');
+        if(!existing){await enforceCount(tenant_id,'users',session);await enforceCount(tenant_id,'doctors',session);}
         const [first_name,...last]=item.name.trim().split(/\s+/),last_name=last.join(' ')||'Doctor',email=existing?.email??`crm-${id}@integration.invalid`;
         await db.collection('users').replaceOne({tenant_id,id},{...existing,id,tenant_id,branch_id,department_id,email,first_name,last_name,role:'doctor',role_codes:existing?.role_codes??['DOCTOR'],portal_code:existing?.portal_code??'DOCTOR',password_hash:existing?.password_hash??doctorPasswords.get(item.externalId),force_password_change:existing?.force_password_change??true,session_version:(existing?.session_version??0)+1,is_active:item.active??true,created_at:existing?.created_at??now,updated_at:now},{session,upsert:true});await db.collection('sessions').deleteMany({user_id:id},{session});
         const staff=await db.collection('staff_members').findOne({tenant_id,user_id:id},{session}),professional={...staff?.professional,qualification:item.qualification??staff?.professional?.qualification??'',specialization:item.specialization??staff?.professional?.specialization??'',registration_number:item.registrationNumber??staff?.professional?.registration_number??'',consultation_fee:item.consultationFee??staff?.professional?.consultation_fee??0};
@@ -75,6 +78,7 @@ router.post('/bootstrap',enabled,async(request,response)=>{
         const old=await mapped('patient',item.externalId);if(unchanged(old,item)){totals.patients++;continue;}
         const branch_id=await required('branch',item.branchExternalId),id=old?.erp_id??randomUUID(),existing=old?await db.collection('patients').findOne({tenant_id,id,deleted_at:null},{session}):null;if(old&&!existing)throw failure('Mapped patient is unavailable.',409);
         if(existing&&existing.branch_id!==branch_id)throw failure('Move an existing patient branch through clinic administration.',409);
+        if(!existing){await enforceCount(tenant_id,'users',session);await enforceCount(tenant_id,'doctors',session);}
         const [first_name,...last]=item.name.trim().split(/\s+/),last_name=last.join(' ')||'Patient',counter=existing?null:await db.collection('counters').findOneAndUpdate({_id:`${tenant_id}:patient`},{$inc:{value:1}},{session,upsert:true,returnDocument:'after'}),medical_record_number=existing?.medical_record_number??`${await configuredPrefix(tenant_id,'uhid_prefix','UHID',session)}-${String(counter.value).padStart(6,'0')}`;
         await db.collection('patients').replaceOne({tenant_id,id},{...existing,id,tenant_id,branch_id,medical_record_number,crm_medical_record_number:item.medicalRecordNumber??existing?.crm_medical_record_number??'',first_name,last_name,normalized_name:`${first_name} ${last_name}`.toLowerCase().replace(/\s+/g,' ').trim(),date_of_birth:item.dateOfBirth??existing?.date_of_birth??null,sex:item.gender??existing?.sex??'unknown',phone:item.mobile??existing?.phone??'',email:item.email??existing?.email??'',blood_group:item.bloodGroup??existing?.blood_group??'',address:item.address??existing?.address??{},status:item.active===false?'Inactive':'Active',deleted_at:null,created_at:existing?.created_at??now,updated_at:now},{session,upsert:true});await saveMap('patient',item,id);totals.patients++;
       }

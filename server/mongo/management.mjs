@@ -1,3 +1,4 @@
+import {enforceCount} from './subscription-access.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {randomUUID} from 'node:crypto';
@@ -80,6 +81,7 @@ router.post('/staff/save',async(request,response)=>{
   const result=await transaction(async session=>{
     const existing=input.id?await db.collection('staff_members').findOne(await scopeFor(response,{id:input.id},session),{session}):null;
     if(input.id&&!existing)throw failure('Staff record not found',404);
+    if(input.staff_type==='Doctor'&&existing?.staff_type!=='Doctor')await enforceCount(tenant_id,'doctors',session);
     for(const branch of new Set(input.branch_ids))await assertBranch(response,branch,session);
     if(input.department_id){
       const department=await db.collection('departments').findOne({tenant_id,id:input.department_id,branch_id:{$in:input.branch_ids},is_active:true},{session});
@@ -104,6 +106,7 @@ router.post('/staff/save',async(request,response)=>{
         await db.collection('sessions').deleteMany({user_id:userId},{session});
       }else{
         if(!password_hash)throw failure('Provide a password of at least 12 characters for the new login.');
+        await enforceCount(tenant_id,'users',session);
         userId=newUserId;
         await db.collection('users').insertOne({id:userId,tenant_id,username,email:loginEmail,phone:String(account.mobile??input.personal.mobile_number??''),first_name:input.first_name,last_name:input.last_name,role:baseRoles[portalCode],portal_code:portalCode,role_codes:[role.code],branch_id:input.branch_ids[0],department_id:input.department_id,is_active:active,password_hash,force_password_change:true,session_version:0,created_at:new Date()},{session});
       }
@@ -179,6 +182,7 @@ async function saveMaster(request,response){
   const tenant_id=response.locals.account.tenant_id;
   if(name==='branches'&&response.locals.claims.portal!=='hospital_admin')throw failure('Only Clinic Admin can change branch setup.',403);
   const row=await transaction(async session=>{
+    if(name==='branches'&&!request.params.id)await enforceCount(tenant_id,'branches',session);
     await references(response,name,body,session);
     const existing=request.params.id?await db.collection(table(name)).findOne(await masterScope(response,name,{id:recordId},session),{session}):null;
     if(request.params.id&&!existing)throw failure('Record not found',404);

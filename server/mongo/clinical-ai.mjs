@@ -1,3 +1,4 @@
+import {subscriptionPlan} from './subscription-access.mjs';
 import {Router} from 'express';
 import {z} from 'zod';
 import {db} from './database.mjs';
@@ -7,7 +8,10 @@ import {completion} from './ai-provider.mjs';
 const router=Router(),text=z.string().max(30000).prefault('');
 const draft=z.object({symptoms:text,history:text,vitals:z.record(z.string().max(100),z.string().max(1000)).prefault({}),investigation:text,diagnosis:text,advice:text,follow_up:text,comment:text,medicines:z.array(z.object({name:z.string().max(200),type:text,dose:text,time:text,when:text,frequency:text,duration:text,quantity:z.union([z.string().max(20),z.number()]).prefault(''),instruction:text})).max(100).prefault([]),lab_tests:z.array(z.object({name:z.string().max(200),priority:z.enum(['Routine','Urgent','STAT']).prefault('Routine'),instruction:text})).max(100).prefault([])});
 export async function aiLimit(response){
-  const account=response.locals.account,window=Math.floor(Date.now()/900000),key=`${account.tenant_id}:${account.id}:${window}`;
+  const account=response.locals.account,plan=await subscriptionPlan(account.tenant_id);
+  const month=new Date().toISOString().slice(0,7),usage=await db.collection('ai_limits').findOneAndUpdate({_id:`plan:${account.tenant_id}:${month}`},{$inc:{requests:1}},{upsert:true,returnDocument:'after'});
+  if(usage.requests>plan.ai_usage_limit)throw Object.assign(Error('Your clinic has reached its monthly AI allowance. Contact your administrator to upgrade.'),{status:403,code:'PLAN_LIMIT_REACHED'});
+  const window=Math.floor(Date.now()/900000),key=`${account.tenant_id}:${account.id}:${window}`;
   const counter=await db.collection('ai_limits').findOneAndUpdate({_id:key},{$inc:{requests:1},$setOnInsert:{expires_at:new Date((window+1)*900000)}},{upsert:true,returnDocument:'after'});
   if(counter.requests>30)throw Object.assign(new Error('AI request limit reached. Try again later.'),{status:429});
 }

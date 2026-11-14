@@ -71,6 +71,7 @@ import {
 import { adminApi, auth } from "./api";
 import { usePlatformBranding, type PlatformBranding } from "../branding";
 import { HospitalForm, PlanForm } from "./AdminForms";
+import SubscriptionManagement from './SubscriptionManagement';
 import PlanList from "./PlanList";
 import "./superadmin.css";
 
@@ -78,6 +79,7 @@ type Page =
   | "Dashboard"
   | "Clinics"
   | "Subscriptions"
+  | "Subscription Plans"
   | "Modules"
   | "Reports"
   | "Monitoring"
@@ -120,16 +122,6 @@ type ModuleRow = {
   is_active: boolean;
   enabled_hospitals: number;
 };
-type Subscription = {
-  id: string;
-  tenant_id: string;
-  hospital_name: string;
-  plan_code: string;
-  status: string;
-  starts_at: string;
-  expires_at: string;
-  monthly_amount: string;
-};
 type Setting = {
   key: string;
   value: unknown;
@@ -151,6 +143,7 @@ const nav: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: "Clinics", icon: Hospital },
   { label: "CRM Connections", icon: Link2 },
   { label: "Subscriptions", icon: CreditCard },
+  { label: "Subscription Plans", icon: Boxes },
   { label: "Modules", icon: Boxes },
   { label: "Reports", icon: FileBarChart },
   { label: "Monitoring", icon: Activity },
@@ -342,7 +335,7 @@ function DashboardPage() {
     [
       "Monthly revenue",
       `₹${Number(data.subscriptions.monthly_revenue).toLocaleString("en-IN")}`,
-      "Subscription MRR",
+      "Contract MRR",
       CircleDollarSign,
       "orange",
     ],
@@ -708,82 +701,7 @@ function ClinicsPage({
   );
 }
 
-function SubscriptionsPage() {
-  const [rows, setRows] = useState<Subscription[]>([]);
-  const load = useCallback(
-    () => adminApi<Subscription[]>("/subscriptions").then(setRows),
-    [],
-  );
-  useEffect(() => {
-    load();
-  }, [load]);
-  return (
-    <>
-      <PageHead
-        title="Subscriptions"
-        text="Track plans, recurring revenue, renewals and expiry risk."
-      />
-      <div className="sa-mini-metrics">
-        <Card>
-          <span>Subscription MRR</span>
-          <strong>
-            ₹
-            {rows
-              .reduce((n, r) => n + Number(r.monthly_amount), 0)
-              .toLocaleString("en-IN")}
-          </strong>
-        </Card>
-        <Card>
-          <span>Active plans</span>
-          <strong>{rows.filter((r) => r.status === "active").length}</strong>
-        </Card>
-        <Card>
-          <span>Expiring in 30 days</span>
-          <strong>
-            {
-              rows.filter(
-                (r) =>
-                  new Date(r.expires_at).getTime() - Date.now() < 2592000000,
-              ).length
-            }
-          </strong>
-        </Card>
-      </div>
-      <Card>
-        <div className="sa-tablewrap">
-          <table className="sa-table">
-            <thead>
-              <tr>
-                <th>Clinic</th>
-                <th>Plan</th>
-                <th>Monthly value</th>
-                <th>Started</th>
-                <th>Expires</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <strong>{r.hospital_name}</strong>
-                  </td>
-                  <td className="capitalize">{r.plan_code}</td>
-                  <td>₹{Number(r.monthly_amount).toLocaleString("en-IN")}</td>
-                  <td>{new Date(r.starts_at).toLocaleDateString()}</td>
-                  <td>{new Date(r.expires_at).toLocaleDateString()}</td>
-                  <td>
-                    <Badge value={r.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </>
-  );
-}
+function SubscriptionsPage(){return <SubscriptionManagement/>;}
 
 function ModulesPage() {
   const [rows, setRows] = useState<ModuleRow[]>([]),
@@ -1279,7 +1197,7 @@ function ReportsPage() {
         <Card>
           <div className="sa-cardhead">
             <div>
-              <h2>Subscription revenue</h2>
+              <h2>Current contract MRR</h2>
               <p>Monthly recurring value by start period.</p>
             </div>
           </div>
@@ -1326,7 +1244,7 @@ function ReportsPage() {
 }
 
 export default function SuperAdminApp() {
-  const superAdminPages: Page[] = ["Dashboard", "Clinics", "CRM Connections", "Create Clinic", "Edit Clinic", "Subscriptions", "Create Plan", "Edit Plan", "Modules", "Platform Settings", "Monitoring", "Reports"];
+  const superAdminPages: Page[] = ["Dashboard", "Clinics", "CRM Connections", "Create Clinic", "Edit Clinic", "Subscriptions", "Subscription Plans", "Create Plan", "Edit Plan", "Modules", "Platform Settings", "Monitoring", "Reports"];
   const { branding, setBranding } = usePlatformBranding();
   const [loggedIn, setLoggedIn] = useState(Boolean(auth.token())),
     [page, setPageState] = useState<Page>(() => pageFromPath(superAdminPages, 1) ?? "Dashboard"),
@@ -1371,9 +1289,10 @@ export default function SuperAdminApp() {
   else if (page === "Clinics") content = <ClinicsPage onCreate={() => setPage("Create Clinic")} onEdit={(id) => { setEditId(id); setPage("Edit Clinic", id); }} />;
   else if (page === "Create Clinic") content = <HospitalForm onBack={() => setPage("Clinics")} onSaved={() => setPage("Clinics")} />;
   else if (page === "Edit Clinic") content = <HospitalForm editId={editId} onBack={() => setPage("Clinics")} onSaved={() => setPage("Clinics")} />;
-  else if (page === "Subscriptions") content = <PlanList onCreate={() => setPage("Create Plan")} onEdit={(id) => { setEditId(id); setPage("Edit Plan", id); }} />;
-  else if (page === "Create Plan") content = <PlanForm onBack={() => setPage("Subscriptions")} onSaved={() => setPage("Subscriptions")} />;
-  else if (page === "Edit Plan") content = <PlanForm editId={editId} onBack={() => setPage("Subscriptions")} onSaved={() => setPage("Subscriptions")} />;
+  else if (page === "Subscriptions") content = <SubscriptionsPage />;
+  else if (page === "Subscription Plans") content = <PlanList onCreate={() => setPage("Create Plan")} onEdit={(id) => { setEditId(id); setPage("Edit Plan", id); }} />;
+  else if (page === "Create Plan") content = <PlanForm onBack={() => setPage("Subscription Plans")} onSaved={() => setPage("Subscription Plans")} />;
+  else if (page === "Edit Plan") content = <PlanForm editId={editId} onBack={() => setPage("Subscription Plans")} onSaved={() => setPage("Subscription Plans")} />;
   else if (page === "Modules") content = <ModulesPage />;
   else if (page === "CRM Connections") content = <CrmConnectionsPage />;
   else if (page === "Platform Settings") content = <SettingsPage onBrandingChange={updateBranding} />;

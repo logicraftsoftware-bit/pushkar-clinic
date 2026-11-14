@@ -1,3 +1,4 @@
+import {subscriptionAccess} from './subscription-access.mjs';
 import { db } from './database.mjs';
 import { activeAccount,authorizedPortal } from './security.mjs';
 import {hasActiveRole} from './access.mjs';
@@ -20,6 +21,7 @@ export function accessEvents(request,response) {
       ]);
       const hospital=account?await db.collection('hospitals').findOne({id:account.tenant_id}):null;
       const branch=account?await db.collection('branches').findOne({tenant_id:account.tenant_id,id:account.branch_id,is_active:true}):null;
+      if(account)await subscriptionAccess(account.tenant_id);
       if(stopped)return;
       response.write('data: refresh\n\n');
       const broker=claims.aud==='careframe-broker',live=broker&&account?{...account,is_active:account.status==='Active',role:'broker'}:account;

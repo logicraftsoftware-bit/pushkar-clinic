@@ -1,3 +1,4 @@
+import {enforceCount} from './subscription-access.mjs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
@@ -82,6 +83,7 @@ router.put('/users/:id',requirePermission('users.manage'),async(request,response
       const portal=role&&rolePortalCode(role);
       if(!portal||portal==='HOSPITAL_ADMIN')throw failure('Select an active staff role in this clinic.');
       validateRoleGrant(granted,role.permissions??[]);
+      if(baseRoles[portal]==='doctor'&&user.role!=='doctor')await enforceCount(tenant_id,'doctors',session);
       Object.assign(changes,{role_codes:[role.code],portal_code:portal,role:baseRoles[portal]});
     }
     if((changes.role??user.role)==='patient'){
