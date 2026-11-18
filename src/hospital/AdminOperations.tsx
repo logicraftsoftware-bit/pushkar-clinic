@@ -1,3 +1,4 @@
+import PatientAppSettings from './PatientAppSettings';
 import {useLiveAccess} from './LiveAccess';
 import {
   Fragment,
@@ -350,6 +351,7 @@ function DocumentForm({
   );
 }
 const settingSections = [
+  "Patient App",
   "General Setting",
   "Attendance Setting",
   "Notification Setting",
@@ -419,7 +421,8 @@ function Settings({ token }: { token: string }) {
     try {
       const payload=completeSettings(sectionKey,section); setSection(payload);
       await q(`/settings/${sectionKey}`, token, {method:"PUT",body:JSON.stringify(payload)});
-      if (tab === "General Setting") await hospitalQ("/profile", token, {method:"PUT",body:JSON.stringify({name:payload.hospital_name,code:payload.hospital_code,logo_url:payload.hospital_logo,email:payload.email,phone:payload.phone,address_line:payload.address,currency:payload.currency,timezone:payload.timezone})});
+      if (tab === "Patient App") return <PatientAppSettings token={token}/>;
+    if (tab === "General Setting") await hospitalQ("/profile", token, {method:"PUT",body:JSON.stringify({name:payload.hospital_name,code:payload.hospital_code,logo_url:payload.hospital_logo,email:payload.email,phone:payload.phone,address_line:payload.address,currency:payload.currency,timezone:payload.timezone})});
       setMessage(`${tab} saved successfully.`);
     }
     catch (e) { setMessage(e instanceof Error ? e.message : "Unable to save settings"); }
@@ -460,10 +463,10 @@ function Settings({ token }: { token: string }) {
         ))}
         </nav>
         <section className="settings-panel">
-          <header><div><small>Clinic Settings</small><h2>{tab}</h2><p>This section is ready. Its settings fields will be added next.</p></div></header>
+          <header><div><small>Clinic Settings</small><h2>{tab}</h2><p>{tab === "Patient App" ? "Publish the clinic and configure mobile booking policies." : "Configure and save this section?s clinic preferences."}</p></div></header>
           {message && <div className="settings-message">{message}</div>}
           {renderContent()}
-          <footer className="settings-save"><button type="button" onClick={saveSection} disabled={saving}>{saving ? "Saving..." : `Save ${tab}`}</button></footer>
+          {tab !== "Patient App" && <footer className="settings-save"><button type="button" onClick={saveSection} disabled={saving}>{saving ? "Saving..." : `Save ${tab}`}</button></footer>}
         </section>
       </div>
     </section>
