@@ -3,14 +3,14 @@ import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DemoProvider } from './src/data/DemoContext';
-import { screens } from './src/screens';
+import { PatientProvider } from './src/live/PatientContext';
+import { liveScreens as screens } from './src/live/screens';
 import type { Routes } from './src/navigation';
 const Stack = createNativeStackNavigator<Routes>();
 export default function App() {
   return (
     <SafeAreaProvider>
-      <DemoProvider>
+      <PatientProvider>
         <StatusBar barStyle="light-content" />
         <NavigationContainer>
           <Stack.Navigator
@@ -28,7 +28,7 @@ export default function App() {
             ))}
           </Stack.Navigator>
         </NavigationContainer>
-      </DemoProvider>
+      </PatientProvider>
     </SafeAreaProvider>
   );
 }

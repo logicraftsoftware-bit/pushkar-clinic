@@ -1,6 +1,21 @@
 # JibonCare patient mobile app
 
-Separate React Native Community CLI application with Android and iOS projects. The existing clinic website and backend are unchanged.
+React Native application connected to `https://erp.pushkarpharmaceutical.com/api/v1/patient-app`. Android uses the live patient screens; the web design preview retains the original offline reference screens.
+
+## Connected Android build
+
+The **Patient Android APK** GitHub workflow checks TypeScript, lint and tests, then builds a standalone ARM64 internal-testing APK. Download the `JibonCare-patient-android` artifact. The APK includes its JavaScript bundle and does not need Metro, a local backend or a local database. It currently uses the repository's testing signing key; it is not a Play Store release.
+
+- Guest users can browse published clinics and doctors without SMS.
+- Patient authentication uses real SMS OTP only. There is no demo OTP or production authentication bypass. Configure the SMS webhook later; the UI keeps SMS login disabled until `/config` reports it ready.
+- The latest backend must be deployed in Hostinger. A 404 from `/api/v1/patient-app/config` means the patient APIs are not deployed yet.
+- A clinic administrator must publish the clinic through the existing patient-app settings API; unpublished clinics do not appear. See `../docs/PATIENT-APP-API.md`.
+- Access tokens stay in memory; rotating refresh tokens use native secure storage. Private documents are fetched with authorization headers into app-private cache and removed on sign-out.
+- Connected flows include profiles/family, clinic/doctor search, available slots, server quotes, pay-at-clinic booking, configured Razorpay checkout, booking status, check-in, five-second foreground queue polling, released records, uploads, lab requests, invoices, notifications, record linking and support requests.
+- Payment, document release, linking and check-in remain subject to the server's ownership and clinic policies. Payment recovery checks the existing order; it never creates a second order automatically.
+- Background push delivery, SMS delivery and online checkout require their provider configuration. Queue updates run while the queue screen is open; no background push is simulated.
+
+To install from Windows after accepting the phone's USB-debugging prompt: `adb install -r app-release.apk`. Accept any installation prompt on the phone. Keep test builds out of public distribution.
 
 ## Windows launcher (works in existing PowerShell terminals)
 
@@ -53,7 +68,7 @@ Open http://127.0.0.1:5181. The sidebar opens all 24 screens. The browser shell 
 
 In native development builds, the small grid button at the top right opens the screen picker. It is absent from release builds.
 
-## Static demo behaviour
+## Design preview behaviour (not the connected Android app)
 
 - Start with **Get Started**, enter any 10-digit mobile number, then use **528471** as the OTP. No SMS is sent.
 - Forms, family members, searches, specialty filters, tabs, appointment selections, booking confirmation, check-in and cancellation work in memory.
