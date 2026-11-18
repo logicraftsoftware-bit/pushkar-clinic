@@ -17,7 +17,7 @@ import { Brand, Avatar } from '../components/Illustrations';
 import { colors, s } from '../theme';
 import type { Navigation, ScreenName } from '../navigation';
 import { api, chooseFile, downloadDocument } from './native';
-import type { Tokens } from './client';
+import { ApiError, type Tokens } from './client';
 import {
   usePatient,
   type Appointment,
@@ -834,6 +834,19 @@ function SelectAppointment() {
         disabled={a.busy || !slot || !p.profile?.name || !p.doctor}
         onPress={() =>
           void a.run(async () => {
+            if (p.hold) {
+              try {
+                await api.request('/booking-holds/' + p.hold.id, 'DELETE');
+              } catch (error) {
+                if (
+                  !(error instanceof ApiError) ||
+                  ![404, 409].includes(error.status)
+                )
+                  throw error;
+              }
+              p.setHold(null);
+              key.current = uuid();
+            }
             const hold = await api.request<{ id: string; expires_at: string }>(
               '/booking-holds',
               'POST',
@@ -944,6 +957,11 @@ function Payment() {
       currency: string;
       appointment_id?: string;
     } | null>(null);
+  useEffect(() => {
+    key.current = uuid();
+    orderKey.current = uuid();
+    setPayment(null);
+  }, [p.quote?.id]);
   const finish = async (id: string) => {
     p.setAppointment(await api.request<Appointment>('/appointments/' + id));
     p.setHold(null);
@@ -1456,8 +1474,25 @@ function Prescription() {
   const p = usePatient(),
     a = useAction(),
     row = p.record;
+  const details = useResource<{
+    data: Record<string, unknown>;
+    doctor_name: string;
+  }>(
+    row?.kind === 'consultation' && typeof row.source_id === 'string'
+      ? '/prescriptions/' + row.source_id
+      : null,
+  );
   return (
     <Screen title={row?.title ?? 'Medical document'} light>
+      <DataState resource={details} />
+      {details.data && (
+        <Details
+          value={{
+            ...details.data.data,
+            doctor_name: details.data.doctor_name,
+          }}
+        />
+      )}
       <Notice text={a.error} />
       {row ? (
         <>

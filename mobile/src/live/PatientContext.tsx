@@ -124,7 +124,6 @@ function usePatientState() {
   function selectDoctor(value: Doctor) {
     setDoctor(value);
     setBranch(value.branch_ids[0] ?? '');
-    setHold(null);
     setQuote(null);
   }
   return {
