@@ -135,9 +135,11 @@ export function Screen({
                 nav.canGoBack() ? nav.goBack() : nav.navigate('Home')
               }
             >
-              <ArrowLeft color="#fff" size={23} />
+              <ArrowLeft color={light ? colors.navy : '#fff'} size={23} />
             </Pressable>
-            <Text style={styles.headerText}>{title}</Text>
+            <Text style={[styles.headerText, light && { color: colors.navy }]}>
+              {title}
+            </Text>
             {right || <View style={{ width: 23 }} />}
           </View>
         )}
