@@ -12,6 +12,7 @@ import { PatientClient } from './client';
 const service = 'com.jiboncare.patient.refresh';
 export const api = new PatientClient({
   async read() {
+    await clearDocuments();
     const entry = await Keychain.getGenericPassword({ service });
     return entry ? entry.password : null;
   },
@@ -28,7 +29,15 @@ export const api = new PatientClient({
 });
 let files: string[] = [];
 export async function clearDocuments() {
-  const previous = files;
+  const cached = await Blob.fs
+    .ls(Blob.fs.dirs.CacheDir)
+    .catch(() => [] as string[]);
+  const previous = [
+    ...files,
+    ...cached
+      .filter(name => /^patient-\d+\.(pdf|jpg|png|webp)$/.test(name))
+      .map(name => `${Blob.fs.dirs.CacheDir}/${name}`),
+  ];
   files = [];
   await Promise.all(previous.map(path => Blob.fs.unlink(path).catch(() => {})));
 }
@@ -38,7 +47,7 @@ export async function downloadDocument(path: string) {
     files.push(target);
     const result = await Blob.config({ path: target }).fetch('GET', url, {
       Authorization: `Bearer ${token}`,
-      Accept: 'application/pdf',
+      Accept: 'application/pdf,image/jpeg,image/png,image/webp',
     });
     if (result.info().status !== 200) {
       await Blob.fs.unlink(target).catch(() => {});
@@ -46,9 +55,30 @@ export async function downloadDocument(path: string) {
         'This document is not available. Refresh the screen and try again.',
       );
     }
+    const headers = result.info().headers;
+    const mime = String(
+      headers['Content-Type'] ?? headers['content-type'] ?? 'application/pdf',
+    )
+      .split(';')[0]
+      .toLowerCase();
+    const extension: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    };
+    if (!extension[mime]) {
+      await Blob.fs.unlink(target).catch(() => {});
+      throw Error('Unsupported document format.');
+    }
+    const finalPath = target.replace(/\.pdf$/, '.' + extension[mime]);
+    if (finalPath !== target) {
+      await Blob.fs.mv(target, finalPath);
+      files.push(finalPath);
+    }
     if (Platform.OS === 'android')
-      await Blob.android.actionViewIntent(target, 'application/pdf');
-    else Blob.ios.openDocument(target);
+      await Blob.android.actionViewIntent(finalPath, mime);
+    else Blob.ios.openDocument(finalPath);
   });
 }
 export async function chooseFile() {

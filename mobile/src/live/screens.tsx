@@ -1496,7 +1496,7 @@ function LabReports() {
       {list(r.data).map(row => (
         <View key={row.id}>
           <Details value={row} />
-          {row.report && typeof row.report === 'object' && (
+          {Boolean(row.report) && typeof row.report === 'object' && (
             <Button
               secondary
               title="Open released report"
@@ -1831,7 +1831,7 @@ export const liveScreens = Object.fromEntries(
       return <Component />;
     },
   ]),
-) as Record<ScreenName, React.ComponentType>;
+) as unknown as Record<ScreenName, React.ComponentType>;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',

@@ -61,6 +61,12 @@ export class PatientClient {
       if (generation !== this.generation)
         throw new ApiError('Session ended.', 401);
       await this.save(tokens);
+      if (generation !== this.generation) {
+        await this.store.clear();
+        this.access = '';
+        this.refreshToken = '';
+        throw new ApiError('Session ended.', 401);
+      }
     })()
       .catch(async error => {
         if (error instanceof ApiError && error.status === 401) {
