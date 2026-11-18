@@ -125,6 +125,7 @@ function useResource<T>(path: string | null, poll = 0) {
         }
       };
       setData(null);
+      setBusy(Boolean(path) || revision > 0);
       void load();
       const timer = poll ? setInterval(() => void load(), poll) : null;
       const listener = AppState.addEventListener('change', state => {
