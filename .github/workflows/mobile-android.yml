@@ -24,11 +24,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --runInBand
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android compilation tools
         run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
       - name: Build standalone internal testing APK
