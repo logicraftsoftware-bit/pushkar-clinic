@@ -84,10 +84,11 @@ export function PlanForm({ editId, onBack, onSaved }: { editId?: string; onBack:
 
 export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onBack: () => void; onSaved: () => void }) {
   const [plans, setPlans] = useState<Plan[]>([]), [hospital, setHospital] = useState<Hospital | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState('')
   const [logo, setLogo] = useState(''), [saving, setSaving] = useState(false), [error, setError] = useState('')
   useEffect(() => {
-    adminApi<Plan[]>('/plans').then(value => setPlans(value.filter(p => p.status === 'active')))
-    if (editId) adminApi<Hospital>(`/hospitals/${editId}`).then(value => { setHospital(value); setLogo(value.logo_url ?? '') })
+    adminApi<Plan[]>('/plans').then(value => setPlans(value))
+    if (editId) adminApi<Hospital>(`/hospitals/${editId}`).then(value => { setHospital(value); setSelectedPlan(value.plan_id); setLogo(value.logo_url ?? '') })
   }, [editId])
   async function chooseLogo(file?: File) {
     if (!file) return
@@ -104,7 +105,7 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       registrationNumber:value('registrationNumber'),email:value('email'),phone:value('phone'),
       emergencyPhone:value('emergencyPhone'),address:value('address'),city:value('city'),state:value('state'),
       pinCode:value('pinCode'),country:value('country'),gstin:value('gstin'),branchName:value('branchName'),
-      planId:editId?hospital?.plan_id:value('planId'),subscriptionStartDate:editId?hospital?.subscription_start_date?.slice(0,10):value('subscriptionStartDate'),billingCycle:editId?hospital?.billing_cycle:value('billingCycle'),
+      planId:value('planId'),subscriptionStartDate:editId?hospital?.subscription_start_date?.slice(0,10):value('subscriptionStartDate'),billingCycle:editId?hospital?.billing_cycle:value('billingCycle'),
       trialDays:editId?hospital?.trial_days:Number(fd.get('trialDays')),status:value('status'),adminName:value('adminName'),
       adminEmail:value('adminEmail'),adminPhone:value('adminPhone'),password:value('password') || undefined,
     }
@@ -136,7 +137,9 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       <Field label="Main branch name" wide required><input name="branchName" required defaultValue={hospital?.branch_name} /></Field>
     </Section>
     <Section icon={CreditCard} title="Subscription" text="Assign commercial terms and initial tenant status.">
-      <p>{editId?'Subscription changes are managed separately under Subscriptions.':'Select the starting subscription for this clinic.'}</p>{editId?<p>Current plan: {plans.find(p=>p.id===hospital?.plan_id)?.name??'Assigned plan'} | {hospital?.billing_cycle}. Open Subscriptions to renew or replace.</p>:<><Field label="Subscription plan" required><select name="planId" required defaultValue={hospital?.plan_id ?? ''}><option value="" disabled>Select a plan</option>{plans.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></Field>
+      <p className="wide">{editId?'Choose the assigned plan below. Saving preserves the current start date, expiry, billing cycle and agreed price. Use Subscriptions to renew or change commercial terms.':'Select the starting subscription for this clinic.'}</p>
+      <Field label="Subscription plan" required><select name="planId" required value={selectedPlan} onChange={event=>setSelectedPlan(event.target.value)}><option value="" disabled>Select a plan</option>{plans.filter(p=>p.status==='active'||p.id===hospital?.plan_id).map(p => <option value={p.id} key={p.id} disabled={p.status!=='active'&&p.id!==hospital?.plan_id}>{p.name}{p.status!=='active'?' (inactive)':''}</option>)}</select></Field>
+      {editId?<p>Current billing cycle: {hospital?.billing_cycle}. Plan modules apply immediately after saving.</p>:<>
       <Field label="Subscription start date" required><input name="subscriptionStartDate" type="date" required defaultValue={date} /></Field>
       <Field label="Billing cycle" required><select name="billingCycle" defaultValue={hospital?.billing_cycle ?? 'monthly'}><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></Field>
       <Field label="Trial days" required><input name="trialDays" type="number" min="0" required defaultValue={hospital?.trial_days ?? 14} /></Field>
@@ -149,6 +152,6 @@ export function HospitalForm({ editId, onBack, onSaved }: { editId?: string; onB
       <Field label="Admin phone" required><input name="adminPhone" type="tel" required defaultValue={hospital?.admin_phone} /></Field>
       <Field label={editId && hospital?.admin_id ? 'New password (optional)' : 'Password'} required={!editId || !hospital?.admin_id}><input name="password" type="password" required={!editId || !hospital?.admin_id} minLength={8} autoComplete="new-password" /></Field>
     </Section>
-    <div className="entity-actionbar">{error && <span className="entity-error">{error}</span>}<button type="button" className="sa-secondary" onClick={onBack}>Cancel</button><button className="sa-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" /> : <Save />}{editId ? 'Save hospital' : 'Create clinic'}</button></div>
+    <div className="entity-actionbar">{error && <span className="entity-error">{error}</span>}<button type="button" className="sa-secondary" onClick={onBack}>Cancel</button><button className="sa-primary" disabled={saving}>{saving ? <LoaderCircle className="spin" /> : <Save />}{editId ? 'Save clinic' : 'Create clinic'}</button></div>
   </form>
 }

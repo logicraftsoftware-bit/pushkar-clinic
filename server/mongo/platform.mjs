@@ -1,4 +1,4 @@
-import {currentSubscriptions} from './subscription-access.mjs';
+import {currentSubscriptions,currentSubscription} from './subscription-access.mjs';
 import {Router} from 'express';
 import {platformSettingsWithDefaults} from './platform-settings.mjs';
 import {z} from 'zod';
@@ -26,6 +26,8 @@ router.put('/hospitals/:id',async(request,response)=>{
   if(body.password)z.string().min(12).max(200).parse(body.password);
   const password_hash=body.password?await hashPassword(body.password):null;
   const result=await transaction(async session=>{
+    await db.collection('workflow_locks').updateOne({_id:`${tenant}:subscription`},{$inc:{version:1}},{session,upsert:true});
+    await db.collection('workflow_locks').updateOne({_id:`${tenant}:subscription-capacity`},{$inc:{version:1}},{session,upsert:true});
     const hospital=await db.collection('hospitals').findOne({id:tenant,deleted_at:null},{session}),plan=await db.collection('subscription_plans').findOne({id:body.planId},{session});
     if(!hospital)throw failure('Clinic not found',404);if(!plan)throw failure('Subscription plan not found.');
     const now=new Date(),profile={name:body.name,code:body.code.toUpperCase(),status:body.status,logo_url:body.logoUrl??null,hospital_type:body.hospitalType,registration_number:body.registrationNumber,email:body.email.toLowerCase(),phone:body.phone,emergency_phone:body.emergencyPhone,address_line:body.address,city:body.city,state:body.state,pin_code:body.pinCode,country:body.country,gstin:body.gstin,updated_at:now};
@@ -38,7 +40,22 @@ router.put('/hospitals/:id',async(request,response)=>{
       await db.collection('users').updateOne({tenant_id:tenant,id:administrator.id},{$set:{first_name:names.shift(),last_name:names.join(' '),email:body.adminEmail.toLowerCase(),phone:body.adminPhone,...(password_hash?{password_hash,force_password_change:true}:{}),updated_at:now},$inc:{session_version:1}},{session});
       await db.collection('sessions').deleteMany({user_id:administrator.id},{session});
     }
-    // Commercial terms are changed only by the audited subscription endpoints.
+    const subscription=await currentSubscription(tenant,session);
+    if(subscription&&subscription.plan_id!==plan.id){
+      if(plan.status!=='active'||plan.archived)throw failure('Select an active subscription plan.');
+      if(!['active','trial','scheduled'].includes(subscriptionSummary(subscription).status))throw failure('Renew the expired or cancelled subscription under Subscriptions first.',409);
+      for(const [collection,limit] of [['branches',plan.max_branches],['users',plan.max_users]]){
+        if(await db.collection(collection).countDocuments({tenant_id:tenant,deleted_at:null},{session})>limit)throw failure('The selected plan cannot support the existing branches or users.',409);
+      }
+      const staff=await db.collection('staff_members').find({tenant_id:tenant,deleted_at:null,staff_type:'Doctor'},{session,projection:{id:1,user_id:1}}).toArray();
+      const doctors=await db.collection('users').find({tenant_id:tenant,deleted_at:null,role:'doctor'},{session,projection:{id:1}}).toArray();
+      if(new Set([...staff.map(row=>row.user_id??row.id),...doctors.map(row=>row.id)]).size>plan.max_doctors)throw failure('The selected plan cannot support the existing doctors.',409);
+      await db.collection('subscriptions').updateOne({id:subscription.id},{$set:{plan_id:plan.id,plan_code:plan.code,updated_at:now}},{session});
+      await db.collection('platform_events').insertOne({id:randomUUID(),tenant_id:tenant,actor_id:response.locals.account.id,source:'subscriptions',severity:'info',event_type:'subscription_plan_changed',message:'Subscription plan changed without renewing the term',details:{subscription_id:subscription.id,previous_plan_id:subscription.plan_id,plan_id:plan.id,starts_at:subscription.starts_at,expires_at:subscription.expires_at,billing_cycle:subscription.billing_cycle,monthly_amount:subscription.monthly_amount,status:subscription.status},created_at:now},{session});
+    }
+    const modules=await db.collection('platform_modules').find({id:{$in:plan.module_ids??[]},is_active:true},{session}).toArray();
+    await db.collection('hospitals').updateOne({id:tenant},{$set:{modules:modules.map(row=>row.code)}},{session});
+    // Changing the assigned plan never changes dates, billing cycle, status or agreed price.
     if(!['active','trial'].includes(body.status))await db.collection('sessions').deleteMany({tenant_id:tenant},{session});
     await audit(response,'hospital_updated',tenant,session);return {id:tenant};
   });response.json(result);
@@ -69,7 +86,7 @@ router.put('/hospitals/:id/modules',async(request,response)=>{
   const id=uuid.parse(request.params.id),body=z.object({moduleId:uuid,enabled:z.boolean()}).parse(request.body);
   await transaction(async session=>{
     const module=await db.collection('platform_modules').findOne({id:body.moduleId},{session});if(!module)throw failure('Module not found',404);
-    const result=await db.collection('hospitals').updateOne({id,deleted_at:null},body.enabled?{$addToSet:{modules:module.code}}:{$pull:{modules:module.code}},{session});
+    const result=await db.collection('hospitals').updateOne({id,deleted_at:null},body.enabled?{$addToSet:{modules:module.code},$pull:{disabled_modules:module.code}}:{$pull:{modules:module.code},$addToSet:{disabled_modules:module.code}},{session});
     if(!result.matchedCount)throw failure('Clinic not found',404);await audit(response,'hospital_modules_updated',id,session);
   });response.status(204).end();
 });

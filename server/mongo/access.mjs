@@ -1,6 +1,6 @@
 import {requireModule,moduleForPermission} from './subscription-access.mjs';
 import {permissionCatalog} from './permission-catalog.mjs';
-import {subscriptionPlan} from './subscription-access.mjs';
+import {entitledModules} from './subscription-access.mjs';
 import { db } from './database.mjs';
 import { permissionTemplates } from './permission-templates.mjs';
 import { randomUUID } from 'node:crypto';
@@ -15,9 +15,8 @@ export async function permissionsFor(account,session) {
   return [...new Set(roles.flatMap(role=>role.permissions??[]))];
 }
 export async function effectivePermissionsFor(account,session){
-  const granted=await permissionsFor(account,session),plan=await subscriptionPlan(account.tenant_id,session);
-  const hospital=await db.collection('hospitals').findOne({id:account.tenant_id},{session});
-  const enabled=await db.collection('platform_modules').find({id:{$in:plan.module_ids??[]},code:{$in:hospital?.modules??[]},is_active:true},{session,projection:{code:1}}).toArray(),codes=new Set(enabled.map(row=>row.code));
+  const granted=await permissionsFor(account,session);
+  const codes=new Set((await entitledModules(account.tenant_id,session)).map(row=>row.code));
   return (granted.includes('*')?permissionCatalog.map(row=>row.code):granted).filter(permission=>{const module=moduleForPermission(permission);return !module||codes.has(module);});
 }
 export async function hasActiveRole(account,session) {

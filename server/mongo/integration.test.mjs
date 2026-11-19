@@ -856,6 +856,47 @@ test('manual subscriptions enforce expiry, all-device logout, renewal history an
     const permissions=await request('/access-control/me','GET',null,first.data.token);assert.equal(permissions.status,200);assert.equal(permissions.data.permissions.includes('appointment.view'),false);
     const {aiLimit}=await import('./clinical-ai.mjs');await assert.rejects(aiLimit({locals:{account:{tenant_id:tenant,id:'synthetic-ai'}}}),error=>error.code==='PLAN_LIMIT_REACHED');
   });
+  await t.test('current plan modules override stale provisioning copies and explicit restrictions still apply',async()=>{
+    const portal=modules.find(row=>row.code==='patient_portal'),opd=modules.find(row=>row.code==='opd');
+    const {requireModule}=await import('./subscription-access.mjs');
+    await db.collection('subscription_plans').updateOne({id:plan.id},{$set:{module_ids:[portal.id,opd.id]}});
+    assert.deepEqual((await db.collection('hospitals').findOne({id:tenant})).modules,[]);
+    await requireModule(tenant,'patient_portal');
+    const published=await request('/patient-app-admin/settings','PATCH',{enabled:true,public_profile:{description:'Synthetic publishing test'}},first.data.token);
+    assert.equal(published.status,200,JSON.stringify(published.data));assert.equal(published.data.enabled,true);
+    assert.equal((await request('/patient-app-admin/settings','GET',null,first.data.token)).data.enabled,true);
+    assert.equal((await request('/access-control/me','GET',null,first.data.token)).data.permissions.includes('appointment.view'),true);
+    assert.equal((await request(`/admin/hospitals/${tenant}/modules`,'PUT',{moduleId:portal.id,enabled:false},owner)).status,204);
+    await assert.rejects(requireModule(tenant,'patient_portal'),error=>error.code==='MODULE_NOT_INCLUDED');
+    assert.equal((await request('/patient-app-admin/settings','PATCH',{enabled:true},first.data.token)).status,403);
+    assert.equal((await request(`/admin/hospitals/${tenant}/modules`,'PUT',{moduleId:portal.id,enabled:true},owner)).status,204);
+    await db.collection('platform_modules').updateOne({id:portal.id},{$set:{is_active:false}});
+    await assert.rejects(requireModule(tenant,'patient_portal'),error=>error.code==='MODULE_NOT_INCLUDED');
+    await db.collection('platform_modules').updateOne({id:portal.id},{$set:{is_active:true}});
+    await db.collection('subscription_plans').updateOne({id:plan.id},{$set:{module_ids:[]}});
+    await assert.rejects(requireModule(tenant,'patient_portal'),error=>error.code==='MODULE_NOT_INCLUDED');
+  });
+  await t.test('clinic plan selection preserves term and price with an audited change',async()=>{
+    const alternate=(await request('/admin/plans','POST',{name:'Alternate Plan',code:'policy-alternate',monthlyPrice:200,yearlyPrice:2000,trialDays:3,maxBranches:1,maxUsers:1,maxDoctors:1,storageLimitGb:1,aiUsageLimit:0,moduleIds:[],status:'active'},owner)).data;
+    const before=await db.collection('subscriptions').findOne({tenant_id:tenant});
+    const extraBranch='00000000-0000-4000-8000-000000000088';
+    await db.collection('branches').insertOne({id:extraBranch,tenant_id:tenant,code:'EXTRA',deleted_at:null});
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'PUT',{...body,planId:alternate.id},owner)).status,409);
+    assert.equal((await db.collection('subscriptions').findOne({id:before.id})).plan_id,plan.id);
+    await db.collection('branches').deleteOne({id:extraBranch,tenant_id:tenant});
+    await db.collection('subscription_plans').updateOne({id:alternate.id},{$set:{status:'inactive'}});
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'PUT',{...body,planId:alternate.id},owner)).status,400);
+    await db.collection('subscription_plans').updateOne({id:alternate.id},{$set:{status:'active'}});
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'PUT',{...body,planId:alternate.id},owner)).status,200);
+    const after=await db.collection('subscriptions').findOne({id:before.id});
+    for(const key of ['starts_at','expires_at','billing_cycle','monthly_amount','status'])assert.deepEqual(after[key],before[key]);
+    assert.equal(after.plan_id,alternate.id);
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'GET',null,owner)).data.plan_id,alternate.id);
+    assert.ok(await db.collection('platform_events').findOne({tenant_id:tenant,event_type:'subscription_plan_changed','details.previous_plan_id':plan.id}));
+    assert.equal((await request(`/admin/hospitals/${tenant}`,'PUT',body,owner)).status,200);
+    // Profile edits revoke the primary administrator's sessions; obtain fresh tokens.
+    first=await signin();second=await signin();assert.equal(first.status,200);assert.equal(second.status,200);
+  });
   await t.test('upload storage guard rejects growth above the plan allowance',async()=>{
     const {enforceStorage}=await import('./subscription-access.mjs'),{transaction}=await import('./database.mjs');
     await db.collection('subscription_plans').updateOne({id:plan.id},{$set:{storage_limit_gb:0}});

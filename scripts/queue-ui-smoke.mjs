@@ -109,11 +109,15 @@ try{
   assert.equal(await staffPage.getByText('No records found.',{exact:true}).count(),0);
   const ownerContext=await browser.newContext({viewport:{width:1440,height:1000}});
   await ownerContext.addInitScript(()=>sessionStorage.setItem('careframe_superadmin_token','synthetic-owner-token'));
-  let assignment;
+  let assignment,clinicEdit;
   await ownerContext.route('**/api/v1/**',async route=>{
     const path=new URL(route.request().url()).pathname;let value={};
     if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
-    else if(path.endsWith('/admin/plans'))value=[{id:doctorId,name:'Clinic Standard',status:'active',monthly_price:500,yearly_price:5000}];
+    else if(path.endsWith('/admin/plans'))value=[{id:doctorId,name:'Clinic Standard',status:'active',monthly_price:500,yearly_price:5000},{id:branchId,name:'Alternate Plan',status:'active'}];
+    else if(path.endsWith('/admin/hospitals/'+branchId)){
+      if(route.request().method()==='PUT'){clinicEdit=route.request().postDataJSON();value={id:branchId};}
+      else value={id:branchId,name:'Synthetic Clinic',code:'SYNTHETIC',hospital_type:'Clinic',registration_number:'TEST',email:'clinic@example.invalid',phone:'9999999999',emergency_phone:'9999999999',address_line:'Test Road',city:'Test City',state:'Test State',pin_code:'100001',country:'India',branch_name:'Main',plan_id:doctorId,subscription_start_date:'2026-11-01',billing_cycle:'yearly',status:'active',trial_days:0,admin_id:'synthetic-admin',admin_name:'Test Admin',admin_email:'admin@example.invalid',admin_phone:'9999999998'};
+    }
     else if(path.endsWith('/admin/hospitals'))value={data:[{id:branchId,name:'Synthetic Clinic'}]};
     else if(path.endsWith('/admin/subscriptions')){
       if(route.request().method()==='POST'){assignment=route.request().postDataJSON();value={id:'new'};}
@@ -135,6 +139,16 @@ try{
   await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});
   assert.equal(assignment.tenantId,branchId);assert.equal(assignment.mode,'renew');assert.equal(assignment.amount,500);
   await ownerPage.screenshot({path:'artifacts/queue-ui/subscription-management.png',fullPage:true});
+  await ownerPage.goto(origin+'/superadmin/edit-clinic/'+branchId);
+  await ownerPage.getByRole('heading',{name:'Edit clinic',exact:true}).waitFor();
+  const planSelector=ownerPage.getByLabel('Subscription plan',{exact:false});
+  await planSelector.locator('option',{hasText:'Clinic Standard'}).waitFor({state:'attached'});
+  assert.equal(await planSelector.inputValue(),doctorId);
+  await planSelector.selectOption(branchId);
+  await ownerPage.screenshot({path:'artifacts/queue-ui/clinic-plan-selection.png',fullPage:true});
+  await ownerPage.getByRole('button',{name:'Save clinic',exact:true}).click();
+  await ownerPage.getByRole('heading',{name:'Edit clinic',exact:true}).waitFor({state:'hidden'});
+  assert.equal(clinicEdit.planId,branchId);assert.equal(clinicEdit.subscriptionStartDate,'2026-11-01');assert.equal(clinicEdit.billingCycle,'yearly');
   const clinicContext=await browser.newContext({viewport:{width:1440,height:1100}});
   await clinicContext.addInitScript(({branchId})=>sessionStorage.setItem('careframe_portal_session',JSON.stringify({token:'synthetic-clinic-admin',user:{id:'synthetic-admin',name:'Test Clinic Admin',email:'admin@example.invalid',phone:'0000000000',role:'hospital_admin',portal:'hospital_admin'},hospital:{id:'synthetic-clinic',name:'Synthetic Clinic',code:'TEST',branchId,branchName:'Synthetic Branch',status:'active'},modules:['opd','patient_portal']})),{branchId});
   let mobileSettings={enabled:false,pay_at_clinic:true,manual_check_in:false,booking_fee:0,lab_reports_require_payment:true,public_profile:{}},publishingSaves=0;

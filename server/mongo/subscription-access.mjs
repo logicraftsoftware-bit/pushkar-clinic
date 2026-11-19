@@ -37,11 +37,15 @@ export async function enforceCount(tenant,kind,session,exclude) {
   }
   if(count>=plan[field])throw Object.assign(Error(`Your plan allows ${plan[field]} ${kind}. Upgrade the subscription before adding more.`),{status:403,code:'PLAN_LIMIT_REACHED'});
 }
+export async function entitledModules(tenant,session) {
+  const plan=await subscriptionPlan(tenant,session);
+  const hospital=await db.collection('hospitals').findOne({id:tenant,deleted_at:null},{session});
+  if(!hospital)return [];
+  // The current plan is authoritative; modules is only a legacy provisioning snapshot.
+  return db.collection('platform_modules').find({id:{$in:plan.module_ids??[]},code:{$nin:hospital.disabled_modules??[]},is_active:true},{session,projection:{id:1,code:1}}).toArray();
+}
 export async function requireModule(tenant,code) {
-  const plan=await subscriptionPlan(tenant);
-  const hospital=await db.collection('hospitals').findOne({id:tenant,deleted_at:null});
-  const module=await db.collection('platform_modules').findOne({code,is_active:true});
-  if(!module||!plan.module_ids?.includes(module.id)||!hospital?.modules?.includes(code))throw Object.assign(Error(`The ${code} module is not included in your clinic subscription.`),{status:403,code:'MODULE_NOT_INCLUDED'});
+  if(!(await entitledModules(tenant)).some(module=>module.code===code))throw Object.assign(Error(`The ${code} module is not included in your clinic subscription.`),{status:403,code:'MODULE_NOT_INCLUDED'});
 }
 export async function revokeExpiredSubscriptions(){
   for(const row of await currentSubscriptions())if(!['active','trial'].includes(row.status))await db.collection('sessions').deleteMany({tenant_id:row.tenant_id});

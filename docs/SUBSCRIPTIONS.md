@@ -12,7 +12,7 @@ There is no subscription payment gateway and no automatic debit.
 4. Enter the approval or renewal reference.
 5. **Renew / activate** extends an unexpired matching plan and cycle from its existing expiry. An expired assignment starts from now. To change the plan/cycle immediately use **Replace now**. Replacement logs out existing devices.
 
-The previous assignment remains as superseded history. Cancellation requires a reason and revokes all clinic sessions immediately. Profile editing does not change subscription dates, prices or plan assignments. Manual clinic suspension remains independent of subscription dates.
+The previous assignment remains as superseded history. Cancellation requires a reason and revokes all clinic sessions immediately. Clinic editing shows the currently assigned plan in a selector. Saving a different active plan changes entitlements without renewing: dates, billing cycle, status and agreed price stay unchanged. Changes are audited with the old and new plan IDs; plans below existing branch/user/doctor counts are rejected. Expired or cancelled terms must be renewed under Subscriptions. Manual clinic suspension remains independent of subscription dates.
 
 ## Expiry and warnings
 
@@ -33,3 +33,7 @@ Public appointment/TV streams, patient self-registration and CRM synchronization
 - Contract MRR includes only current active paid terms; annual cycle prices are divided by twelve. Trial, expired and superseded assignments do not contribute. Contract MRR is not collected cash or an invoice ledger.
 
 No credentials, new environment variables, payment gateway, external mail service or local database setup is required for these controls.
+
+## Module updates
+
+Module access follows the current assigned plan and active platform modules, not an old clinic provisioning snapshot. Adding Patient Portal to an assigned plan takes effect without replacing or renewing subscriptions. Explicit clinic module restrictions remain enforced through disabled_modules. After deployment, refresh Clinic Admin > Settings > Patient App and save publication again. No SMS gateway is required to publish; SMS OTP still requires separate provider configuration.

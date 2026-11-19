@@ -10,7 +10,7 @@ import { db, initializeMongo, transaction } from './database.mjs';
 import { activeAccount, hashPassword, verifyPassword, authorizedPortal } from './security.mjs';
 import provisioning from './provisioning.mjs';
 import subscriptionAdmin from './subscription-admin.mjs';
-import {subscriptionAccess,requireModule,moduleForRoute,revokeExpiredSubscriptions} from './subscription-access.mjs';
+import {subscriptionAccess,requireModule,moduleForRoute,revokeExpiredSubscriptions,entitledModules} from './subscription-access.mjs';
 import patients from './patients.mjs';
 import management from './management.mjs';
 import clinical from './clinical.mjs';
@@ -167,7 +167,7 @@ app.post('/api/v1/auth/login', rateLimit, async (request, response) => {
   const token = await issueSession(account, 'careframe-portal', { tenantId: account.tenant_id, branchId: account.branch_id, role: account.role, portal });
   const activityId = randomUUID();
   await db.collection('login_activity').insertOne({ id: activityId, tenant_id: account.tenant_id, user_id: account.id, role: account.role, branch_id: account.branch_id, login_status: 'Success', login_time: new Date() });
-  const modules=await db.collection('platform_modules').find({code:{$in:hospital.modules??[]},is_active:true},{projection:{code:1}}).toArray();
+  const modules=await entitledModules(account.tenant_id);
   response.json({ token, forcePasswordChange: Boolean(account.force_password_change), loginActivityId: activityId,
     user: { id: account.id, name: `${account.first_name} ${account.last_name}`.trim(), email: account.email, phone: account.phone, role: account.role, portal },
     hospital: { id: hospital.id, name: hospital.name, code: hospital.code, logoUrl: hospital.logo_url ?? '', status: hospital.status, branchId: branch.id, branchName: branch.name, settings: hospital.settings ?? {} },
