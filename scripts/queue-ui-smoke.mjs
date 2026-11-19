@@ -139,7 +139,7 @@ try{
   await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});
   assert.equal(assignment.tenantId,branchId);assert.equal(assignment.mode,'renew');assert.equal(assignment.amount,500);
   await ownerPage.screenshot({path:'artifacts/queue-ui/subscription-management.png',fullPage:true});
-  await ownerPage.goto(origin+'/superadmin/edit-clinic/'+branchId);
+  await ownerPage.goto(origin+'/superadmin/edit-hospital/'+branchId);
   await ownerPage.getByRole('heading',{name:'Edit clinic',exact:true}).waitFor();
   const planSelector=ownerPage.getByLabel('Subscription plan',{exact:false});
   await planSelector.locator('option',{hasText:'Clinic Standard'}).waitFor({state:'attached'});
