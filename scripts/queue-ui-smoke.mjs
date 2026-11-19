@@ -135,6 +135,32 @@ try{
   await ownerPage.getByRole('heading',{name:'Manual subscription assignment',exact:true}).waitFor({state:'hidden'});
   assert.equal(assignment.tenantId,branchId);assert.equal(assignment.mode,'renew');assert.equal(assignment.amount,500);
   await ownerPage.screenshot({path:'artifacts/queue-ui/subscription-management.png',fullPage:true});
+  const clinicContext=await browser.newContext({viewport:{width:1440,height:1100}});
+  await clinicContext.addInitScript(({branchId})=>sessionStorage.setItem('careframe_portal_session',JSON.stringify({token:'synthetic-clinic-admin',user:{id:'synthetic-admin',name:'Test Clinic Admin',email:'admin@example.invalid',phone:'0000000000',role:'hospital_admin',portal:'hospital_admin'},hospital:{id:'synthetic-clinic',name:'Synthetic Clinic',code:'TEST',branchId,branchName:'Synthetic Branch',status:'active'},modules:['opd','patient_portal']})),{branchId});
+  let mobileSettings={enabled:false,pay_at_clinic:true,manual_check_in:false,booking_fee:0,lab_reports_require_payment:true,public_profile:{}},publishingSaves=0;
+  await clinicContext.route('**/api/v1/**',async route=>{
+    const path=new URL(route.request().url()).pathname;let value={};
+    if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
+    else if(path.endsWith('/access-control/me'))value={permissions:['menu.settings.view','settings.view','settings.manage'],roles:[],managed_roles:[]};
+    else if(path.endsWith('/subscription'))value={status:'active',renewal_warning:false};
+    else if(path.endsWith('/patient-app-admin/settings')){if(route.request().method()==='PATCH'){mobileSettings={...mobileSettings,...route.request().postDataJSON()};publishingSaves++;}value=mobileSettings;}
+    else if(path.endsWith('/hospital-admin/profile'))value={name:'Synthetic Clinic',code:'TEST'};
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)});
+  });
+  const clinicPage=await clinicContext.newPage();clinicPage.on('pageerror',error=>errors.push(error.message));
+  await clinicPage.goto(origin+'/app/hospital-admin/settings');
+  await clinicPage.getByRole('button',{name:'Patient App',exact:true}).click();
+  await clinicPage.getByRole('checkbox',{name:'Publish this clinic in the patient app',exact:true}).check();
+  await clinicPage.getByRole('textbox',{name:'Public clinic description',exact:true}).fill('Synthetic public clinic');
+  await clinicPage.getByRole('button',{name:'Save patient app settings',exact:true}).click();
+  await clinicPage.getByText(/Patient app settings saved/).waitFor();
+  assert.equal(publishingSaves,1);assert.equal(mobileSettings.enabled,true);
+  assert.equal(await clinicPage.getByText('Tell me which settings should be available in this section.',{exact:true}).count(),0);
+  await clinicPage.reload();
+  await clinicPage.getByRole('checkbox',{name:'Publish this clinic in the patient app',exact:true}).waitFor();
+  assert.equal(await clinicPage.getByRole('checkbox',{name:'Publish this clinic in the patient app',exact:true}).isChecked(),true);
+  await clinicPage.screenshot({path:'artifacts/queue-ui/patient-app-settings.png',fullPage:true});
+  await clinicContext.close();
   await ownerContext.close();
   await staffContext.close();
   assert.deepEqual(errors,[],'Browser runtime errors');
