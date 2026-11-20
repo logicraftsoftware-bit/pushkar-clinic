@@ -1,3 +1,8 @@
+import {
+  requestFirebaseOtp,
+  confirmFirebaseOtp,
+  clearFirebaseLogin,
+} from './firebase';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -282,7 +287,10 @@ function Welcome() {
   const nav = useNavigation<Navigation>(),
     p = usePatient(),
     a = useAction(),
-    config = useResource<{ sms_login_configured: boolean }>('/config');
+    config = useResource<{
+      sms_login_configured: boolean;
+      phone_auth_provider?: string;
+    }>('/config');
   return (
     <Screen title="Welcome to JibonCare" light>
       <View style={{ alignItems: 'center', paddingVertical: 24 }}>
@@ -308,6 +316,10 @@ function Welcome() {
           can browse clinics and doctors now.
         </Text>
       )}
+      <Text style={styles.muted}>
+        By continuing, you agree to phone verification. Google processes your
+        phone number for authentication and abuse prevention.
+      </Text>
       <Button
         title={a.busy ? 'Sending…' : 'Send OTP'}
         disabled={
@@ -317,16 +329,19 @@ function Welcome() {
         }
         onPress={() =>
           void a.run(async () => {
-            const challenge = await api.request<{
-              challenge_id: string;
-              resend_after: number;
-              phone: string;
-            }>(
-              '/auth/otp/request',
-              'POST',
-              { phone: '+91' + p.phone },
-              { public: true },
-            );
+            const challenge =
+              config.data?.phone_auth_provider === 'firebase'
+                ? await requestFirebaseOtp('+91' + p.phone)
+                : await api.request<{
+                    challenge_id: string;
+                    resend_after: number;
+                    phone: string;
+                  }>(
+                    '/auth/otp/request',
+                    'POST',
+                    { phone: '+91' + p.phone },
+                    { public: true },
+                  );
             p.setChallenge(challenge);
             nav.navigate('OTP');
           })
@@ -371,13 +386,23 @@ function OTP() {
         disabled={a.busy || !/^\d{6}$/.test(code) || !p.challenge}
         onPress={() =>
           void a.run(async () => {
-            const response = await api.request<Tokens>(
-              '/auth/otp/verify',
-              'POST',
-              { challenge_id: p.challenge!.challenge_id, code },
-              { public: true },
-            );
+            const response =
+              p.challenge?.challenge_id === 'firebase'
+                ? await api.request<Tokens>(
+                    '/auth/firebase',
+                    'POST',
+                    { id_token: await confirmFirebaseOtp(code) },
+                    { public: true },
+                  )
+                : await api.request<Tokens>(
+                    '/auth/otp/verify',
+                    'POST',
+                    { challenge_id: p.challenge!.challenge_id, code },
+                    { public: true },
+                  );
             await api.save(response);
+            if (p.challenge?.challenge_id === 'firebase')
+              await clearFirebaseLogin();
             const me = await p.loadMe();
             nav.reset({
               index: 0,
@@ -392,16 +417,19 @@ function OTP() {
         disabled={seconds > 0 || a.busy}
         onPress={() =>
           void a.run(async () => {
-            const next = await api.request<{
-              challenge_id: string;
-              resend_after: number;
-              phone: string;
-            }>(
-              '/auth/otp/request',
-              'POST',
-              { phone: '+91' + p.phone },
-              { public: true },
-            );
+            const next =
+              p.challenge?.challenge_id === 'firebase'
+                ? await requestFirebaseOtp('+91' + p.phone, true)
+                : await api.request<{
+                    challenge_id: string;
+                    resend_after: number;
+                    phone: string;
+                  }>(
+                    '/auth/otp/request',
+                    'POST',
+                    { phone: '+91' + p.phone },
+                    { public: true },
+                  );
             p.setChallenge(next);
             setSeconds(next.resend_after);
             setCode('');

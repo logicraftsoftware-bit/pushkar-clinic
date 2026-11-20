@@ -18,6 +18,7 @@ const parsed = z.object({
   CRM_INTEGRATION_ENABLED:z.enum(['true','false']).prefault('false'),
   CRM_API_BASE_URL:z.string().url().regex(/^https:\/\//).optional(),
   PATIENT_APP_OTP_MODE:z.enum(['disabled','development','webhook']).prefault('disabled'),
+  PATIENT_APP_FIREBASE_PROJECT_ID:z.string().regex(/^[a-z][a-z0-9-]{4,62}$/).prefault('jiboncare'),
   PATIENT_APP_SMS_WEBHOOK_URL:z.string().url().regex(/^https:\/\//).optional(),
   PATIENT_APP_SMS_WEBHOOK_SECRET:z.string().min(32).optional(),
   PATIENT_APP_PUSH_WEBHOOK_URL:z.string().url().regex(/^https:\/\//).optional(),

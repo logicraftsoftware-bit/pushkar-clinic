@@ -34,6 +34,8 @@ jobs:
           packages: platform-tools
       - name: Install Android compilation tools
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - name: Print testing APK signing fingerprints
+        run: keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android
       - name: Build standalone internal testing APK
         run: |
           chmod +x android/gradlew

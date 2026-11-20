@@ -1,3 +1,8 @@
+jest.mock('../src/live/firebase', () => ({
+  requestFirebaseOtp: jest.fn(),
+  confirmFirebaseOtp: jest.fn(),
+  clearFirebaseLogin: jest.fn(),
+}));
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
 import { PatientProvider } from '../src/live/PatientContext';

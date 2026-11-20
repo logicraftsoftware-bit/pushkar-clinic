@@ -1,3 +1,4 @@
+import {config} from '../config.mjs';
 import { z } from 'zod';
 import { db } from '../database.mjs';
 import { slotsFor } from '../clinical.mjs';
@@ -150,7 +151,8 @@ export function registerDirectory(router) {
         languages: ['en', 'hi', 'bn'],
         currency: 'INR',
         timezone: 'Asia/Kolkata',
-        sms_login_configured: process.env.PATIENT_APP_OTP_MODE === 'webhook',
+        sms_login_configured: Boolean(config.PATIENT_APP_FIREBASE_PROJECT_ID) || process.env.PATIENT_APP_OTP_MODE === 'webhook',
+        phone_auth_provider: config.PATIENT_APP_FIREBASE_PROJECT_ID ? 'firebase' : 'webhook',
         terms_url: values.patient_app_terms_url ?? null,
         privacy_url: values.patient_app_privacy_url ?? null,
         online_payment_provider: 'Razorpay',

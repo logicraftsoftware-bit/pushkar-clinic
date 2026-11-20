@@ -4,6 +4,7 @@ import { randomUUID, randomInt, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { db, transaction } from '../database.mjs';
 import { config } from '../config.mjs';
+import {verifyFirebasePhoneToken} from './firebase.mjs';
 import {
   audit,
   equalSecret,
@@ -236,65 +237,7 @@ route(
         { session }
       );
       if (!consumed.modifiedCount) throw fail('OTP was already used.', 401);
-      let account = await db
-        .collection('mobile_accounts')
-        .findOne({ phone: challenge.phone }, { session });
-      if (account && account.status !== 'Active')
-        throw fail('Account is not active. Contact support.', 403);
-      if (!account) {
-        const now = new Date(),
-          profileId = randomUUID();
-        account = {
-          id: randomUUID(),
-          phone: challenge.phone,
-          status: 'Active',
-          self_profile_id: profileId,
-          preferences: {
-            language: 'en',
-            push_enabled: true,
-            appointment_reminders: true,
-            queue_alerts: true,
-          },
-          created_at: now,
-          updated_at: now,
-        };
-        await db
-          .collection('mobile_accounts')
-          .insertOne({ ...account }, { session });
-        await db.collection('mobile_profiles').insertOne(
-          {
-            id: profileId,
-            account_id: account.id,
-            name: '',
-            date_of_birth: null,
-            sex: 'Other',
-            address: {},
-            emergency_contact: {},
-            relationship: 'Self',
-            active: true,
-            created_at: now,
-            updated_at: now,
-          },
-          { session }
-        );
-      }
-      await audit(account, 'patient_app_login', account.id, session);
-      return {
-        ...(await issue(account, session)),
-        account: {
-          id: account.id,
-          phone: account.phone,
-          self_profile_id: account.self_profile_id,
-        },
-        profile: safeProfile(
-          await db
-            .collection('mobile_profiles')
-            .findOne(
-              { id: account.self_profile_id, account_id: account.id },
-              { session }
-            )
-        ),
-      };
+      return patientLogin(challenge.phone, session);
     });
     res.json(result);
   },
@@ -376,3 +319,80 @@ export function registerLogout(router) {
     }
   );
 }
+
+// Reuse the same account, profile and session lifecycle for both verified phone providers.
+async function patientLogin(mobile, session) {
+      let account = await db
+        .collection('mobile_accounts')
+        .findOne({ phone: mobile }, { session });
+      if (account && account.status !== 'Active')
+        throw fail('Account is not active. Contact support.', 403);
+      if (!account) {
+        const now = new Date(),
+          profileId = randomUUID();
+        account = {
+          id: randomUUID(),
+          phone: mobile,
+          status: 'Active',
+          self_profile_id: profileId,
+          preferences: {
+            language: 'en',
+            push_enabled: true,
+            appointment_reminders: true,
+            queue_alerts: true,
+          },
+          created_at: now,
+          updated_at: now,
+        };
+        await db
+          .collection('mobile_accounts')
+          .insertOne({ ...account }, { session });
+        await db.collection('mobile_profiles').insertOne(
+          {
+            id: profileId,
+            account_id: account.id,
+            name: '',
+            date_of_birth: null,
+            sex: 'Other',
+            address: {},
+            emergency_contact: {},
+            relationship: 'Self',
+            active: true,
+            created_at: now,
+            updated_at: now,
+          },
+          { session }
+        );
+      }
+      await audit(account, 'patient_app_login', account.id, session);
+      return {
+        ...(await issue(account, session)),
+        account: {
+          id: account.id,
+          phone: account.phone,
+          self_profile_id: account.self_profile_id,
+        },
+        profile: safeProfile(
+          await db
+            .collection('mobile_profiles')
+            .findOne(
+              { id: account.self_profile_id, account_id: account.id },
+              { session }
+            )
+        ),
+      };
+}
+route(authRouter,'post','/auth/firebase','Exchange Firebase phone authentication for a patient session',async(req,res)=>{
+  await rateLimit(`firebase-login:${req.ip}`,30);
+  if(!config.PATIENT_APP_FIREBASE_PROJECT_ID)throw fail('Firebase sign-in is not configured.',503);
+  const identity=await verifyFirebasePhoneToken(req.input.id_token,config.PATIENT_APP_FIREBASE_PROJECT_ID);
+  const mobile=phone.parse(identity.phone_number);
+  const result=await transaction(async session=>{
+    const account=await db.collection('mobile_accounts').findOne({phone:mobile},{session});
+    if(account?.firebase_uid&&account.firebase_uid!==identity.sub)throw fail('Phone identity has changed. Contact support.',403);
+    const response=await patientLogin(mobile,session);
+    await db.collection('mobile_accounts').updateOne({id:response.account.id},{$set:{firebase_uid:identity.sub}},{session});
+    return response;
+  });
+  res.json(result);
+},{public:true,body:z.object({id_token:z.string().min(100).max(10000)}).strict()});

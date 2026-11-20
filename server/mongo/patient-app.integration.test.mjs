@@ -1,6 +1,8 @@
 // Run only against an explicitly selected disposable local replica set, never Atlas.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import jwt from 'jsonwebtoken';
+import {generateKeyPairSync} from 'node:crypto';
 import { randomUUID, createHmac } from 'node:crypto';
 if (
   process.env.PATIENT_APP_INTEGRATION_TEST !== 'true' ||
@@ -27,10 +29,12 @@ const realFetch = globalThis.fetch,
   orders = new Map(),
   payments = new Map();
 let orderNumber = 0;
+const firebaseKeys=generateKeyPairSync('rsa',{modulusLength:2048});
 globalThis.fetch = async (url, options = {}) => {
   const target = new URL(String(url));
   if (target.hostname === '127.0.0.1' && target.origin === base)
     return realFetch(url, options);
+  if(target.href==='https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com')return Response.json({synthetic:firebaseKeys.publicKey.export({type:'spki',format:'pem'})},{headers:{'cache-control':'max-age=3600'}});
   if (target.origin === 'https://api.razorpay.com') {
     const path = target.pathname.replace('/v1/', '');
     if (path === 'orders' && options.method === 'POST') {
@@ -337,6 +341,20 @@ const gatewaySecret = 'synthetic-razorpay-secret-not-real',
   webhookSecret = 'synthetic-webhook-secret-not-real';
 
 test('patient mobile HTTP workflows, access boundaries and financial integrity', async (t) => {
+  await t.test('Firebase phone exchange verifies project and provider, reuses account and blocks disabled accounts',async()=>{
+    const now=Math.floor(Date.now()/1000);
+    const identity={sub:'synthetic-firebase-uid',phone_number:'+919999988888',auth_time:now,iat:now,exp:now+3600,aud:'jiboncare',iss:'https://securetoken.google.com/jiboncare',firebase:{sign_in_provider:'phone'}};
+    const signed=(extra={})=>jwt.sign({...identity,...extra},firebaseKeys.privateKey,{algorithm:'RS256',keyid:'synthetic'});
+    expectStatus(await call('/auth/firebase',null,'POST',{id_token:signed({aud:'wrong-project'})}),401);
+    expectStatus(await call('/auth/firebase',null,'POST',{id_token:signed({firebase:{sign_in_provider:'password'}})}),401);
+    const first=expectStatus(await call('/auth/firebase',null,'POST',{id_token:signed()}),200);
+    assert.equal(first.account.phone,identity.phone_number);assert.ok(first.refresh_token);
+    const next=expectStatus(await call('/auth/firebase',null,'POST',{id_token:signed()}),200);
+    assert.equal(next.account.id,first.account.id);assert.equal(next.profile.id,first.profile.id);
+    expectStatus(await call('/me',first.access_token),200);
+    await db.collection('mobile_accounts').updateOne({id:first.account.id},{$set:{status:'Disabled'}});
+    expectStatus(await call('/auth/firebase',null,'POST',{id_token:signed()}),403);
+  });
   await t.test(
     'OpenAPI documents the implemented routes and public config has no provider secrets',
     async () => {
@@ -349,7 +367,8 @@ test('patient mobile HTTP workflows, access boundaries and financial integrity',
       );
       assert.equal((await call('/me')).status, 401);
       const config = expectStatus(await call('/config'), 200);
-      assert.equal(config.sms_login_configured, false);
+      assert.equal(config.sms_login_configured, true);
+      assert.equal(config.phone_auth_provider, 'firebase');
       assert.ok(!JSON.stringify(config).includes(gatewaySecret));
     }
   );

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "320648334204",
+    "project_id": "jiboncare",
+    "storage_bucket": "jiboncare.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320648334204:android:b728a208f5a4b154f432f9",
+        "android_client_info": {
+          "package_name": "com.jiboncare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACpbCXiZ31JaWlmBy2w0ZPlguaTuBY1lw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
