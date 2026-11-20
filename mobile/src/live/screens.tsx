@@ -419,7 +419,7 @@ function OTP() {
           void a.run(async () => {
             const next =
               p.challenge?.challenge_id === 'firebase'
-                ? await requestFirebaseOtp('+91' + p.phone, true)
+                ? await requestFirebaseOtp('+91' + p.phone)
                 : await api.request<{
                     challenge_id: string;
                     resend_after: number;

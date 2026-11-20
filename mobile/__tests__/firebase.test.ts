@@ -28,13 +28,13 @@ test('Firebase SMS confirmation stays in memory and yields a signed token', asyn
   );
   const challenge = await requestFirebaseOtp('+919999999999');
   expect(challenge.challenge_id).toBe('firebase');
-  expect(mockRequest).toHaveBeenCalledWith({}, '+919999999999', false);
+  expect(mockRequest).toHaveBeenCalledWith({}, '+919999999999');
   expect(await confirmFirebaseOtp('123456')).toBe('synthetic-signed-token');
   expect(mockConfirm).toHaveBeenCalledWith('123456');
   await expect(confirmFirebaseOtp('123456')).rejects.toThrow(
     'Request a new OTP',
   );
-  await requestFirebaseOtp('+919999999999', true);
-  expect(mockRequest).toHaveBeenLastCalledWith({}, '+919999999999', true);
+  await requestFirebaseOtp('+919999999999');
+  expect(mockRequest).toHaveBeenLastCalledWith({}, '+919999999999');
   await clearFirebaseLogin();
 });

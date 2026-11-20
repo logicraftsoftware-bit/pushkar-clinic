@@ -3,12 +3,12 @@ import {
   signInWithPhoneNumber,
   signOut,
   getIdToken,
-  type FirebaseAuthTypes,
 } from '@react-native-firebase/auth';
 import { Platform } from 'react-native';
 
-let confirmation: FirebaseAuthTypes.ConfirmationResult | null = null;
-export async function requestFirebaseOtp(phone: string, resend = false) {
+let confirmation: Awaited<ReturnType<typeof signInWithPhoneNumber>> | null =
+  null;
+export async function requestFirebaseOtp(phone: string) {
   if (Platform.OS !== 'android')
     throw new Error(
       'Firebase phone sign-in is currently configured for Android only.',
@@ -16,7 +16,7 @@ export async function requestFirebaseOtp(phone: string, resend = false) {
   confirmation = null;
   const auth = getAuth();
   await signOut(auth);
-  confirmation = await signInWithPhoneNumber(auth, phone, resend);
+  confirmation = await signInWithPhoneNumber(auth, phone);
   return { challenge_id: 'firebase', resend_after: 60, phone };
 }
 export async function confirmFirebaseOtp(code: string) {
