@@ -47,7 +47,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (api.restore as jest.Mock).mockResolvedValue(false);
 });
-test('SMS-disabled login remains disabled while guest browsing works', async () => {
+test('SMS-disabled login remains disabled and offers no guest entry', async () => {
   (api.request as jest.Mock).mockResolvedValue({ sms_login_configured: false });
   let tree: Renderer.ReactTestRenderer;
   await act(async () => {
@@ -61,11 +61,12 @@ test('SMS-disabled login remains disabled while guest browsing works', async () 
     .findAllByProps({ accessibilityLabel: 'Send OTP' })
     .find(node => node.props.accessibilityRole === 'button');
   expect(send?.props.disabled).toBe(true);
-  const guest = tree!.root
-    .findAllByProps({ accessibilityLabel: 'Browse clinics without signing in' })
-    .find(node => node.props.accessibilityRole === 'button');
-  await act(async () => guest!.props.onPress());
-  expect(mockNavigate).toHaveBeenCalledWith('Clinics');
+  expect(
+    tree!.root.findAllByProps({
+      accessibilityLabel: 'Browse clinics without signing in',
+    }),
+  ).toHaveLength(0);
+  expect(mockNavigate).not.toHaveBeenCalledWith('Clinics');
   expect(JSON.stringify(tree!.toJSON())).not.toContain('528471');
   await act(async () => tree!.unmount());
 });

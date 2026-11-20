@@ -66,3 +66,27 @@ test('automatic verification accepts only the phone requested for this login', a
   await Promise.resolve();
   expect(complete).not.toHaveBeenCalled();
 });
+
+test('first login sends OTP even when native Firebase has no user to sign out', async () => {
+  mockSignOut.mockRejectedValue(
+    Object.assign(new Error('No user currently signed in.'), {
+      code: 'auth/no-current-user',
+    }),
+  );
+  await expect(requestFirebaseOtp('+919999999999')).resolves.toMatchObject({
+    challenge_id: 'firebase',
+  });
+  expect(mockRequest).toHaveBeenCalledTimes(1);
+  await expect(clearFirebaseLogin()).resolves.toBeUndefined();
+});
+test('unexpected sign-out errors remain visible and do not send an OTP', async () => {
+  mockSignOut.mockRejectedValue(
+    Object.assign(new Error('Native authentication unavailable'), {
+      code: 'auth/internal-error',
+    }),
+  );
+  await expect(requestFirebaseOtp('+919999999999')).rejects.toThrow(
+    'Native authentication unavailable',
+  );
+  expect(mockRequest).not.toHaveBeenCalled();
+});

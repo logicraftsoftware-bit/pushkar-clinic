@@ -18,7 +18,7 @@ export async function requestFirebaseOtp(phone: string) {
   confirmation = null;
   expectedPhone = '';
   const auth = getAuth();
-  await signOut(auth);
+  await signOutIfPresent(auth);
   expectedPhone = phone;
   confirmation = await signInWithPhoneNumber(auth, phone);
   return { challenge_id: 'firebase', resend_after: 60, phone };
@@ -35,7 +35,7 @@ export async function confirmFirebaseOtp(code: string) {
 export async function clearFirebaseLogin() {
   confirmation = null;
   expectedPhone = '';
-  await signOut(getAuth());
+  await signOutIfPresent(getAuth());
 }
 
 export function observeFirebaseOtp(complete: (token: string) => void) {
@@ -46,4 +46,14 @@ export function observeFirebaseOtp(complete: (token: string) => void) {
         .catch(() => {});
     }
   });
+}
+
+async function signOutIfPresent(auth: ReturnType<typeof getAuth>) {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    // Firebase's native bridge rejects signOut on a fresh installation.
+    if ((error as { code?: string }).code !== 'auth/no-current-user')
+      throw error;
+  }
 }

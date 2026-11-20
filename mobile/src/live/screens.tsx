@@ -313,8 +313,7 @@ function Welcome() {
       />
       {config.data && !config.data.sms_login_configured && (
         <Text style={styles.muted}>
-          Phone sign-in will be available after the clinic configures SMS. You
-          can browse clinics and doctors now.
+          Phone sign-in will be available after the clinic configures SMS.
         </Text>
       )}
       <Text style={styles.muted}>
@@ -347,11 +346,6 @@ function Welcome() {
             nav.navigate('OTP');
           })
         }
-      />
-      <Button
-        secondary
-        title="Browse clinics without signing in"
-        onPress={() => nav.navigate('Clinics')}
       />
       {p.signedIn && (
         <Button title="Open my account" onPress={() => nav.navigate('Home')} />
