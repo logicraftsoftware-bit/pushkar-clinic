@@ -3,9 +3,11 @@ import {
   signInWithPhoneNumber,
   signOut,
   getIdToken,
+  onAuthStateChanged,
 } from '@react-native-firebase/auth';
 import { Platform } from 'react-native';
 
+let expectedPhone = '';
 let confirmation: Awaited<ReturnType<typeof signInWithPhoneNumber>> | null =
   null;
 export async function requestFirebaseOtp(phone: string) {
@@ -14,8 +16,10 @@ export async function requestFirebaseOtp(phone: string) {
       'Firebase phone sign-in is currently configured for Android only.',
     );
   confirmation = null;
+  expectedPhone = '';
   const auth = getAuth();
   await signOut(auth);
+  expectedPhone = phone;
   confirmation = await signInWithPhoneNumber(auth, phone);
   return { challenge_id: 'firebase', resend_after: 60, phone };
 }
@@ -30,5 +34,16 @@ export async function confirmFirebaseOtp(code: string) {
 }
 export async function clearFirebaseLogin() {
   confirmation = null;
+  expectedPhone = '';
   await signOut(getAuth());
+}
+
+export function observeFirebaseOtp(complete: (token: string) => void) {
+  return onAuthStateChanged(getAuth(), user => {
+    if (user && expectedPhone && user.phoneNumber === expectedPhone) {
+      void getIdToken(user, true)
+        .then(complete)
+        .catch(() => {});
+    }
+  });
 }

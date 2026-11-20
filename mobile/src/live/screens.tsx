@@ -2,6 +2,7 @@ import {
   requestFirebaseOtp,
   confirmFirebaseOtp,
   clearFirebaseLogin,
+  observeFirebaseOtp,
 } from './firebase';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -364,6 +365,31 @@ function OTP() {
     a = useAction(),
     [code, setCode] = useState(''),
     [seconds, setSeconds] = useState(p.challenge?.resend_after ?? 60);
+  async function finishLogin(response: Tokens) {
+    await api.save(response);
+    if (p.challenge?.challenge_id === 'firebase') await clearFirebaseLogin();
+    const me = await p.loadMe();
+    nav.reset({
+      index: 0,
+      routes: [{ name: me.profile.name ? 'Home' : 'Profile' }],
+    });
+  }
+  const automatic = useRef<(token: string) => void>(() => {});
+  automatic.current = token =>
+    void a.run(async () => {
+      await finishLogin(
+        await api.request<Tokens>(
+          '/auth/firebase',
+          'POST',
+          { id_token: token },
+          { public: true },
+        ),
+      );
+    });
+  useEffect(() => {
+    if (p.challenge?.challenge_id === 'firebase')
+      return observeFirebaseOtp(token => automatic.current(token));
+  }, [p.challenge?.challenge_id]);
   useEffect(() => {
     if (seconds <= 0) return;
     const timer = setTimeout(() => setSeconds(n => n - 1), 1000);
@@ -400,14 +426,7 @@ function OTP() {
                     { challenge_id: p.challenge!.challenge_id, code },
                     { public: true },
                   );
-            await api.save(response);
-            if (p.challenge?.challenge_id === 'firebase')
-              await clearFirebaseLogin();
-            const me = await p.loadMe();
-            nav.reset({
-              index: 0,
-              routes: [{ name: me.profile.name ? 'Home' : 'Profile' }],
-            });
+            await finishLogin(response);
           })
         }
       />

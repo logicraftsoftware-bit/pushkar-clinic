@@ -2,6 +2,7 @@ jest.mock('../src/live/firebase', () => ({
   requestFirebaseOtp: jest.fn(),
   confirmFirebaseOtp: jest.fn(),
   clearFirebaseLogin: jest.fn(),
+  observeFirebaseOtp: jest.fn(() => () => {}),
 }));
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
