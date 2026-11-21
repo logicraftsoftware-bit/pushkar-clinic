@@ -113,7 +113,8 @@ try{
   let smsConfig={enabled:false,username:'synthetic',sender_id:'TESTID',message:'Code {code}',entity_id:'123',template_id:'456',entity_param:'entityid',template_param:'templateid',success_prefix:'ACCEPTED:',has_api_key:true};
   await ownerContext.route('**/api/v1/**',async route=>{
     const path=new URL(route.request().url()).pathname;let value={};
-    if(path.endsWith('/admin/sms-gateway')){if(route.request().method()==='PUT'){smsSaved=route.request().postDataJSON();smsConfig={...smsConfig,...smsSaved,has_api_key:true};}value=smsConfig;}
+    if(path.endsWith('/admin/settings'))value=[];
+    else if(path.endsWith('/admin/sms-gateway')){if(route.request().method()==='PUT'){smsSaved=route.request().postDataJSON();smsConfig={...smsConfig,...smsSaved,has_api_key:true};}value=smsConfig;}
     else if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
     else if(path.endsWith('/admin/plans'))value=[{id:doctorId,name:'Clinic Standard',status:'active',monthly_price:500,yearly_price:5000},{id:branchId,name:'Alternate Plan',status:'active'}];
     else if(path.endsWith('/admin/hospitals/'+branchId)){
