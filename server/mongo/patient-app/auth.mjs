@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { randomUUID, randomInt, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { db, transaction } from '../database.mjs';
+import {hashPassword,verifyPassword} from '../security.mjs';
+import {smsAvailable,smsSettings,sendGatewayOtp} from './sms-gateway.mjs';
 import { config } from '../config.mjs';
 import {verifyFirebasePhoneToken} from './firebase.mjs';
 import {
@@ -102,11 +104,20 @@ route(
   '/auth/otp/request',
   'Request a patient login OTP',
   async (req, res) => {
-    if (config.PATIENT_APP_OTP_MODE === 'disabled')
+    if (!await smsAvailable() && config.PATIENT_APP_OTP_MODE !== 'development')
       throw fail('SMS login is not configured yet.', 503, 'SMS_NOT_CONFIGURED');
     const mobile = req.input.phone;
     await rateLimit(`otp-ip:${req.ip}`, 20);
     await rateLimit(`otp-phone:${mobile}`, 5);
+    const purpose=req.input.purpose;
+    let pending;
+    if(purpose==='register'){
+      if(!req.input.name||!req.input.password)throw fail('Enter your name and password.');
+      pending={name:req.input.name,email:req.input.email??'',password_hash:await hashPassword(req.input.password)};
+    }
+    const existing=await db.collection('mobile_accounts').findOne({phone:mobile});
+    // Keep request responses uniform for unknown/inactive phone numbers.
+    const eligible=purpose==='legacy'||purpose==='register'?!existing||purpose==='legacy':existing?.status==='Active';
     const now = new Date(),
       cooldown = await db
         .collection('mobile_otp_cooldowns')
@@ -138,9 +149,12 @@ route(
       consumed_at: null,
       expires_at,
       state: 'Sending',
+      purpose,pending,eligible,
     });
-    if (config.PATIENT_APP_OTP_MODE === 'webhook') {
+    if ((await smsSettings())?.enabled || config.PATIENT_APP_OTP_MODE === 'webhook') {
       try {
+        if(eligible && (await smsSettings())?.enabled)await sendGatewayOtp(mobile,code);
+        else if(eligible){
         const result = await fetch(config.PATIENT_APP_SMS_WEBHOOK_URL, {
           method: 'POST',
           headers: {
@@ -158,6 +172,7 @@ route(
           redirect: 'error',
         });
         if (!result.ok) throw Error('SMS rejected');
+        }
       } catch {
         await db
           .collection('mobile_otps')
@@ -192,7 +207,7 @@ route(
   {
     public: true,
     body: z
-      .object({ phone, language: z.enum(['en', 'hi', 'bn']).prefault('en') })
+      .object({ phone, language: z.enum(['en', 'hi', 'bn']).prefault('en'),purpose:z.enum(['legacy','login','register','reset']).prefault('legacy'),name:z.string().trim().min(2).max(120).optional(),email:z.string().email().max(200).optional(),password:z.string().min(12).max(128).optional() })
       .strict(),
   }
 );
@@ -237,6 +252,23 @@ route(
         { session }
       );
       if (!consumed.modifiedCount) throw fail('OTP was already used.', 401);
+      if(challenge.eligible===false)throw fail('Unable to verify this account. Check the number or use Register / Login as appropriate.',401);
+      await db.collection('workflow_locks').updateOne({_id:`mobile-auth:${secretHash(challenge.phone)}`},{$inc:{version:1}},{session,upsert:true});
+      const existing=await db.collection('mobile_accounts').findOne({phone:challenge.phone},{session});
+      if(challenge.purpose==='reset'){
+        if(!existing||existing.status!=='Active')throw fail('Unable to reset this account.',401);
+        const token=refreshToken();
+        await db.collection('mobile_password_resets').insertOne({_id:secretHash(token),account_id:existing.id,expires_at:new Date(Date.now()+300000),consumed_at:null},{session});
+        return {reset_token:token,expires_in:300};
+      }
+      if(challenge.purpose==='register'){
+        if(existing)throw fail('This mobile number already has an account. Use Login or Forgot password.',409);
+        const result=await patientLogin(challenge.phone,session);
+        await db.collection('mobile_accounts').updateOne({id:result.account.id},{$set:{password_hash:challenge.pending.password_hash,email:challenge.pending.email}},{session});
+        await db.collection('mobile_profiles').updateOne({id:result.account.self_profile_id},{$set:{name:challenge.pending.name}},{session});
+        result.profile.name=challenge.pending.name;return result;
+      }
+      if(challenge.purpose==='login'&&!existing)throw fail('Create an account first.',401);
       return patientLogin(challenge.phone, session);
     });
     res.json(result);
@@ -384,7 +416,7 @@ async function patientLogin(mobile, session) {
 }
 route(authRouter,'post','/auth/firebase','Exchange Firebase phone authentication for a patient session',async(req,res)=>{
   await rateLimit(`firebase-login:${req.ip}`,30);
-  if(!config.PATIENT_APP_FIREBASE_PROJECT_ID)throw fail('Firebase sign-in is not configured.',503);
+  if(config.PATIENT_APP_FIREBASE_ENABLED!=='true'||!config.PATIENT_APP_FIREBASE_PROJECT_ID)throw fail('Firebase sign-in is not configured.',503);
   const identity=await verifyFirebasePhoneToken(req.input.id_token,config.PATIENT_APP_FIREBASE_PROJECT_ID);
   const mobile=phone.parse(identity.phone_number);
   const result=await transaction(async session=>{
@@ -396,3 +428,34 @@ route(authRouter,'post','/auth/firebase','Exchange Firebase phone authentication
   });
   res.json(result);
 },{public:true,body:z.object({id_token:z.string().min(100).max(10000)}).strict()});
+
+route(authRouter,'post','/auth/password/login','Sign in with mobile and password',async(req,res)=>{
+  await rateLimit(`password-ip:${req.ip}`,20);await rateLimit(`password-phone:${secretHash(req.input.phone)}`,10);
+  const account=await db.collection('mobile_accounts').findOne({phone:req.input.phone});
+  const dummy='scrypt-v1$'+'0'.repeat(32)+'$'+'0'.repeat(128);
+  const valid=await verifyPassword(req.input.password,account?.password_hash??dummy);
+  if(!valid||account?.status!=='Active')throw fail('Mobile number or password is incorrect. You can also use Login with OTP.',401);
+  const result=await transaction(async session=>{
+    await db.collection('workflow_locks').updateOne({_id:`mobile-auth:${secretHash(req.input.phone)}`},{$inc:{version:1}},{session,upsert:true});
+    const current=await db.collection('mobile_accounts').findOne({id:account.id},{session});
+    if(current?.password_hash!==account.password_hash)throw fail('Password has changed. Sign in again.',401);
+    return patientLogin(req.input.phone,session);
+  });res.json(result);
+},{public:true,body:z.object({phone,password:z.string().min(1).max(128)}).strict()});
+route(authRouter,'post','/auth/password/reset','Set a new password after phone OTP verification',async(req,res)=>{
+  await rateLimit(`password-reset:${req.ip}`,15);
+  const password_hash=await hashPassword(req.input.password);
+  const result=await transaction(async session=>{
+    const grant=await db.collection('mobile_password_resets').findOneAndUpdate({_id:secretHash(req.input.reset_token),consumed_at:null,expires_at:{$gt:new Date()}},{$set:{consumed_at:new Date()}},{session,returnDocument:'before'});
+    if(!grant)throw fail('Password reset expired or already used. Request a new OTP.',401);
+    const account=await db.collection('mobile_accounts').findOne({id:grant.account_id,status:'Active'},{session});
+    if(!account)throw fail('Account is not available.',401);
+    await db.collection('workflow_locks').updateOne({_id:`mobile-auth:${secretHash(account.phone)}`},{$inc:{version:1}},{session,upsert:true});
+    await db.collection('mobile_accounts').updateOne({id:account.id},{$set:{password_hash,updated_at:new Date()}},{session});
+    await db.collection('mobile_sessions').deleteMany({account_id:account.id},{session});
+    await db.collection('mobile_devices').deleteMany({account_id:account.id},{session});
+    await db.collection('mobile_password_resets').updateMany({account_id:account.id,consumed_at:null},{$set:{consumed_at:new Date()}},{session});
+    await audit(account,'patient_password_reset',account.id,session);
+    return patientLogin(account.phone,session);
+  });res.json(result);
+},{public:true,body:z.object({reset_token:z.string().regex(/^[A-Za-z0-9_-]{43}$/),password:z.string().min(12).max(128)}).strict()});

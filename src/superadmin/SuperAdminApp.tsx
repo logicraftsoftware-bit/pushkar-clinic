@@ -1,3 +1,4 @@
+import SmsGatewaySettings from './SmsGatewaySettings';
 import {
   useCallback,
   useEffect,
@@ -894,6 +895,7 @@ function SettingsPage({
         title="Platform Settings"
         text="Configure branding, subscriptions, security and operational defaults."
       />
+      <SmsGatewaySettings />
       <div className="settings-layout">
         <aside>
           {categories.map((category) => (

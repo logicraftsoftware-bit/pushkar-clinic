@@ -96,6 +96,7 @@ jobs:
           ENV_FILE: /dev/null
           NODE_ENV: test
           PATIENT_APP_INTEGRATION_TEST: 'true'
+          PATIENT_APP_FIREBASE_ENABLED: 'true'
           PATIENT_APP_OTP_MODE: development
           MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=rs0
           MONGODB_DB: pushkar_test_patient_ci

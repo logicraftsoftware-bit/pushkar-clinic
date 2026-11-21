@@ -936,3 +936,15 @@ test('manual subscriptions enforce expiry, all-device logout, renewal history an
     assert.equal((await request('/access-control/me','GET',null,signed.data.token)).status,401);
   });
 });
+
+test('Super Admin SMS settings keep API keys encrypted and outside read responses',async()=>{
+ await db.collection('login_limits').deleteMany({});
+ const owner=(await request('/admin/auth/login','POST',{username:'test-owner',password})).data.token;
+ const body={enabled:false,username:'synthetic',api_key:'synthetic-private-sms-key',sender_id:'TESTID',message:'Your test code is {code}.',entity_id:'123',template_id:'456',entity_param:'entityid',template_param:'templateid',success_prefix:'ACCEPTED:'};
+ const saved=await request('/admin/sms-gateway','PUT',body,owner);assert.equal(saved.status,200,JSON.stringify(saved.data));assert.equal(saved.data.has_api_key,true);assert.ok(!JSON.stringify(saved.data).includes(body.api_key));
+ const stored=await db.collection('platform_sms_gateway').findOne({_id:'patient-otp'});assert.ok(stored.encrypted_key);assert.ok(!JSON.stringify(stored).includes(body.api_key));
+ const read=await request('/admin/sms-gateway','GET',null,owner);assert.equal(read.status,200);assert.ok(!JSON.stringify(read.data).includes(stored.encrypted_key));
+ assert.equal((await request('/admin/sms-gateway','PUT',{...body,api_key:''},owner)).status,200);assert.equal((await db.collection('platform_sms_gateway').findOne({_id:'patient-otp'})).encrypted_key,stored.encrypted_key);
+ assert.equal((await request('/admin/sms-gateway','GET',null)).status,401);
+ assert.equal((await request('/admin/sms-gateway','PUT',{...body,entity_param:'key'},owner)).status,400);
+});

@@ -1,9 +1,4 @@
-import {
-  requestFirebaseOtp,
-  confirmFirebaseOtp,
-  clearFirebaseLogin,
-  observeFirebaseOtp,
-} from './firebase';
+import { PatientAuth } from './AuthScreens';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,11 +14,11 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Razorpay from 'react-native-razorpay';
 import QRCode from 'react-native-qrcode-svg';
 import { Button, Field, Screen } from '../components/ui';
-import { Brand, Avatar } from '../components/Illustrations';
+import { Avatar } from '../components/Illustrations';
 import { colors, s } from '../theme';
 import type { Navigation, ScreenName } from '../navigation';
 import { api, chooseFile, downloadDocument } from './native';
-import { ApiError, type Tokens } from './client';
+import { ApiError } from './client';
 import {
   usePatient,
   type Appointment,
@@ -284,174 +279,6 @@ function Menu() {
   );
 }
 
-function Welcome() {
-  const nav = useNavigation<Navigation>(),
-    p = usePatient(),
-    a = useAction(),
-    config = useResource<{
-      sms_login_configured: boolean;
-      phone_auth_provider?: string;
-    }>('/config');
-  return (
-    <Screen title="Welcome to JibonCare" light>
-      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-        <Brand />
-        <Avatar doctor size={130} />
-        <Text style={s.title}>Your clinic, connected.</Text>
-        <Text style={styles.muted}>
-          Book visits, follow your queue and access your own health records.
-        </Text>
-      </View>
-      <DataState resource={config} />
-      <Notice text={a.error} />
-      <Field
-        label="Mobile number"
-        keyboardType="phone-pad"
-        maxLength={10}
-        value={p.phone}
-        onChangeText={p.setPhone}
-      />
-      {config.data && !config.data.sms_login_configured && (
-        <Text style={styles.muted}>
-          Phone sign-in will be available after the clinic configures SMS.
-        </Text>
-      )}
-      <Text style={styles.muted}>
-        By continuing, you agree to phone verification. Google processes your
-        phone number for authentication and abuse prevention.
-      </Text>
-      <Button
-        title={a.busy ? 'Sending…' : 'Send OTP'}
-        disabled={
-          a.busy ||
-          !/^\d{10}$/.test(p.phone) ||
-          !config.data?.sms_login_configured
-        }
-        onPress={() =>
-          void a.run(async () => {
-            const challenge =
-              config.data?.phone_auth_provider === 'firebase'
-                ? await requestFirebaseOtp('+91' + p.phone)
-                : await api.request<{
-                    challenge_id: string;
-                    resend_after: number;
-                    phone: string;
-                  }>(
-                    '/auth/otp/request',
-                    'POST',
-                    { phone: '+91' + p.phone },
-                    { public: true },
-                  );
-            p.setChallenge(challenge);
-            nav.navigate('OTP');
-          })
-        }
-      />
-      {p.signedIn && (
-        <Button title="Open my account" onPress={() => nav.navigate('Home')} />
-      )}
-    </Screen>
-  );
-}
-function OTP() {
-  const nav = useNavigation<Navigation>(),
-    p = usePatient(),
-    a = useAction(),
-    [code, setCode] = useState(''),
-    [seconds, setSeconds] = useState(p.challenge?.resend_after ?? 60);
-  async function finishLogin(response: Tokens) {
-    await api.save(response);
-    if (p.challenge?.challenge_id === 'firebase') await clearFirebaseLogin();
-    const me = await p.loadMe();
-    nav.reset({
-      index: 0,
-      routes: [{ name: me.profile.name ? 'Home' : 'Profile' }],
-    });
-  }
-  const automatic = useRef<(token: string) => void>(() => {});
-  automatic.current = token =>
-    void a.run(async () => {
-      await finishLogin(
-        await api.request<Tokens>(
-          '/auth/firebase',
-          'POST',
-          { id_token: token },
-          { public: true },
-        ),
-      );
-    });
-  useEffect(() => {
-    if (p.challenge?.challenge_id === 'firebase')
-      return observeFirebaseOtp(token => automatic.current(token));
-  }, [p.challenge?.challenge_id]);
-  useEffect(() => {
-    if (seconds <= 0) return;
-    const timer = setTimeout(() => setSeconds(n => n - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [seconds]);
-  return (
-    <Screen title="Verify your phone" light>
-      <Text style={s.title}>Enter your SMS code</Text>
-      <Text style={styles.muted}>Sent to +91 {p.phone}</Text>
-      <Field
-        label="Six-digit OTP"
-        keyboardType="number-pad"
-        maxLength={6}
-        value={code}
-        onChangeText={setCode}
-      />
-      <Notice text={a.error} />
-      <Button
-        title={a.busy ? 'Verifying…' : 'Verify & sign in'}
-        disabled={a.busy || !/^\d{6}$/.test(code) || !p.challenge}
-        onPress={() =>
-          void a.run(async () => {
-            const response =
-              p.challenge?.challenge_id === 'firebase'
-                ? await api.request<Tokens>(
-                    '/auth/firebase',
-                    'POST',
-                    { id_token: await confirmFirebaseOtp(code) },
-                    { public: true },
-                  )
-                : await api.request<Tokens>(
-                    '/auth/otp/verify',
-                    'POST',
-                    { challenge_id: p.challenge!.challenge_id, code },
-                    { public: true },
-                  );
-            await finishLogin(response);
-          })
-        }
-      />
-      <Button
-        secondary
-        title={seconds ? `Resend in ${seconds}s` : 'Resend OTP'}
-        disabled={seconds > 0 || a.busy}
-        onPress={() =>
-          void a.run(async () => {
-            const next =
-              p.challenge?.challenge_id === 'firebase'
-                ? await requestFirebaseOtp('+91' + p.phone)
-                : await api.request<{
-                    challenge_id: string;
-                    resend_after: number;
-                    phone: string;
-                  }>(
-                    '/auth/otp/request',
-                    'POST',
-                    { phone: '+91' + p.phone },
-                    { public: true },
-                  );
-            p.setChallenge(next);
-            setSeconds(next.resend_after);
-            setCode('');
-          })
-        }
-      />
-    </Screen>
-  );
-}
 function ProfileScreen() {
   const p = usePatient(),
     nav = useNavigation<Navigation>(),
@@ -1845,8 +1672,8 @@ function Account() {
   );
 }
 const components: Record<ScreenName, React.ComponentType> = {
-  Welcome,
-  OTP,
+  Welcome: PatientAuth,
+  OTP: PatientAuth,
   Profile: ProfileScreen,
   Family,
   Home,

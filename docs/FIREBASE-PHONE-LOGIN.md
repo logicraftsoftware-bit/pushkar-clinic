@@ -1,3 +1,7 @@
+# Previous Firebase integration (disabled by default)
+
+Patient login now uses the SMS gateway and password/OTP flows. See PATIENT-LOGIN-AND-SMS.md. The Firebase endpoint is retained only for explicit rollback with PATIENT_APP_FIREBASE_ENABLED=true; the current app does not call it.
+
 # JibonCare Firebase phone login
 
 Android package: `com.jiboncare`. Firebase project: `jiboncare`.

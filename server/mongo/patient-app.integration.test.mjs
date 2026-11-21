@@ -367,8 +367,8 @@ test('patient mobile HTTP workflows, access boundaries and financial integrity',
       );
       assert.equal((await call('/me')).status, 401);
       const config = expectStatus(await call('/config'), 200);
-      assert.equal(config.sms_login_configured, true);
-      assert.equal(config.phone_auth_provider, 'firebase');
+      assert.equal(config.sms_login_configured, false);
+      assert.equal(config.phone_auth_provider, 'sms_gateway');
       assert.ok(!JSON.stringify(config).includes(gatewaySecret));
     }
   );
@@ -2148,4 +2148,32 @@ test('patient mobile HTTP workflows, access boundaries and financial integrity',
       );
     }
   );
+});
+
+test('patient password registration, login, recovery and SMS gateway settings',async()=>{
+ await db.collection('mobile_limits').deleteMany({});
+ const phone='+919999977777',password='Synthetic-password-123';
+ async function challenge(purpose,extra={}){
+  await db.collection('mobile_otp_cooldowns').deleteMany({});
+  return expectStatus(await call('/auth/otp/request',null,'POST',{phone,purpose,...extra}),202);
+ }
+ const pending=await challenge('register',{name:'New Patient',email:'new@example.invalid',password});
+ const stored=await db.collection('mobile_otps').findOne({id:pending.challenge_id});
+ assert.ok(stored.pending.password_hash.startsWith('scrypt-v1$'));assert.ok(!JSON.stringify(stored).includes(password));
+ const signup=expectStatus(await call('/auth/otp/verify',null,'POST',{challenge_id:pending.challenge_id,code:pending.development_code}),200);
+ assert.equal(signup.profile.name,'New Patient');expectStatus(await call('/me',signup.access_token),200);
+ expectStatus(await call('/auth/otp/verify',null,'POST',{challenge_id:pending.challenge_id,code:pending.development_code}),401);
+ expectStatus(await call('/auth/password/login',null,'POST',{phone,password:'wrong-password'}),401);
+ const signed=expectStatus(await call('/auth/password/login',null,'POST',{phone,password}),200);assert.equal(signed.account.id,signup.account.id);
+ const otp=await challenge('login');const otpLogin=expectStatus(await call('/auth/otp/verify',null,'POST',{challenge_id:otp.challenge_id,code:otp.development_code}),200);assert.equal(otpLogin.account.id,signup.account.id);
+ const reset=await challenge('reset');const grant=expectStatus(await call('/auth/otp/verify',null,'POST',{challenge_id:reset.challenge_id,code:reset.development_code}),200);assert.ok(grant.reset_token);assert.equal(grant.access_token,undefined);
+ expectStatus(await call('/auth/password/reset',null,'POST',{reset_token:'a'.repeat(43),password:'Synthetic-new-password-123'}),401);
+ const changed=expectStatus(await call('/auth/password/reset',null,'POST',{reset_token:grant.reset_token,password:'Synthetic-new-password-123'}),200);
+ expectStatus(await call('/me',signed.access_token),401);expectStatus(await call('/me',signup.access_token),401);expectStatus(await call('/me',changed.access_token),200);
+ expectStatus(await call('/auth/password/reset',null,'POST',{reset_token:grant.reset_token,password:'Synthetic-other-password'}),401);
+ expectStatus(await call('/auth/password/login',null,'POST',{phone,password}),401);
+ expectStatus(await call('/auth/password/login',null,'POST',{phone,password:'Synthetic-new-password-123'}),200);
+ const expired=await challenge('reset');await db.collection('mobile_otps').updateOne({id:expired.challenge_id},{$set:{expires_at:new Date(Date.now()-1)}});
+ expectStatus(await call('/auth/otp/verify',null,'POST',{challenge_id:expired.challenge_id,code:expired.development_code}),401);
+ const existing=await db.collection('mobile_accounts').findOne({id:signup.account.id});assert.ok(existing.password_hash);assert.equal(await db.collection('mobile_profiles').countDocuments({account_id:existing.id}),1);
 });

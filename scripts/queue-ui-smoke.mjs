@@ -109,10 +109,12 @@ try{
   assert.equal(await staffPage.getByText('No records found.',{exact:true}).count(),0);
   const ownerContext=await browser.newContext({viewport:{width:1440,height:1000}});
   await ownerContext.addInitScript(()=>sessionStorage.setItem('careframe_superadmin_token','synthetic-owner-token'));
-  let assignment,clinicEdit;
+  let assignment,clinicEdit,smsSaved;
+  let smsConfig={enabled:false,username:'synthetic',sender_id:'TESTID',message:'Code {code}',entity_id:'123',template_id:'456',entity_param:'entityid',template_param:'templateid',success_prefix:'ACCEPTED:',has_api_key:true};
   await ownerContext.route('**/api/v1/**',async route=>{
     const path=new URL(route.request().url()).pathname;let value={};
-    if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
+    if(path.endsWith('/admin/sms-gateway')){if(route.request().method()==='PUT'){smsSaved=route.request().postDataJSON();smsConfig={...smsConfig,...smsSaved,has_api_key:true};}value=smsConfig;}
+    else if(path.endsWith('/branding'))value={name:'Pushkar Clinic ERP',logo:'/branding/pushkar-logo.png'};
     else if(path.endsWith('/admin/plans'))value=[{id:doctorId,name:'Clinic Standard',status:'active',monthly_price:500,yearly_price:5000},{id:branchId,name:'Alternate Plan',status:'active'}];
     else if(path.endsWith('/admin/hospitals/'+branchId)){
       if(route.request().method()==='PUT'){clinicEdit=route.request().postDataJSON();value={id:branchId};}
@@ -149,6 +151,13 @@ try{
   await ownerPage.getByRole('button',{name:'Save clinic',exact:true}).click();
   await ownerPage.getByRole('heading',{name:'Edit clinic',exact:true}).waitFor({state:'hidden'});
   assert.equal(clinicEdit.planId,branchId);assert.equal(clinicEdit.subscriptionStartDate,'2026-11-01');assert.equal(clinicEdit.billingCycle,'yearly');
+  await ownerPage.goto(origin+'/superadmin/platform-settings');
+  await ownerPage.getByRole('heading',{name:'Patient App \u00b7 SMS Gateway',exact:true}).waitFor();
+  await ownerPage.getByLabel('Approved sender ID',{exact:true}).fill('PUSHKR');
+  await ownerPage.getByRole('button',{name:'Save SMS gateway',exact:true}).click();
+  await ownerPage.getByText('SMS gateway settings saved.',{exact:true}).waitFor();
+  assert.equal(smsSaved.sender_id,'PUSHKR');assert.equal(smsSaved.api_key,undefined);assert.equal(smsSaved.has_api_key,undefined);
+  await ownerPage.screenshot({path:'artifacts/queue-ui/sms-gateway-settings.png',fullPage:true});
   const clinicContext=await browser.newContext({viewport:{width:1440,height:1100}});
   await clinicContext.addInitScript(({branchId})=>sessionStorage.setItem('careframe_portal_session',JSON.stringify({token:'synthetic-clinic-admin',user:{id:'synthetic-admin',name:'Test Clinic Admin',email:'admin@example.invalid',phone:'0000000000',role:'hospital_admin',portal:'hospital_admin'},hospital:{id:'synthetic-clinic',name:'Synthetic Clinic',code:'TEST',branchId,branchName:'Synthetic Branch',status:'active'},modules:['opd','patient_portal']})),{branchId});
   let mobileSettings={enabled:false,pay_at_clinic:true,manual_check_in:false,booking_fee:0,lab_reports_require_payment:true,public_profile:{}},publishingSaves=0;

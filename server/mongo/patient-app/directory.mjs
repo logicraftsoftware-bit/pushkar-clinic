@@ -1,3 +1,4 @@
+import {smsAvailable} from './sms-gateway.mjs';
 import {config} from '../config.mjs';
 import { z } from 'zod';
 import { db } from '../database.mjs';
@@ -151,8 +152,9 @@ export function registerDirectory(router) {
         languages: ['en', 'hi', 'bn'],
         currency: 'INR',
         timezone: 'Asia/Kolkata',
-        sms_login_configured: Boolean(config.PATIENT_APP_FIREBASE_PROJECT_ID) || process.env.PATIENT_APP_OTP_MODE === 'webhook',
-        phone_auth_provider: config.PATIENT_APP_FIREBASE_PROJECT_ID ? 'firebase' : 'webhook',
+        sms_login_configured: await smsAvailable(),
+        password_login_enabled: true,
+        phone_auth_provider: 'sms_gateway',
         terms_url: values.patient_app_terms_url ?? null,
         privacy_url: values.patient_app_privacy_url ?? null,
         online_payment_provider: 'Razorpay',

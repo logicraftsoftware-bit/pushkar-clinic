@@ -15,6 +15,7 @@ export async function initializePatientAppIndexes(db) {
       { unique: true },
     ],
     ['mobile_clinic_links', { tenant_id: 1, patient_id: 1, active: 1 }, {}],
+    ['mobile_password_resets', { expires_at: 1 }, { expireAfterSeconds: 0 }],
     ['mobile_otps', { id: 1 }, { unique: true }],
     ['mobile_otps', { expires_at: 1 }, { expireAfterSeconds: 0 }],
     ['mobile_limits', { expires_at: 1 }, { expireAfterSeconds: 0 }],

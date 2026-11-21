@@ -1,9 +1,3 @@
-jest.mock('../src/live/firebase', () => ({
-  requestFirebaseOtp: jest.fn(),
-  confirmFirebaseOtp: jest.fn(),
-  clearFirebaseLogin: jest.fn(),
-  observeFirebaseOtp: jest.fn(() => () => {}),
-}));
 import React from 'react';
 import Renderer, { act } from 'react-test-renderer';
 import { PatientProvider } from '../src/live/PatientContext';
@@ -16,6 +10,7 @@ jest.mock('../src/live/native', () => ({
     request: jest.fn(),
     onExpired: () => {},
     clear: jest.fn(),
+    save: jest.fn(),
   },
   chooseFile: jest.fn(),
   downloadDocument: jest.fn(),
@@ -47,7 +42,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (api.restore as jest.Mock).mockResolvedValue(false);
 });
-test('SMS-disabled login remains disabled and offers no guest entry', async () => {
+test('password login is the initial screen and offers no guest entry', async () => {
   (api.request as jest.Mock).mockResolvedValue({ sms_login_configured: false });
   let tree: Renderer.ReactTestRenderer;
   await act(async () => {
@@ -58,7 +53,7 @@ test('SMS-disabled login remains disabled and offers no guest entry', async () =
     );
   });
   const send = tree!.root
-    .findAllByProps({ accessibilityLabel: 'Send OTP' })
+    .findAllByProps({ accessibilityLabel: 'Login' })
     .find(node => node.props.accessibilityRole === 'button');
   expect(send?.props.disabled).toBe(true);
   expect(
@@ -116,4 +111,117 @@ test('authenticated home displays API appointments rather than demo patients', a
   expect(JSON.stringify(tree!.toJSON())).toContain('Dr. Synthetic');
   expect(JSON.stringify(tree!.toJSON())).not.toContain('Dwaipayan');
   await act(async () => tree!.unmount());
+});
+
+async function authScreen() {
+  (api.request as jest.Mock).mockImplementation(async (path: string) =>
+    path === '/me'
+      ? {
+          profile: { id: 'self', name: 'New Patient' },
+          phone: '+919999999999',
+          self_profile_id: 'self',
+        }
+      : path === '/auth/otp/request'
+      ? { challenge_id: 'test-challenge', resend_after: 60 }
+      : path === '/auth/otp/verify'
+      ? { access_token: 'verified', refresh_token: 'refresh', expires_in: 900 }
+      : { access_token: 'password', refresh_token: 'refresh', expires_in: 900 },
+  );
+  let tree: Renderer.ReactTestRenderer;
+  await act(async () => {
+    tree = Renderer.create(
+      <PatientProvider>
+        <liveScreens.Welcome />
+      </PatientProvider>,
+    );
+  });
+  const press = async (label: string) => {
+    const node = tree!.root
+      .findAllByProps({ accessibilityLabel: label })
+      .find(n => n.props.accessibilityRole === 'button');
+    expect(node).toBeDefined();
+    await act(async () => node!.props.onPress());
+  };
+  const fill = async (label: string, value: string) => {
+    const node = tree!.root
+      .findAllByProps({ accessibilityLabel: label })
+      .find(n => n.props.onChangeText);
+    expect(node).toBeDefined();
+    await act(async () => node!.props.onChangeText(value));
+  };
+  return { tree: tree!, press, fill };
+}
+test('password login exchanges credentials and opens the authenticated account', async () => {
+  const page = await authScreen();
+  await page.fill('Mobile number', '9999999999');
+  await page.fill('Password', 'Synthetic-password-123');
+  await page.press('Login');
+  expect(api.request).toHaveBeenCalledWith(
+    '/auth/password/login',
+    'POST',
+    { phone: '+919999999999', password: 'Synthetic-password-123' },
+    { public: true },
+  );
+  expect(api.save).toHaveBeenCalled();
+  await act(async () => page.tree.unmount());
+});
+test('registration verifies its OTP and signs in immediately', async () => {
+  const page = await authScreen();
+  await page.press('Register / Create Account');
+  await page.fill('Full name', 'New Patient');
+  await page.fill('Mobile number', '9999999999');
+  await page.fill('Password', 'Synthetic-password-123');
+  await page.press('Send OTP');
+  expect(api.request).toHaveBeenCalledWith(
+    '/auth/otp/request',
+    'POST',
+    expect.objectContaining({ purpose: 'register', name: 'New Patient' }),
+    { public: true },
+  );
+  await page.fill('Six-digit OTP', '123456');
+  await page.press('Verify & create account');
+  expect(api.save).toHaveBeenCalled();
+  await act(async () => page.tree.unmount());
+});
+test('forgot password verifies OTP before accepting a new password and signing in', async () => {
+  const page = await authScreen();
+  await page.press('Forgot password?');
+  await page.fill('Mobile number', '9999999999');
+  await page.press('Send OTP');
+  (api.request as jest.Mock).mockImplementation(async (path: string) =>
+    path === '/auth/otp/verify'
+      ? { reset_token: 'test-reset' }
+      : path === '/me'
+      ? { profile: { id: 'self', name: 'New Patient' } }
+      : { access_token: 'new', refresh_token: 'refresh', expires_in: 900 },
+  );
+  await page.fill('Six-digit OTP', '123456');
+  await page.press('Verify OTP');
+  await page.fill('New password', 'Synthetic-new-password-123');
+  await page.fill('Confirm new password', 'Synthetic-new-password-123');
+  await page.press('Save password & login');
+  expect(api.request).toHaveBeenCalledWith(
+    '/auth/password/reset',
+    'POST',
+    { reset_token: 'test-reset', password: 'Synthetic-new-password-123' },
+    { public: true },
+  );
+  expect(api.save).toHaveBeenCalled();
+  await act(async () => page.tree.unmount());
+});
+test('OTP login requests the login purpose and signs in after verification', async () => {
+  const page = await authScreen();
+  await page.press('Login with OTP');
+  await page.fill('Mobile number', '9999999999');
+  await page.press('Send OTP');
+  await page.fill('Six-digit OTP', '123456');
+  await page.press('Verify & login');
+  expect(api.request).toHaveBeenCalledWith(
+    '/auth/otp/request',
+    'POST',
+    { phone: '+919999999999', purpose: 'login' },
+    { public: true },
+  );
+  expect(api.save).toHaveBeenCalled();
+  await act(async () => page.tree.unmount());
 });
