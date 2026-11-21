@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -235,6 +236,7 @@ export function PatientAuth() {
   }
   return (
     <LinearGradient colors={['#fff2fa', '#fff', '#fff3fa']} style={{ flex: 1 }}>
+      <StatusBar barStyle="dark-content" />
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -245,7 +247,7 @@ export function PatientAuth() {
             contentContainerStyle={a.content}
           >
             <Svg
-              height={55}
+              height={40}
               width="100%"
               viewBox="0 0 400 55"
               preserveAspectRatio="none"
@@ -271,7 +273,7 @@ export function PatientAuth() {
               <View style={a.logo}>
                 <Image
                   source={require('../assets/pushkar-logo.png')}
-                  style={{ width: 145, height: 51 }}
+                  style={{ width: 134, height: 46 }}
                   resizeMode="contain"
                 />
               </View>
@@ -280,7 +282,7 @@ export function PatientAuth() {
             </View>
             {mode === 'login' && (
               <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                <Avatar doctor size={92} />
+                <Avatar doctor size={80} />
                 <Text style={a.title}>{title}</Text>
               </View>
             )}
