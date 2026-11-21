@@ -24,7 +24,12 @@ import {
   Phone,
   UserRound,
 } from 'lucide-react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import { colors } from '../theme';
+import {
+  HeaderArt,
+  BodyWaves,
+  ClinicLandscape,
+} from '../components/HealthArtwork';
 import { Avatar } from '../components/Illustrations';
 import { api } from './native';
 import type { Tokens } from './client';
@@ -175,11 +180,11 @@ export function PatientAuth() {
   ) {
     return (
       <View style={a.field}>
-        <Icon size={20} color="#6f2559" />
+        <Icon size={20} color={colors.blue} />
         <TextInput
           accessibilityLabel={label}
           placeholder={label}
-          placeholderTextColor="#8f8093"
+          placeholderTextColor={colors.muted}
           style={a.input}
           value={value}
           onChangeText={onChange}
@@ -202,9 +207,9 @@ export function PatientAuth() {
             onPress={() => setVisible(v => !v)}
           >
             {visible ? (
-              <EyeOff size={20} color="#77586e" />
+              <EyeOff size={20} color={colors.muted} />
             ) : (
-              <Eye size={20} color="#77586e" />
+              <Eye size={20} color={colors.muted} />
             )}
           </Pressable>
         )}
@@ -224,7 +229,7 @@ export function PatientAuth() {
         onPress={() => void run(onPress)}
         style={{ opacity: busy || disabled ? 0.5 : 1 }}
       >
-        <LinearGradient colors={['#e00085', '#97005b']} style={a.button}>
+        <LinearGradient colors={['#0797d7', '#005eaa']} style={a.button}>
           {busy ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -235,7 +240,10 @@ export function PatientAuth() {
     );
   }
   return (
-    <LinearGradient colors={['#fff2fa', '#fff', '#fff3fa']} style={{ flex: 1 }}>
+    <LinearGradient colors={[colors.bg, '#fff']} style={{ flex: 1 }}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <BodyWaves />
+      </View>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
@@ -246,26 +254,16 @@ export function PatientAuth() {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={a.content}
           >
-            <Svg
-              height={40}
-              width="100%"
-              viewBox="0 0 400 55"
-              preserveAspectRatio="none"
-            >
-              <Path d="M0 0H400V30Q300 65 190 29T0 40Z" fill="#ffd3ec" />
-              <Path
-                d="M0 0H400V12Q240 55 120 10T0 20Z"
-                fill="#f8aed8"
-                opacity=".5"
-              />
-            </Svg>
+            <View pointerEvents="none" style={{ height: 40 }}>
+              <HeaderArt />
+            </View>
             {mode !== 'login' && (
               <Pressable
                 accessibilityLabel="Back to login"
                 style={a.back}
                 onPress={() => change('login')}
               >
-                <ArrowLeft size={22} color="#651342" />
+                <ArrowLeft size={22} color={colors.navy} />
                 <Text style={a.backText}>{title}</Text>
               </Pressable>
             )}
@@ -439,27 +437,12 @@ export function PatientAuth() {
             <Text style={a.footer}>
               Secure access to your own appointments and health records.
             </Text>
-            <Svg height={110} width="100%" viewBox="0 0 400 110">
-              <Path d="M0 70Q100 25 200 70T400 70V110H0Z" fill="#f7c9e3" />
-              <Rect
-                x={157}
-                y={34}
-                width={86}
-                height={76}
-                rx={5}
-                fill="#fff"
-                stroke="#ec99c9"
-                strokeWidth={3}
-              />
-              <Path
-                d="M146 36L200 12L254 36"
-                stroke="#c70075"
-                strokeWidth={7}
-                fill="none"
-              />
-              <Path d="M197 42H204V67H197ZM188 51H213V58H188Z" fill="#cf007a" />
-              <Rect x={185} y={80} width={29} height={30} fill="#eba8d0" />
-            </Svg>
+            <View
+              pointerEvents="none"
+              style={{ height: 110, marginHorizontal: -20 }}
+            >
+              <ClinicLandscape />
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -470,7 +453,7 @@ const a = StyleSheet.create({
   content: { paddingHorizontal: 20, flexGrow: 1 },
   brand: { alignItems: 'center', paddingTop: 10, marginBottom: 20 },
   logo: {
-    backgroundColor: '#cf007b',
+    backgroundColor: colors.blue,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -478,14 +461,14 @@ const a = StyleSheet.create({
   brandName: {
     fontSize: 23,
     fontWeight: '800',
-    color: '#681044',
+    color: colors.navy,
     marginTop: 12,
   },
-  tag: { fontSize: 13, color: '#75566e', marginTop: 4 },
+  tag: { fontSize: 13, color: colors.muted, marginTop: 4 },
   title: {
     fontSize: 23,
     fontWeight: '800',
-    color: '#441034',
+    color: colors.navy,
     marginTop: 10,
     textAlign: 'center',
   },
@@ -493,7 +476,7 @@ const a = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
-    color: '#503548',
+    color: colors.text,
     marginBottom: 20,
   },
   card: {
@@ -501,7 +484,7 @@ const a = StyleSheet.create({
     padding: 16,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#f1d6e7',
+    borderColor: colors.line,
     gap: 12,
   },
   field: {
@@ -509,13 +492,13 @@ const a = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderWidth: 1,
-    borderColor: '#decbd9',
+    borderColor: colors.line,
     borderRadius: 13,
     paddingHorizontal: 13,
     minHeight: 52,
     backgroundColor: '#fff',
   },
-  input: { flex: 1, fontSize: 16, color: '#302032', paddingVertical: 12 },
+  input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 12 },
   button: {
     minHeight: 52,
     borderRadius: 13,
@@ -530,38 +513,43 @@ const a = StyleSheet.create({
     gap: 8,
     marginVertical: 8,
   },
-  link: { fontSize: 14, fontWeight: '700', color: '#b80070' },
-  hint: { fontSize: 13, lineHeight: 19, color: '#827180', textAlign: 'center' },
+  link: { fontSize: 14, fontWeight: '700', color: colors.blue },
+  hint: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
+    textAlign: 'center',
+  },
   register: {
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#d994bc',
+    borderColor: colors.line,
     borderRadius: 30,
     padding: 10,
   },
-  otp: { backgroundColor: '#fff0f8', borderRadius: 16, padding: 14, gap: 10 },
-  otpTitle: { fontSize: 17, fontWeight: '700', color: '#4e163c' },
+  otp: { backgroundColor: colors.pale, borderRadius: 16, padding: 14, gap: 10 },
+  otpTitle: { fontSize: 17, fontWeight: '700', color: colors.navy },
   code: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ecc5dd',
+    borderColor: colors.line,
     borderRadius: 12,
     padding: 12,
     textAlign: 'center',
     fontSize: 25,
     letterSpacing: 10,
-    color: '#671449',
+    color: colors.navy,
   },
   error: {
     backgroundColor: '#fff0f1',
-    color: '#ad2348',
+    color: colors.red,
     padding: 12,
     borderRadius: 12,
     lineHeight: 20,
   },
   footer: {
     textAlign: 'center',
-    color: '#94768b',
+    color: colors.muted,
     fontSize: 12,
     marginVertical: 20,
   },
@@ -571,5 +559,5 @@ const a = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
   },
-  backText: { fontSize: 20, fontWeight: '700', color: '#58113e' },
+  backText: { fontSize: 20, fontWeight: '700', color: colors.navy },
 });
