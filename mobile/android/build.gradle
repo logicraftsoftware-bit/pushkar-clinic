@@ -20,3 +20,15 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// Avoid the payment SDK's dynamic latest.integration lookup in release builds.
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "com.razorpay" && details.requested.name == "standard-core") {
+                details.useVersion "1.7.22"
+                details.because "Use the payment core verified in the previous successful APK"
+            }
+        }
+    }
+}
