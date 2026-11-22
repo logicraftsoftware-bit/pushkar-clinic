@@ -31,3 +31,7 @@ API keys are encrypted with AES-256-GCM using a key derived from the existing JW
 Your screenshot shows transactional/DLT credits and zero dedicated OTP credits. Ask Dove/mobiCOMM whether the approved OTP template can use the transactional route and whether the account/route is enabled. Do not assume the displayed balance guarantees OTP delivery.
 
 The app/backend/transport can be tested with synthetic data on CI, but actual delivery needs your approved sender/template, valid credentials, route balance and the provider's confirmed response format. No real SMS is sent by automated tests.
+
+### DLT IDs with blank parameter names
+
+When both DLT IDs are saved and both custom parameter names are blank, the server uses Dove POST /REST/sendsms/ with entityid and tempid in each listsms item. It validates the JSON smslist.sms response: exactly one result, status success and code 000. The legacy success prefix is not used for this JSON response. Explicit custom parameter names retain the legacy submitsms.jsp integration. Provider acceptance still does not establish handset delivery; check delivery reports.

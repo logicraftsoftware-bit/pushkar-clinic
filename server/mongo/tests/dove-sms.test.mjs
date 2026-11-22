@@ -13,3 +13,15 @@ test('Dove transport encodes approved content and requires documented acceptance
  await assert.rejects(deliverDove(settings,'private-test-key','+919999999999','123456',async()=>new Response('ACCEPTED: false',{status:500})),e=>e.status===503);
  const first=sealSmsKey('private-test-key'),second=sealSmsKey('private-test-key');assert.notEqual(first,second);assert.ok(!first.includes('private-test-key'));
 });
+
+test('Dove JSON transport includes saved DLT IDs when legacy names are blank',async()=>{
+ const mapped={...settings,entity_param:'',template_param:''};
+ const send=async(reply)=>deliverDove(mapped,'private-test-key','+919999999999','123456',async(url,options)=>{
+  assert.equal(url.pathname,'/REST/sendsms/');assert.equal(url.search,'');assert.equal(options.method,'POST');
+  const body=JSON.parse(options.body);assert.equal(body.password,'private-test-key');
+  assert.equal(body.listsms[0].entityid,'123');assert.equal(body.listsms[0].tempid,'456');assert.equal(body.listsms[0].sms,'Code 123456 for testing.');
+  return new Response(reply);
+ });
+ await send(JSON.stringify({smslist:{sms:[{status:'success',reason:'success',code:'000'}]}}));
+ for(const reply of [JSON.stringify({smslist:{sms:[{status:'fail',code:'001'}]}}),JSON.stringify({smslist:{sms:[]}}),'sent,success,123','invalid'])await assert.rejects(send(reply),e=>e.code==='SMS_DELIVERY_FAILED');
+});
