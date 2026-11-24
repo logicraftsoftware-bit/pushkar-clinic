@@ -22,5 +22,6 @@ test('Dove query transport always includes fixed DLT parameter names',async()=>{
   return new Response(reply);
  });
  await send('ACCEPTED: synthetic-id');
- for(const reply of ['blocked_Dlt_template','invalid'])await assert.rejects(send(reply),e=>e.code==='SMS_DELIVERY_FAILED');
+ await assert.rejects(send('blocked_Dlt_template'),{status:503,code:'SMS_DLT_TEMPLATE_REJECTED'});
+ await assert.rejects(send('invalid'),{status:503,code:'SMS_DELIVERY_FAILED'});
 });
