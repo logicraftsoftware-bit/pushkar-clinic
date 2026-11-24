@@ -115,8 +115,22 @@ route(
       if(!req.input.name||!req.input.password)throw fail('Enter your name and password.');
       pending={name:req.input.name,email:req.input.email??'',password_hash:await hashPassword(req.input.password)};
     }
-    const existing=await db.collection('mobile_accounts').findOne({phone:mobile});
-    const eligible=purpose==='legacy'||purpose==='register'?!existing||purpose==='legacy':existing?.status==='Active';
+    const existing = await db.collection('mobile_accounts').findOne({ phone: mobile });
+    // Clinic registration and patient-app registration are separate. Let an
+    // active clinic patient verify the same phone to create an app account,
+    // while leaving medical-record linking to its explicit verification flow.
+    const clinicPatient = purpose === 'login' && !existing
+      ? await db.collection('patients').findOne({
+          phone: { $in: [mobile.slice(3), mobile] },
+          status: 'Active',
+          $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }],
+        }, { projection: { _id: 1 } })
+      : null;
+    let eligible;
+    if (purpose === 'legacy') eligible = true;
+    else if (purpose === 'register') eligible = !existing;
+    else if (purpose === 'login') eligible = existing?.status === 'Active' || Boolean(clinicPatient);
+    else eligible = purpose === 'reset' && existing?.status === 'Active';
     // Do not return a fake OTP challenge when no SMS will be sent. Keep the
     // guidance the same for login, registration, and recovery to avoid exposing
     // whether a number is registered.
@@ -271,7 +285,9 @@ route(
         await db.collection('mobile_profiles').updateOne({id:result.account.self_profile_id},{$set:{name:challenge.pending.name}},{session});
         result.profile.name=challenge.pending.name;return result;
       }
-      if(challenge.purpose==='login'&&!existing)throw fail('Create an account first.',401);
+      // A verified OTP for an eligible clinic patient may create their
+      // patient-app account on first sign-in. patientLogin does not link any
+      // clinic chart automatically.
       return patientLogin(challenge.phone, session);
     });
     res.json(result);
