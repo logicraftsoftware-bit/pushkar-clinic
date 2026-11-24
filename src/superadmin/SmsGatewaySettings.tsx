@@ -112,7 +112,8 @@ export default function SmsGatewaySettings() {
             Enable this SMS gateway
           </label>
           <p className="wide">
-            With both DLT IDs entered and API parameter names blank, messages use the documented Dove JSON API at https://mobicomm.dove-sms.com/REST/sendsms/. Use the
+            OTPs use Dove&apos;s submitsms.jsp HTTPS request. The server sends the
+            configured entity and template IDs as entityid and tempid. Use the
             exact approved message, replacing only its OTP variable with{" "}
             {"{code}"}. Save the API key here; it is encrypted and is never
             returned to the browser.
@@ -157,10 +158,12 @@ export default function SmsGatewaySettings() {
             />
           </label>
           <p className="wide">
-            Enter both approved DLT IDs. Leave both API parameter names blank to
-            send entityid and tempid through the JSON API; success is checked from
-            its status and code. Custom parameter names select the legacy HTTP
-            API, which uses the documented successful-response prefix.
+            Enter the approved DLT entity ID and content-template ID. The
+            parameter names are fixed to entityid and tempid for this gateway;
+            leave the optional custom parameter-name fields blank. Set the
+            successful-response prefix to the exact prefix documented by Dove
+            (for example, sent,success, if that is the response your account
+            returns). HTTP 200 alone does not confirm provider acceptance.
           </p>
           {error && (
             <p role="alert" className="entity-error wide">

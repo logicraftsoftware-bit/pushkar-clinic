@@ -11,7 +11,7 @@ const safe=row=>{const {encrypted_key,_id,...fields}=row??{};return {...fields,h
 router.get('/sms-gateway',async(_req,res)=>res.json(safe(await smsSettings())));
 router.put('/sms-gateway',async(req,res)=>{
   const body=input.parse(req.body),old=await smsSettings();
-  if(body.enabled&&(!body.username||!body.sender_id||!body.message.includes('{code}')||!body.success_prefix||(!body.api_key&&!old?.encrypted_key)))return res.status(400).json({error:'Enter the gateway user, API key, approved sender, message containing {code}, and documented success response prefix.'});
+  if(body.enabled&&(!body.username||!body.sender_id||!body.entity_id||!body.template_id||!body.message.includes('{code}')||!body.success_prefix||(!body.api_key&&!old?.encrypted_key)))return res.status(400).json({error:'Enter the gateway user, API key, approved sender, DLT entity and template IDs, approved message containing {code}, and documented success response prefix.'});
   if(body.entity_param&&body.entity_param===body.template_param)return res.status(400).json({error:'DLT parameter names must be different.'});
   const {api_key,...fields}=body;
   await db.collection('platform_sms_gateway').updateOne({_id:'patient-otp'},{$set:{...fields,...(api_key?{encrypted_key:sealSmsKey(api_key)}:{}),updated_at:new Date(),updated_by:res.locals.account.id}},{upsert:true});

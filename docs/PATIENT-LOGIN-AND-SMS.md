@@ -20,9 +20,9 @@ Open **Super Admin > Platform Settings > Patient App ? SMS Gateway**.
 2. Enter the gateway username and replacement API key.
 3. Enter the approved sender ID, DLT entity ID and approved content-template ID.
 4. Paste the exact approved OTP message. Replace only its code variable with `{code}`. The application replaces this with a random six-digit code; all other text stays unchanged. Make sure any stated expiry agrees with five minutes.
-5. The provider endpoint is fixed to `https://mobicomm.dove-sms.com/submitsms.jsp`. Its HTTPS GET parameters follow the supplied dashboard sample: `user`, `key`, `mobile`, `message`, `senderid`, `accusage=1`.
-6. If the provider automatically maps DLT templates, leave Entity API parameter name and Template API parameter name blank. If its documentation requires explicit DLT parameters, enter the documented names. Do not guess them.
-7. Enter the documented accepted-response prefix. This must be confirmed from your gateway documentation or a redacted successful API response. No default is guessed; HTTP 200 alone is not success. A response starting with this exact prefix is treated as provider acceptance, not handset delivery.
+5. The provider endpoint is fixed to `https://mobicomm.dove-sms.com/submitsms.jsp`. It uses the confirmed HTTPS GET parameters: `user`, `key`, `mobile`, `message`, `senderid`, `accusage=1`, `entityid`, and `tempid`. The application URL-encodes values, including the leading `+` in an international phone number.
+6. Entity/template parameter names are fixed to `entityid` and `tempid`. Leave the optional custom parameter-name fields blank; those settings do not alter the request parameter names.
+7. Set the documented accepted-response prefix to the one returned by this gateway account (the supplied example uses `sent,success,`). A response starting with that prefix is treated as provider acceptance, not handset delivery; HTTP 200 alone is not success.
 8. Enable the gateway and save. An empty API key on subsequent edits preserves the stored key.
 9. Enter a test number and click Send test SMS. This sends a provider-billed message with an inert code that cannot log in. Check the gateway delivery report and approved route/credits if it fails. Then test real app registration.
 
@@ -31,7 +31,3 @@ API keys are encrypted with AES-256-GCM using a key derived from the existing JW
 Your screenshot shows transactional/DLT credits and zero dedicated OTP credits. Ask Dove/mobiCOMM whether the approved OTP template can use the transactional route and whether the account/route is enabled. Do not assume the displayed balance guarantees OTP delivery.
 
 The app/backend/transport can be tested with synthetic data on CI, but actual delivery needs your approved sender/template, valid credentials, route balance and the provider's confirmed response format. No real SMS is sent by automated tests.
-
-### DLT IDs with blank parameter names
-
-When both DLT IDs are saved and both custom parameter names are blank, the server uses Dove POST /REST/sendsms/ with entityid and tempid in each listsms item. It validates the JSON smslist.sms response: exactly one result, status success and code 000. The legacy success prefix is not used for this JSON response. Explicit custom parameter names retain the legacy submitsms.jsp integration. Provider acceptance still does not establish handset delivery; check delivery reports.
