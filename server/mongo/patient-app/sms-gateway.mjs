@@ -9,6 +9,8 @@ export async function smsAvailable(){return Boolean((await smsSettings())?.enabl
 export async function sendGatewayOtp(mobile,code){
   const settings=await smsSettings();
   if(!settings?.enabled)throw Object.assign(Error('Enable and configure the SMS gateway first.'),{status:503});
+  if(!settings.entity_id||!settings.template_id||!settings.sender_id||!settings.message?.includes('{code}'))
+    throw Object.assign(Error('OTP delivery is missing the approved DLT sender, entity ID, template ID, or message. Check Super Admin > Platform Settings > Patient App · SMS Gateway.'),{status:503,code:'SMS_DLT_CONFIGURATION_MISSING'});
   await deliverDove(settings,unseal(settings.encrypted_key),mobile,code);
 }
 export async function deliverDove(settings,apiKey,mobile,code,fetcher=globalThis.fetch){
@@ -24,10 +26,15 @@ export async function deliverDove(settings,apiKey,mobile,code,fetcher=globalThis
     tempid:settings.template_id,
   }).toString();
   const options={method:'GET',signal:AbortSignal.timeout(10000),redirect:'error'};
+  let result,reply;
   try{
-    const result=await fetcher(url,options);
-    const reply=(await result.text()).trim();
-    if(!result.ok||reply.length>4096)throw Error('Rejected');
-    if(!settings.success_prefix||!reply.startsWith(settings.success_prefix))throw Error('Rejected');
-  }catch{throw Object.assign(Error('SMS provider did not accept the message. Check gateway settings and balance.'),{status:503,code:'SMS_DELIVERY_FAILED'});}
+    result=await fetcher(url,options);
+    reply=(await result.text()).trim();
+  }catch{throw Object.assign(Error('Could not reach the SMS provider. Check the gateway connection and try again.'),{status:503,code:'SMS_DELIVERY_FAILED'});}
+  if(!result.ok||reply.length>4096||!settings.success_prefix||!reply.startsWith(settings.success_prefix)){
+    const dltBlocked=/blocked[ _-]*dlt[ _-]*template/i.test(reply);
+    throw Object.assign(Error(dltBlocked
+      ?'The SMS provider rejected this DLT template. Check that the saved entity ID, template ID, sender ID, and message exactly match the approved template.'
+      :'The SMS provider did not accept the message. Check the gateway settings, response prefix, and balance.'),{status:503,code:dltBlocked?'SMS_DLT_TEMPLATE_REJECTED':'SMS_DELIVERY_FAILED'});
+  }
 }

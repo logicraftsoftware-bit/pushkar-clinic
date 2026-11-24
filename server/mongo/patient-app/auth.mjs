@@ -116,8 +116,11 @@ route(
       pending={name:req.input.name,email:req.input.email??'',password_hash:await hashPassword(req.input.password)};
     }
     const existing=await db.collection('mobile_accounts').findOne({phone:mobile});
-    // Keep request responses uniform for unknown/inactive phone numbers.
     const eligible=purpose==='legacy'||purpose==='register'?!existing||purpose==='legacy':existing?.status==='Active';
+    // Do not return a fake OTP challenge when no SMS will be sent. Keep the
+    // guidance the same for login, registration, and recovery to avoid exposing
+    // whether a number is registered.
+    if(!eligible)throw fail('No OTP was sent. If this is your first time using the app, choose Register / Create Account. Otherwise, check that you entered the mobile number used for your patient-app account.',400,'OTP_ACCOUNT_ACTION_REQUIRED');
     const now = new Date(),
       cooldown = await db
         .collection('mobile_otp_cooldowns')
