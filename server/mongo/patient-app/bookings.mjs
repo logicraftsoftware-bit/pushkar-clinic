@@ -41,7 +41,7 @@ import {
 } from './booking-service.mjs';
 import { gateway } from './payments.mjs';
 import { validateSession } from './auth.mjs';
-import { sendPdf, simplePdf } from './documents.mjs';
+import { sendPdf, patientPdf } from './documents.mjs';
 
 const visit = z
   .object({
@@ -928,26 +928,27 @@ export function registerBookings(router) {
             expiresIn: ttl,
           }
         );
-      if (req.query.format === 'pdf')
+      if (req.query.format === 'pdf') {
+        const clinic = await db.collection('hospitals').findOne(
+          { id: row.tenant_id },
+          { projection: { logo_url: 1 } }
+        );
         return sendPdf(
           res,
           row.appointment_number + '.pdf',
-          await simplePdf(
-            'Appointment Pass',
-            [
-              appointment.clinic_name,
-              appointment.doctor_name,
-              `Patient: ${appointment.patient_name}`,
-              `UHID: ${appointment.medical_record_number}`,
-              `Appointment: ${row.appointment_number}`,
-              `Date: ${row.appointment_date}  Time: ${row.appointment_time}`,
-              `Token: ${row.token_number}`,
-              `Status: ${row.status}`,
-              `Payment: ${row.payment_status}`,
+          await patientPdf({
+            title: 'Appointment Pass',
+            clinic: appointment.clinic_name,
+            logo: clinic?.logo_url,
+            reference: row.appointment_number,
+            qr,
+            sections: [
+              { title: 'Visit details', rows: [['Clinic', appointment.clinic_name], ['Branch', appointment.branch_name], ['Doctor', appointment.doctor_name], ['Date and time', `${row.appointment_date} · ${row.appointment_time}`]] },
+              { title: 'Patient and booking', rows: [['Patient', appointment.patient_name], ['UHID', appointment.medical_record_number], ['Queue token', row.token_number], ['Booking status', row.status], ['Payment status', row.payment_status]] },
             ],
-            qr
-          )
+          })
         );
+      }
       res.json({
         appointment,
         qr_payload: qr,

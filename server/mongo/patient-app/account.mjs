@@ -26,7 +26,7 @@ import {
 } from './common.mjs';
 import { appointmentView } from './booking-service.mjs';
 import { patientQueue } from './bookings.mjs';
-import { sendPdf, simplePdf } from './documents.mjs';
+import { sendPdf, patientPdf } from './documents.mjs';
 
 export async function notify(accountId, key, title, message, target) {
   const now = new Date(),
@@ -372,20 +372,23 @@ export function registerAccount(router) {
     'Download a patient invoice PDF',
     async (req, res) => {
       const bill = await invoice(res.locals.account, req.params.id);
+      const clinic = bill.clinic_id
+        ? await db.collection('hospitals').findOne({ id: bill.clinic_id }, { projection: { name: 1, logo_url: 1 } })
+        : null;
       sendPdf(
         res,
         bill.record_number + '.pdf',
-        await simplePdf('Clinic Invoice', [
-          `Invoice: ${bill.record_number}`,
-          `Date: ${bill.record_date}`,
-          ...bill.items.map(
-            (i) => `${i.name ?? 'Service'}: INR ${i.amount ?? i.price ?? 0}`
-          ),
-          `Total: INR ${bill.total}`,
-          `Paid: INR ${bill.paid}`,
-          `Due: INR ${bill.due}`,
-          `Status: ${bill.status}`,
-        ])
+        await patientPdf({
+          title: 'Clinic Invoice',
+          clinic: clinic?.name,
+          logo: clinic?.logo_url,
+          reference: bill.record_number,
+          sections: [
+            { title: 'Invoice details', rows: [['Invoice date', bill.record_date], ['Status', bill.status]] },
+            { title: 'Services and charges', rows: bill.items.map(item => [item.name ?? 'Service', `INR ${item.amount ?? item.price ?? 0}`]) },
+            { title: 'Payment summary', rows: [['Total', `INR ${bill.total}`], ['Paid', `INR ${bill.paid}`], ['Balance due', `INR ${bill.due}`]] },
+          ],
+        })
       );
     }
   );
