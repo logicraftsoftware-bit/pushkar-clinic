@@ -13,8 +13,10 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Razorpay from 'react-native-razorpay';
 import QRCode from 'react-native-qrcode-svg';
-import { Button, Field, Screen } from '../components/ui';
-import { Avatar } from '../components/Illustrations';
+import { Bell, CalendarPlus, ClipboardList, FileText, HeartPulse, Receipt, Users, UserRound, CircleHelp } from 'lucide-react-native';
+import { Button, Field, Screen, SearchBar } from '../components/ui';
+import { DateField } from '../components/DateField';
+import { Avatar, ClinicArt } from '../components/Illustrations';
 import { colors, s } from '../theme';
 import type { Navigation, ScreenName } from '../navigation';
 import { api, chooseFile, downloadDocument } from './native';
@@ -155,21 +157,50 @@ function Tile({
   title,
   subtitle,
   onPress,
+  leading,
+  trailing,
 }: {
   title: string;
   subtitle?: string;
   onPress?: () => void;
+  leading?: React.ReactNode;
+  trailing?: React.ReactNode;
 }) {
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : undefined}
       onPress={onPress}
-      style={styles.card}
+      disabled={!onPress}
+      style={({ pressed }) => [styles.card, onPress && pressed && styles.cardPressed]}
     >
-      <Text style={styles.cardTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
+      <View style={styles.tileRow}>
+        {leading}
+        <View style={styles.tileBody}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.tileSubtitle}>{subtitle}</Text> : null}
+        </View>
+        {trailing ?? (onPress ? <Text style={styles.chevron}>›</Text> : null)}
+      </View>
     </Pressable>
   );
+}
+function Segments({ values, selected, onChange }: {
+  values: string[];
+  selected: string;
+  onChange: (value: string) => void;
+}) {
+  return <View style={styles.segments}>
+    {values.map(value => (
+      <Pressable key={value} accessibilityRole="tab"
+        accessibilityState={{ selected: value === selected }}
+        onPress={() => onChange(value)}
+        style={[styles.segment, value === selected && styles.activeSegment]}>
+        <Text style={[styles.segmentText, value === selected && styles.activeSegmentText]}>
+          {value.charAt(0).toUpperCase() + value.slice(1)}
+        </Text>
+      </Pressable>
+    ))}
+  </View>;
 }
 function DataState({
   resource,
@@ -233,9 +264,9 @@ function Details({ value }: { value: Record<string, unknown> }) {
             value[key] !== '',
         )
         .map(key => (
-          <View key={key} style={{ marginBottom: 12 }}>
-            <Text style={styles.label}>{key.replace(/_/g, ' ')}</Text>
-            <Text style={s.text}>{format(value[key])}</Text>
+          <View key={key} style={styles.detailRow}>
+            <Text style={styles.detailLabel}>{key.replace(/_/g, ' ')}</Text>
+            <Text style={styles.detailValue}>{format(value[key])}</Text>
           </View>
         ))}
     </View>
@@ -250,32 +281,17 @@ function format(value: unknown): string {
       .join(' · ');
   return asText(value);
 }
-const links: [ScreenName, string][] = [
-  ['Home', 'Home'],
-  ['Clinics', 'Find a clinic'],
-  ['Doctors', 'Find a doctor'],
-  ['Appointments', 'My appointments'],
-  ['Records', 'Medical records'],
-  ['LabReports', 'Lab tests & reports'],
-  ['Invoices', 'Payments & invoices'],
-  ['Notifications', 'Notifications'],
-  ['Family', 'Family members'],
-  ['Account', 'Account & help'],
-];
-function Menu() {
-  const nav = useNavigation<Navigation>();
+function SettingRow({ title, icon: Icon, onPress }: {
+  title: string;
+  icon: typeof Bell;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.menu}>
-      {links.map(([name, title]) => (
-        <Pressable
-          key={name}
-          onPress={() => nav.navigate(name)}
-          style={styles.pill}
-        >
-          <Text style={s.blue}>{title}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.settingRow}>
+      <Icon size={19} color="#07598e" />
+      <Text style={[styles.cardTitle, styles.tileBody]}>{title}</Text>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -287,23 +303,17 @@ function ProfileScreen() {
     [dob, setDob] = useState(p.me?.profile.date_of_birth ?? ''),
     [sex, setSex] = useState(p.me?.profile.sex ?? 'Other');
   return (
-    <Screen title="My profile" light>
+    <Screen title="Patient profile" light>
+      <View style={styles.doctorHero}><Avatar size={82} /></View>
       <Field label="Full name" value={name} onChangeText={setName} />
-      <Field
-        label="Date of birth (YYYY-MM-DD)"
+      <DateField
+        label="Date of birth"
         value={dob}
-        onChangeText={setDob}
+        onSelect={setDob}
+        max={today()}
       />
-      <View style={styles.menu}>
-        {['Male', 'Female', 'Other'].map(value => (
-          <Button
-            key={value}
-            secondary={sex !== value}
-            title={value}
-            onPress={() => setSex(value)}
-          />
-        ))}
-      </View>
+      <Text style={styles.label}>Gender</Text>
+      <Segments values={['Male', 'Female', 'Other']} selected={sex} onChange={setSex} />
       <Notice text={a.error} />
       <Button
         title="Save profile"
@@ -339,6 +349,7 @@ function Family() {
         <View key={row.id}>
           <Tile
             title={row.name || 'Complete your profile'}
+            leading={<Avatar size={46} />}
             subtitle={`${row.relationship ?? 'Self'}${
               p.profile?.id === row.id ? ' · Selected' : ''
             }`}
@@ -376,10 +387,11 @@ function Family() {
       ))}
       <Text style={s.title}>Add a family member</Text>
       <Field label="Full name" value={name} onChangeText={setName} />
-      <Field
-        label="Date of birth (YYYY-MM-DD)"
+      <DateField
+        label="Date of birth"
         value={dob}
-        onChangeText={setDob}
+        onSelect={setDob}
+        max={today()}
       />
       <View style={styles.menu}>
         {['Spouse', 'Child', 'Parent', 'Sibling', 'Other'].map(v => (
@@ -429,10 +441,34 @@ function Home() {
       unread_notifications: number;
     }>('/home' + query({ patient_id: p.profile?.id }));
   return (
-    <Screen title="My health" tab="Home" light>
-      <Text style={s.title}>Hello, {p.profile?.name || 'welcome'}</Text>
+    <Screen title="Pushkar Clinic" tab="Home" light>
+      <View style={styles.hero}>
+        <Text style={styles.heroTitle}>Hello, {p.profile?.name || 'welcome'}</Text>
+        <Avatar size={46} />
+      </View>
       <DataState resource={r} />
-      <Menu />
+      <View style={styles.shortcuts}>
+        {([
+          ['Clinics', CalendarPlus, 'Book visit'],
+          ['Queue', HeartPulse, 'Live queue'],
+          ['LabReports', ClipboardList, 'Reports'],
+          ['Records', FileText, 'Records'],
+        ] as const).map(([route, Icon, label]) => (
+          <Pressable key={route} style={styles.shortcut} accessibilityRole="button"
+            onPress={() => {
+              if (route === 'Queue') {
+                const upcoming = r.data?.upcoming_appointments[0];
+                if (!upcoming) return nav.navigate('Appointments');
+                p.setAppointment(upcoming);
+              }
+              nav.navigate(route);
+            }}>
+            <Icon size={22} color="#07598e" />
+            <Text style={styles.segmentText}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.sectionTitle}>Upcoming appointments</Text>
       {r.data?.upcoming_appointments.map(row => (
         <Tile
           key={row.id}
@@ -449,6 +485,11 @@ function Home() {
           No upcoming appointments. Find a clinic to book your first visit.
         </Text>
       )}
+      <View style={styles.settingsGroup}>
+        <SettingRow title="Find a doctor" icon={HeartPulse} onPress={() => nav.navigate('Doctors')} />
+        <SettingRow title="Notifications" icon={Bell} onPress={() => nav.navigate('Notifications')} />
+        <SettingRow title="Payments & invoices" icon={Receipt} onPress={() => nav.navigate('Invoices')} />
+      </View>
     </Screen>
   );
 }
@@ -458,20 +499,24 @@ function Clinics() {
     [search, setSearch] = useState(''),
     [term, setTerm] = useState(''),
     r = useResource<{ data: Clinic[] }>('/clinics' + query({ q: term }));
+  useEffect(() => {
+    const timer = setTimeout(() => setTerm(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
   return (
     <Screen title="Find a clinic" tab="Clinics" light>
-      <Field
-        label="Search clinics or city"
+      <SearchBar
+        placeholder="Search clinics or city"
         value={search}
         onChangeText={setSearch}
       />
-      <Button secondary title="Search" onPress={() => setTerm(search)} />
       <DataState resource={r} />
       {list(r.data).map(row => (
         <Tile
           key={row.id}
           title={row.name}
           subtitle={`${row.city ?? ''} ${row.address ?? ''}`}
+          leading={<View style={styles.clinicThumb}><ClinicArt width={76} height={60} /></View>}
           onPress={() => {
             p.setClinic(row);
             p.setBranch('');
@@ -501,10 +546,11 @@ function ClinicDetails() {
     r = useResource<Clinic>(p.clinic ? '/clinics/' + p.clinic.id : null),
     clinic = r.data ?? p.clinic;
   return (
-    <Screen title={clinic?.name ?? 'Clinic details'} light>
+    <Screen title="Clinic details" light>
       <DataState resource={r} />
       {clinic && (
         <>
+          <View style={styles.clinicBanner}><ClinicArt width="100%" height={160} /></View>
           <Text style={s.title}>{clinic.name}</Text>
           <Text style={styles.muted}>{clinic.description}</Text>
           <Text style={s.text}>
@@ -557,17 +603,16 @@ function Doctors() {
           branch_id: p.branch || undefined,
         }),
     );
+  useEffect(() => {
+    const timer = setTimeout(() => setTerm(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
   return (
     <Screen title="Find a doctor" light>
-      <Field
-        label="Search doctor or specialty"
+      <SearchBar
+        placeholder="Search doctor or specialty"
         value={search}
         onChangeText={setSearch}
-      />
-      <Button
-        secondary
-        title="Search doctors"
-        onPress={() => setTerm(search)}
       />
       <DataState resource={r} />
       {p.clinic && (
@@ -584,7 +629,9 @@ function Doctors() {
         <Tile
           key={row.id}
           title={row.name}
-          subtitle={`${row.specialty} · ₹${row.consultation_fee}`}
+          subtitle={row.specialty}
+          leading={<Avatar doctor size={48} />}
+          trailing={<Text style={styles.chevron}>₹{row.consultation_fee}</Text>}
           onPress={() => {
             const preferred = p.branch;
             p.selectDoctor(row);
@@ -617,13 +664,15 @@ function DoctorProfile() {
       <DataState resource={r} />
       {doctor && (
         <>
-          <Avatar doctor size={100} />
-          <Text style={s.title}>{doctor.name}</Text>
-          <Text style={s.text}>
-            {doctor.specialty} · {doctor.qualification}
-          </Text>
-          <Text style={styles.muted}>{doctor.about}</Text>
-          <Text style={s.title}>₹{doctor.consultation_fee}</Text>
+          <View style={styles.doctorHero}>
+            <Avatar doctor size={96} />
+            <Text style={s.title}>{doctor.name}</Text>
+            <Text style={styles.tileSubtitle}>{doctor.specialty}</Text>
+          </View>
+          <Text style={styles.sectionTitle}>About</Text>
+          {doctor.qualification ? <Tile title="Qualifications" subtitle={doctor.qualification} /> : null}
+          {doctor.about ? <Text style={styles.muted}>{doctor.about}</Text> : null}
+          <Tile title="Consultation fee" trailing={<Text style={styles.chevron}>₹{doctor.consultation_fee}</Text>} />
           <Button
             title="Choose appointment"
             onPress={() =>
@@ -640,7 +689,6 @@ function SelectAppointment() {
     nav = useNavigation<Navigation>(),
     a = useAction(),
     [date, setDate] = useState(today()),
-    [loadedDate, setLoadedDate] = useState(date),
     [slot, setSlot] = useState(''),
     key = useRef(uuid()),
     r = useResource<{ slots: { time: string; serial: number }[] }>(
@@ -651,47 +699,40 @@ function SelectAppointment() {
             query({
               clinic_id: p.doctor.clinic_id,
               branch_id: p.branch,
-              date: loadedDate,
+              date,
             })
         : null,
     );
   return (
     <Screen title="Select appointment" light>
-      <Text style={s.text}>
-        Patient: {p.profile?.name || 'Complete your profile'}
-      </Text>
-      <Button
-        secondary
-        title="Change patient"
-        onPress={() => nav.navigate('Family')}
-      />
-      <Field
-        label="Appointment date (YYYY-MM-DD)"
+      <Tile title={p.profile?.name || 'Choose a patient'} subtitle="Patient" leading={<Avatar size={42} />} onPress={() => nav.navigate('Family')} />
+      <DateField
+        label="Appointment date"
         value={date}
-        onChangeText={setDate}
-      />
-      <Button
-        secondary
-        title="Load available times"
-        onPress={() => {
+        min={today()}
+        onSelect={selected => {
           setSlot('');
-          setLoadedDate(date);
+          setDate(selected);
           key.current = uuid();
         }}
       />
       <DataState resource={r} />
       <Notice text={a.error} />
+      <Text style={styles.sectionTitle}>Available times</Text>
       <View style={styles.menu}>
         {r.data?.slots.map(row => (
-          <Button
+          <Pressable
             key={row.time}
-            title={row.time}
-            secondary={slot !== row.time}
+            accessibilityRole="button"
+            accessibilityState={{ selected: slot === row.time }}
+            style={[styles.timeSlot, slot === row.time && styles.activeSegment]}
             onPress={() => {
               setSlot(row.time);
               key.current = uuid();
             }}
-          />
+          >
+            <Text style={[styles.segmentText, slot === row.time && styles.activeSegmentText]}>{row.time}</Text>
+          </Pressable>
         ))}
       </View>
       {r.data && !r.data.slots.length && (
@@ -723,7 +764,7 @@ function SelectAppointment() {
                 clinic_id: p.doctor!.clinic_id,
                 branch_id: p.branch,
                 doctor_id: p.doctor!.id,
-                appointment_date: loadedDate,
+                appointment_date: date,
                 appointment_time: slot,
               },
               { key: key.current },
@@ -743,7 +784,7 @@ function VisitDetails() {
     a = useAction(),
     [reason, setReason] = useState(''),
     [followup, setFollowup] = useState(false),
-    [uploads, setUploads] = useState<string[]>([]),
+    [uploads, setUploads] = useState<{ id: string; filename: string }[]>([]),
     [share, setShare] = useState(false);
   return (
     <Screen title="Visit details" light>
@@ -773,9 +814,14 @@ function VisitDetails() {
         onPress={() => setShare(!share)}
       />
       <Notice text={a.error} />
+      <View style={styles.formCard}>
+      <Text style={styles.sectionTitle}>Visit attachments</Text>
+      <Text style={styles.tileSubtitle}>PDF or image · {uploads.length} of 10 files attached</Text>
+      {uploads.map(file => <Tile key={file.id} title={file.filename} subtitle="Tap to remove from this visit"
+        onPress={() => setUploads(current => current.filter(item => item.id !== file.id))} />)}
       <Button
         secondary
-        title={`Attach PDF / image (${uploads.length}/10)`}
+        title="Choose PDF or image"
         disabled={a.busy || !share || uploads.length >= 10}
         onPress={() =>
           void a.run(async () => {
@@ -786,10 +832,11 @@ function VisitDetails() {
               'POST',
               { ...file, profile_id: p.profile!.id, share_with_clinic: true },
             );
-            setUploads(old => [...old, upload.id]);
+            setUploads(old => [...old, { id: upload.id, filename: file.filename }]);
           })
         }
       />
+      </View>
       <Button
         title="Review booking"
         disabled={a.busy || !p.hold}
@@ -798,7 +845,7 @@ function VisitDetails() {
             await api.request('/booking-holds/' + p.hold!.id, 'PATCH', {
               reason,
               visit_type: followup ? 'Follow-up' : 'New',
-              upload_ids: uploads,
+              upload_ids: share ? uploads.map(file => file.id) : [],
             });
             const quote = await api.request<Quote>('/booking-quotes', 'POST', {
               hold_id: p.hold!.id,
@@ -841,8 +888,9 @@ function Payment() {
   };
   return (
     <Screen title="Review & payment" light>
-      <Text style={s.title}>{p.doctor?.name}</Text>
-      <Text style={s.text}>Patient: {p.profile?.name}</Text>
+      <Text style={styles.sectionTitle}>Booking summary</Text>
+      <Tile title={p.doctor?.name ?? 'Consultation'} subtitle={p.doctor?.specialty} leading={<Avatar doctor size={48} />} />
+      <Tile title="Patient" subtitle={p.profile?.name} />
       <Text style={s.title}>
         ₹{((p.quote?.total_cents ?? 0) / 100).toFixed(2)}
       </Text>
@@ -964,13 +1012,18 @@ function Confirmation() {
     a = useAction();
   return (
     <Screen title="Booking confirmed" light>
-      <Text style={s.title}>Your appointment is booked</Text>
+      <View style={styles.doctorHero}>
+        <Text style={styles.confirmIcon}>✓</Text>
+        <Text style={s.title}>Appointment confirmed!</Text>
+        {p.appointment && <Text style={styles.tileSubtitle}>{p.appointment.appointment_number}</Text>}
+      </View>
       {p.appointment && <Details value={{ ...p.appointment }} />}
       <Notice text={a.error} />
       <Button
         title="View appointment"
         onPress={() => nav.navigate('AppointmentDetails')}
       />
+      <Tile title="Back to Home" onPress={() => nav.navigate('Home')} />
       <Button
         secondary
         title="Download appointment pass"
@@ -995,22 +1048,15 @@ function Appointments() {
     );
   return (
     <Screen title="My appointments" tab="Appointments" light>
-      <View style={styles.menu}>
-        {['upcoming', 'past', 'cancelled', 'all'].map(v => (
-          <Button
-            key={v}
-            title={v}
-            secondary={status !== v}
-            onPress={() => setStatus(v)}
-          />
-        ))}
-      </View>
+      <Segments values={['upcoming', 'past', 'cancelled', 'all']} selected={status} onChange={setStatus} />
       <DataState resource={r} />
       {list(r.data).map(row => (
         <Tile
           key={row.id}
           title={row.doctor_name ?? row.appointment_number}
-          subtitle={`${row.patient_name} · ${row.appointment_date} ${row.appointment_time} · ${row.status}`}
+          leading={<Avatar doctor size={44} />}
+          subtitle={`${row.clinic_name ?? row.patient_name ?? ''}\n${row.appointment_date} · ${row.appointment_time}`}
+          trailing={<Text style={styles.statusChip}>{row.status}</Text>}
           onPress={() => {
             p.setAppointment(row);
             nav.navigate('AppointmentDetails');
@@ -1024,6 +1070,7 @@ function Appointments() {
   );
 }
 function AppointmentDetails() {
+  const [change, setChange] = useState<'reschedule' | 'cancel' | null>(null);
   const p = usePatient(),
     nav = useNavigation<Navigation>(),
     a = useAction(),
@@ -1044,7 +1091,8 @@ function AppointmentDetails() {
       <Notice text={a.error} />
       {row && (
         <>
-          <Details value={{ ...row }} />
+          <Tile title={row.doctor_name ?? 'Appointment'} subtitle={row.clinic_name} leading={<Avatar doctor size={48} />} trailing={<Text style={styles.chevron}>{row.status}</Text>} />
+          <Details value={{ ...row, doctor_name: undefined, clinic_name: undefined, status: undefined }} />
           <Button
             title="Live queue"
             onPress={() => {
@@ -1072,12 +1120,14 @@ function AppointmentDetails() {
               )
             }
           />
-          {r.data?.can_reschedule && (
-            <>
-              <Field
-                label="New date (YYYY-MM-DD)"
+          {r.data?.can_reschedule && <SettingRow title="Reschedule appointment" icon={CalendarPlus} onPress={() => setChange(change === 'reschedule' ? null : 'reschedule')} />}
+          {r.data?.can_reschedule && change === 'reschedule' && (
+            <View style={styles.formCard}>
+              <DateField
+                label="New appointment date"
                 value={date}
-                onChangeText={v => {
+                min={today()}
+                onSelect={v => {
                   setDate(v);
                   rescheduleKey.current = uuid();
                 }}
@@ -1121,10 +1171,11 @@ function AppointmentDetails() {
                   )
                 }
               />
-            </>
+            </View>
           )}
-          {r.data?.cancellation_policy.can_cancel && (
-            <>
+          {r.data?.cancellation_policy.can_cancel && <SettingRow title="Cancel appointment" icon={CalendarPlus} onPress={() => setChange(change === 'cancel' ? null : 'cancel')} />}
+          {r.data?.cancellation_policy.can_cancel && change === 'cancel' && (
+            <View style={styles.formCard}>
               <Field
                 label="Cancellation reason"
                 value={reason}
@@ -1157,7 +1208,7 @@ function AppointmentDetails() {
                   )
                 }
               />
-            </>
+            </View>
           )}
         </>
       )}
@@ -1176,8 +1227,9 @@ function CheckIn() {
     <Screen title="Patient check-in" light>
       <DataState resource={pass} />
       {pass.data && (
-        <View style={{ alignItems: 'center', padding: 20 }}>
+        <View style={[styles.card, styles.doctorHero]}>
           <QRCode value={pass.data.qr_payload} size={200} />
+          <Text style={styles.sectionTitle}>Check in at the clinic</Text>
           <Text style={styles.muted}>
             Show this appointment pass at reception.
           </Text>
@@ -1211,7 +1263,7 @@ function CheckIn() {
     </Screen>
   );
 }
-function Queue() {
+function Queue({ alert = false }: { alert?: boolean } = {}) {
   const p = usePatient(),
     nav = useNavigation<Navigation>(),
     r = useResource<{
@@ -1228,7 +1280,7 @@ function Queue() {
     );
   const q = r.data;
   return (
-    <Screen title="Live OPD queue" light>
+    <Screen title={alert ? 'Turn alert' : 'Live queue'} light>
       <DataState resource={r} />
       {q && (
         <>
@@ -1238,14 +1290,17 @@ function Queue() {
             </Text>
           ) : (
             <>
-              <Tile
-                title={`Your token: ${q.token ?? 'Awaiting token'}`}
-                subtitle={q.queue_status}
-              />
-              <Tile
-                title={`Now serving: ${q.now_serving_token ?? 'Not started'}`}
-                subtitle={`${q.patients_ahead} patients ahead`}
-              />
+              <Tile title={p.appointment?.doctor_name ?? 'Your appointment'} leading={<Avatar doctor size={44} />} subtitle={q.queue_status} />
+              <View style={[styles.queueToken, alert && styles.hero]}>
+                <Text style={alert ? styles.heroTitle : styles.sectionTitle}>
+                  {alert && q.queue_status === 'In Consultation' ? 'It’s your turn' : 'Your token'}
+                </Text>
+                <Text style={[styles.tokenNumber, alert && styles.activeSegmentText]}>{q.token ?? 'Awaiting token'}</Text>
+              </View>
+              <View style={styles.queueStats}>
+                <View style={styles.stat}><Text style={styles.tileSubtitle}>Now serving</Text><Text style={styles.cardTitle}>{q.now_serving_token ?? 'Not started'}</Text></View>
+                <View style={styles.stat}><Text style={styles.tileSubtitle}>Patients ahead</Text><Text style={styles.cardTitle}>{q.patients_ahead}</Text></View>
+              </View>
               <Text style={s.title}>
                 {q.queue_status === 'In Consultation'
                   ? 'It’s your turn'
@@ -1260,11 +1315,11 @@ function Queue() {
                 Updates every five seconds while this screen is open. Estimated
                 times can change.
               </Text>
-              <Button
+              {!alert && <Button
                 secondary
                 title="Turn alert"
                 onPress={() => nav.navigate('TurnAlert')}
-              />
+              />}
             </>
           )}
         </>
@@ -1273,24 +1328,31 @@ function Queue() {
   );
 }
 function Records() {
+  const [showUpload, setShowUpload] = useState(false);
   const p = usePatient(),
     nav = useNavigation<Navigation>(),
     a = useAction(),
     r = useResource<{ data: Item[] }>(
       '/records' + query({ patient_id: p.profile?.id }),
     ),
-    [title, setTitle] = useState('');
+    [title, setTitle] = useState(''),
+    [category, setCategory] = useState('all');
+  const records = list(r.data).filter(row => {
+    const kind = (row.kind ?? '').toLowerCase();
+    if (category === 'all') return true;
+    if (kind === 'consultation') return category === 'visit' || category === 'prescription';
+    return kind.includes(category);
+  });
   return (
     <Screen title="Medical records" tab="Records" light>
+      <Segments values={['all', 'prescription', 'report', 'visit']} selected={category} onChange={setCategory} />
       <DataState resource={r} />
       <Notice text={a.error} />
-      <Text style={styles.muted}>
-        Only clinic-released records and your own uploads appear here.
-      </Text>
-      {list(r.data).map(row => (
+      {records.map(row => (
         <Tile
           key={row.id}
           title={row.title ?? 'Medical record'}
+          leading={<FileText color="#07598e" size={23} />}
           subtitle={`${row.kind ?? ''} · ${row.record_date ?? ''}`}
           onPress={() => {
             p.setRecord(row);
@@ -1298,11 +1360,15 @@ function Records() {
           }}
         />
       ))}
-      {r.data && !list(r.data).length && (
+      {r.data && !records.length && (
         <Text style={styles.muted}>No released records yet.</Text>
       )}
+      <SettingRow title="Upload a personal record" icon={FileText} onPress={() => setShowUpload(!showUpload)} />
+      {showUpload && <View style={styles.formCard}>
+      <Text style={styles.sectionTitle}>Upload a personal record</Text>
+      <Text style={styles.tileSubtitle}>Choose a PDF or image from your device.</Text>
       <Field
-        label="Title for a new personal record"
+        label="Document title"
         value={title}
         onChangeText={setTitle}
       />
@@ -1331,10 +1397,12 @@ function Records() {
               { key: uuid() },
             );
             setTitle('');
+            setShowUpload(false);
             r.reload();
           })
         }
       />
+      </View>}
     </Screen>
   );
 }
@@ -1351,7 +1419,8 @@ function Prescription() {
       : null,
   );
   return (
-    <Screen title={row?.title ?? 'Medical document'} light>
+    <Screen title={row?.kind === 'consultation' ? 'Prescription details' : 'Medical document'} light>
+      {row && <Tile title={row.title ?? 'Visit summary'} subtitle={details.data?.doctor_name ?? asText(row.record_date)} leading={<FileText color="#07598e" size={26} />} />}
       <DataState resource={details} />
       {details.data && (
         <Details
@@ -1364,7 +1433,7 @@ function Prescription() {
       <Notice text={a.error} />
       {row ? (
         <>
-          <Details value={row} />
+          {row.kind !== 'uploaded' && <Details value={{ ...row, title: undefined, record_date: undefined }} />}
           <Button
             title="Open private document"
             disabled={a.busy}
@@ -1392,14 +1461,17 @@ function LabReports() {
         ? '/lab-tests' + query({ clinic_id: p.clinic.id, branch_id: p.branch })
         : null,
     ),
-    [tests, setTests] = useState<string[]>([]);
+    [tests, setTests] = useState<string[]>([]),
+    [section, setSection] = useState('tests');
+  const orders = list(r.data).filter(row => section === 'tests' || Boolean(row.report));
   return (
     <Screen title="Lab tests & reports" light>
+      <Segments values={['tests', 'reports']} selected={section} onChange={setSection} />
       <DataState resource={r} />
       <Notice text={a.error} />
-      {list(r.data).map(row => (
+      {orders.map(row => (
         <View key={row.id}>
-          <Details value={row} />
+          <Tile title={row.name ?? row.title ?? 'Lab order'} subtitle={asText(row.status)} />
           {Boolean(row.report) && typeof row.report === 'object' && (
             <Button
               secondary
@@ -1416,8 +1488,8 @@ function LabReports() {
           )}
         </View>
       ))}
-      {r.data && !list(r.data).length && (
-        <Text style={styles.muted}>No lab orders yet.</Text>
+      {r.data && !orders.length && (
+        <Text style={styles.muted}>{section === 'tests' ? 'No lab orders yet.' : 'No released reports yet.'}</Text>
       )}
       <Text style={s.title}>Request lab tests</Text>
       {!p.clinic || !p.branch ? (
@@ -1475,19 +1547,37 @@ function Invoices() {
     r = useResource<{ data: Item[] }>(
       '/invoices' + query({ patient_id: p.profile?.id }),
     ),
+    [filter, setFilter] = useState('all'),
     payments = useResource<{ data: Item[] }>(
       '/payments' + query({ patient_id: p.profile?.id }),
     );
+  const invoices = list(r.data).filter(row => {
+    const status = asText(row.payment_status ?? row.status).toLowerCase();
+    return filter === 'all' || (filter === 'paid' ? status === 'paid' : ['pending', 'unpaid', 'partial', 'partially paid', 'overdue'].includes(status));
+  });
   return (
     <Screen title="Payments & invoices" light>
+      <Segments values={['all', 'paid', 'pending']} selected={filter} onChange={setFilter} />
       <DataState resource={r} />
       <Notice text={a.error} />
-      {list(r.data).map(row => (
-        <View key={row.id}>
-          <Details value={row} />
+      {invoices.map(row => (
+        <View key={row.id} style={styles.formCard}>
+          <View style={styles.tileRow}>
+            <Receipt color="#07598e" size={24} />
+            <View style={styles.tileBody}>
+              <Text style={styles.cardTitle}>{asText(row.record_number) || 'Clinic invoice'}</Text>
+              <Text style={styles.tileSubtitle}>{asText(row.record_date)}</Text>
+            </View>
+            <View style={styles.invoiceAmount}>
+              <Text style={styles.cardTitle}>₹{Number(row.total ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
+              <Text style={styles.statusChip}>{asText(row.payment_status ?? row.status) || 'Unknown'}</Text>
+            </View>
+          </View>
           <Button
             secondary
-            title="Open invoice"
+            title="Download invoice PDF"
+            icon={FileText}
+            disabled={a.busy}
             onPress={() =>
               void a.run(() =>
                 downloadDocument('/invoices/' + row.id + '/download'),
@@ -1496,8 +1586,10 @@ function Invoices() {
           />
         </View>
       ))}
-      <Text style={s.title}>Online payment history</Text>
+      {r.data && !invoices.length && <Tile title="No invoices in this view" />}
+      <Text style={styles.sectionTitle}>Online payment history</Text>
       <DataState resource={payments} />
+      {payments.data && !list(payments.data).length && <Tile title="No online payments yet" />}
       {list(payments.data).map(row => (
         <Tile
           key={row.id}
@@ -1532,6 +1624,7 @@ function Notifications() {
         <Tile
           key={row.id}
           title={row.title ?? 'Clinic notification'}
+          leading={<Text style={styles.shortcutIcon}>●</Text>}
           subtitle={asText(row.message) || asText(row.body)}
           onPress={() =>
             void a.run(async () => {
@@ -1560,24 +1653,23 @@ function Account() {
     [code, setCode] = useState(''),
     [subject, setSubject] = useState(''),
     [message, setMessage] = useState(''),
-    [success, setSuccess] = useState('');
+    [success, setSuccess] = useState(''),
+    [panel, setPanel] = useState<'link' | 'support' | null>(null);
   return (
-    <Screen title="Account & help" tab="Account" light>
-      <Text style={s.title}>{p.me?.profile.name}</Text>
-      <Text style={s.text}>{p.me?.phone}</Text>
+    <Screen title="Account" tab="Account" light>
+      <Tile title={p.me?.profile.name ?? 'My account'} subtitle={p.me?.phone} leading={<Avatar size={54} />} />
       <Notice text={a.error} />
       {success && <Text style={styles.muted}>{success}</Text>}
-      <Button
-        secondary
-        title="Edit profile"
-        onPress={() => nav.navigate('Profile')}
-      />
-      <Button
-        secondary
-        title="Manage family"
-        onPress={() => nav.navigate('Family')}
-      />
-      <Text style={s.title}>Link an existing clinic record</Text>
+      <View style={styles.settingsGroup}>
+        <SettingRow title="My profile" icon={UserRound} onPress={() => nav.navigate('Profile')} />
+        <SettingRow title="Family members" icon={Users} onPress={() => nav.navigate('Family')} />
+        <SettingRow title="Notifications" icon={Bell} onPress={() => nav.navigate('Notifications')} />
+        <SettingRow title="Payments & invoices" icon={Receipt} onPress={() => nav.navigate('Invoices')} />
+        <SettingRow title="Link a clinic record" icon={FileText} onPress={() => setPanel(panel === 'link' ? null : 'link')} />
+        <SettingRow title="Help & support" icon={CircleHelp} onPress={() => setPanel(panel === 'support' ? null : 'support')} />
+      </View>
+      {panel === 'link' && <View style={styles.formCard}>
+      <Text style={styles.sectionTitle}>Link an existing clinic record</Text>
       <Text style={styles.muted}>
         Ask clinic staff for a one-time, phone-bound linking code. Matching a
         phone number alone does not grant access to medical records.
@@ -1600,7 +1692,10 @@ function Account() {
           })
         }
       />
-      <Text style={s.title}>Contact clinic support</Text>
+      </View>}
+      {panel === 'support' && <View style={styles.formCard}>
+      <Text style={styles.sectionTitle}>Contact clinic support</Text>
+      {!p.clinic && <Tile title="Choose a clinic" onPress={() => nav.navigate('Clinics')} />}
       <Field label="Subject" value={subject} onChangeText={setSubject} />
       <Field
         label="Message"
@@ -1631,6 +1726,7 @@ function Account() {
           })
         }
       />
+      </View>}
       <Button
         secondary
         title="Request account deletion"
@@ -1667,7 +1763,6 @@ function Account() {
           })
         }
       />
-      <Menu />
     </Screen>
   );
 }
@@ -1689,7 +1784,7 @@ const components: Record<ScreenName, React.ComponentType> = {
   AppointmentDetails,
   CheckIn,
   Queue,
-  TurnAlert: Queue,
+  TurnAlert: () => <Queue alert />,
   Records,
   Prescription,
   LabReports,
@@ -1737,23 +1832,68 @@ export const liveScreens = Object.fromEntries(
   ]),
 ) as unknown as Record<ScreenName, React.ComponentType>;
 const styles = StyleSheet.create({
+  settingsGroup: { backgroundColor: '#fff', borderRadius: 15, borderWidth: 1, borderColor: '#e1ebf4', overflow: 'hidden' },
+  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, minHeight: 48, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e1ebf4' },
+  formCard: { backgroundColor: '#fff', padding: 14, borderRadius: 15, gap: 10 },
+  timeSlot: { width: '30%', minHeight: 44, justifyContent: 'center', borderRadius: 10, borderColor: '#c8dcec', borderWidth: 1, backgroundColor: '#fff' },
+  statusChip: { color: '#07598e', backgroundColor: '#e8f3ff', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, fontSize: 11, fontWeight: '700', maxWidth: 94 },
+  invoiceAmount: { alignItems: 'flex-end', gap: 5 },
+  tileRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  tileBody: { flex: 1 },
+  tileSubtitle: { color: '#526b83', fontSize: 13, lineHeight: 19, marginTop: 3 },
+  chevron: { color: '#07598e', fontWeight: '700', fontSize: 16 },
+  segments: { flexDirection: 'row', padding: 4, gap: 4, backgroundColor: '#e7eff8', borderRadius: 18, marginVertical: 8 },
+  segment: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 15 },
+  activeSegment: { backgroundColor: '#07598e' },
+  segmentText: { color: '#143953', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  activeSegmentText: { color: '#fff' },
+  hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: '#07598e', padding: 16, borderRadius: 18 },
+  heroTitle: { color: '#fff', flexShrink: 1, fontWeight: '800', fontSize: 24 },
+  shortcuts: { flexDirection: 'row', gap: 6, marginVertical: 14 },
+  shortcut: { flex: 1, borderRadius: 12, paddingVertical: 10, gap: 5, backgroundColor: '#e8f3ff', alignItems: 'center' },
+  shortcutIcon: { color: '#07598e', fontSize: 23, fontWeight: '800', marginBottom: 4 },
+  sectionTitle: { color: '#102b45', fontSize: 17, fontWeight: '800', marginTop: 8, marginBottom: 5 },
+  clinicThumb: { borderRadius: 10, overflow: 'hidden' },
+  clinicBanner: { borderRadius: 16, overflow: 'hidden' },
+  doctorHero: { backgroundColor: '#e8f3ff', borderRadius: 18, alignItems: 'center', padding: 20 },
+  queueToken: { alignItems: 'center', borderRadius: 16, backgroundColor: '#edf7ff', padding: 14 },
+  tokenNumber: { fontSize: 30, fontWeight: '800', color: '#07598e' },
+  confirmIcon: { color: '#087962', fontSize: 44, fontWeight: '800' },
+  queueStats: { flexDirection: 'row', gap: 10 },
+  stat: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#e8f3ff', alignItems: 'center' },
   card: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#d6e7f1',
-    borderRadius: 18,
-    padding: 18,
-    marginVertical: 8,
+    borderColor: '#d8e8f4',
+    borderRadius: 14,
+    padding: 13,
+    marginVertical: 2,
+    shadowColor: '#174c76',
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#12334f' },
+  cardPressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: '#12334f' },
   muted: { color: '#567189', lineHeight: 23, marginVertical: 12 },
   label: {
     fontSize: 13,
     fontWeight: '600',
     color: '#567189',
     textTransform: 'capitalize',
-    marginBottom: 5,
+    marginBottom: 4,
   },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e1ebf4',
+    paddingVertical: 8,
+  },
+  detailLabel: { width: '36%', color: '#526b83', fontSize: 13, lineHeight: 19, textTransform: 'capitalize' },
+  detailValue: { flex: 1, color: '#12334f', fontSize: 14, lineHeight: 20 },
   error: {
     color: '#a32135',
     backgroundColor: '#fff0f1',
@@ -1762,7 +1902,6 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   menu: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 14 },
-  pill: { backgroundColor: '#e7f4fc', padding: 12, borderRadius: 12 },
   loading: {
     flex: 1,
     alignItems: 'center',

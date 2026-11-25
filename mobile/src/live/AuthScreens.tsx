@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -54,6 +55,7 @@ export function PatientAuth() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const running = useRef(false);
+  const otpInput = useRef<TextInputInstance>(null);
   useEffect(() => {
     if (!cooldown) return;
     const timer = setTimeout(() => setCooldown(n => n - 1), 1000);
@@ -132,6 +134,7 @@ export function PatientAuth() {
     setChallenge(next);
     setCooldown(next.resend_after);
     setCode('');
+    setTimeout(() => otpInput.current?.focus(), 150);
   }
   async function verify() {
     if (!challenge || !/^\d{6}$/.test(code))
@@ -386,16 +389,39 @@ export function PatientAuth() {
                         Enter the six-digit code sent to your mobile. It expires
                         in 5 minutes.
                       </Text>
-                      <TextInput
-                        accessibilityLabel="Six-digit OTP"
-                        value={code}
-                        onChangeText={v => setCode(v.replace(/\D/g, ''))}
-                        keyboardType="number-pad"
-                        textContentType="oneTimeCode"
-                        autoComplete="sms-otp"
-                        maxLength={6}
-                        style={a.code}
-                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Enter six-digit OTP"
+                        onPress={() => otpInput.current?.focus()}
+                        style={a.codeCells}
+                      >
+                        {Array.from({ length: 6 }, (_, index) => (
+                          <View
+                            key={index}
+                            style={[
+                              a.codeCell,
+                              code[index] ? a.codeCellFilled : undefined,
+                              index === Math.min(code.length, 5)
+                                ? a.codeCellActive
+                                : undefined,
+                            ]}
+                          >
+                            <Text style={a.codeDigit}>{code[index] ?? ''}</Text>
+                          </View>
+                        ))}
+                        <TextInput
+                          ref={otpInput}
+                          accessibilityLabel="Six-digit OTP"
+                          value={code}
+                          onChangeText={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                          keyboardType="number-pad"
+                          textContentType="oneTimeCode"
+                          autoComplete="sms-otp"
+                          maxLength={6}
+                          caretHidden
+                          style={a.hiddenCodeInput}
+                        />
+                      </Pressable>
                       {button(
                         mode === 'register'
                           ? 'Verify & create account'
@@ -529,16 +555,34 @@ const a = StyleSheet.create({
   },
   otp: { backgroundColor: colors.pale, borderRadius: 16, padding: 14, gap: 10 },
   otpTitle: { fontSize: 17, fontWeight: '700', color: colors.navy },
-  code: {
+  codeCells: {
+    position: 'relative',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    minHeight: 58,
+  },
+  codeCell: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#fff',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.line,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 13,
+  },
+  codeCellFilled: { backgroundColor: '#f4faff' },
+  codeCellActive: { borderColor: colors.blue, backgroundColor: '#f3faff' },
+  codeDigit: { fontSize: 24, fontWeight: '700', color: colors.navy },
+  hiddenCodeInput: {
+    ...StyleSheet.absoluteFill,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+    opacity: 0.02,
+    zIndex: 2,
     textAlign: 'center',
-    fontSize: 25,
-    letterSpacing: 10,
-    color: colors.navy,
   },
   error: {
     backgroundColor: '#fff0f1',

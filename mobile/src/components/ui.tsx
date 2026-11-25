@@ -116,18 +116,20 @@ export function Screen({
   const insets = useSafeAreaInsets();
   return (
     <LinearGradient
-      colors={light ? ['#f1f9ff', '#fff'] : ['#048fca', '#00589f']}
+      colors={light ? ['#06477e', '#0876b0'] : ['#048fca', '#00589f']}
       style={styles.root}
     >
       <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
         {focused && (
-          <StatusBar barStyle={light ? 'dark-content' : 'light-content'} />
+          <StatusBar barStyle="light-content" />
         )}
         {title && (
-          <View style={styles.header}>
-            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-              <HeaderArt />
-            </View>
+          <View style={[styles.header, light && styles.lightHeader]}>
+            {!light && (
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <HeaderArt />
+              </View>
+            )}
             <Pressable
               accessibilityLabel="Go back"
               hitSlop={14}
@@ -135,18 +137,18 @@ export function Screen({
                 nav.canGoBack() ? nav.goBack() : nav.navigate('Home')
               }
             >
-              <ArrowLeft color={light ? colors.navy : '#fff'} size={23} />
+              <ArrowLeft color="#fff" size={23} />
             </Pressable>
-            <Text style={[styles.headerText, light && { color: colors.navy }]}>
-              {title}
-            </Text>
+            <Text numberOfLines={2} style={[styles.headerText, light && styles.clinicHeaderText]}>{title}</Text>
             {right || <View style={{ width: 23 }} />}
           </View>
         )}
-        <View style={[styles.sheet, !title && styles.noRound]}>
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            <BodyWaves />
-          </View>
+        <View style={[styles.sheet, light && title && styles.clinicSheet, !title && styles.noRound]}>
+          {!light && (
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <BodyWaves />
+            </View>
+          )}
           {!scroll && !immersive && (
             <View
               pointerEvents="none"
@@ -167,16 +169,16 @@ export function Screen({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              <View>{children}</View>
+              <View style={light && styles.clinicStack}>{children}</View>
               <View
                 pointerEvents="none"
                 style={{
-                  height: tab === 'Home' ? 105 : 145,
+                  height: tab === 'Home' && !light ? 105 : 24,
                   marginHorizontal: -20,
                   marginTop: 'auto',
                 }}
               >
-                <ClinicLandscape />
+                {tab === 'Home' && !light && <ClinicLandscape />}
               </View>
             </ScrollView>
           ) : (
@@ -466,6 +468,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  lightHeader: {
+    height: 54,
+  },
+  clinicHeaderText: { fontSize: 17, fontWeight: '700' },
+  clinicSheet: { borderTopLeftRadius: 19, borderTopRightRadius: 19, backgroundColor: '#f7fafd' },
+  clinicStack: { gap: 10 },
   headerText: {
     fontSize: 20,
     fontWeight: '800',
@@ -477,11 +485,11 @@ const styles = StyleSheet.create({
   sheet: {
     flex: 1,
     backgroundColor: colors.bg,
-    marginTop: -2,
+    marginTop: 0,
     overflow: 'hidden',
   },
   noRound: { borderRadius: 0 },
-  content: { padding: 20, paddingBottom: 145 },
+  content: { padding: 16, paddingBottom: 145 },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -503,10 +511,16 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 14,
+    paddingTop: 11,
+    paddingBottom: 9,
     borderTopWidth: 1,
     borderColor: colors.line,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
+    elevation: 8,
+    shadowColor: '#163b5d',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
   },
   tab: { alignItems: 'center', gap: 5, flex: 1 },
   chip: {
@@ -520,8 +534,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     paddingVertical: 13,
-    borderBottomWidth: 1,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
     borderColor: colors.line,
+    borderRadius: 16,
+    backgroundColor: '#fff',
   },
   menuIcon: { padding: 7, borderRadius: 12, backgroundColor: '#e1f3ffb3' },
   landscape: {
